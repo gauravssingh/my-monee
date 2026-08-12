@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from expense_tracker.app import create_app
+from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+
+
+def _settings(tmp_path: Path) -> Settings:
+    return Settings(
+        app=AppConfig(data_dir=tmp_path),
+        database=DatabaseConfig(filename="test.db"),
+        logging=LoggingConfig(file=tmp_path / "test.log"),
+    )
+
+
+def test_categories_list_and_custom_crud(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+    listed = client.get("/api/categories")
+    assert listed.status_code == 200
+    names = {c["name"] for c in listed.json()["items"]}
+    assert "Food" in names
+
+    created = client.post("/api/categories", json={"name": "Pets"})
+    assert created.status_code == 200
+    cat_id = created.json()["id"]
+
+    sub = client.post(f"/api/categories/{cat_id}/subcategories", json={"name": "Vet"})
+    assert sub.status_code == 200
+
+    deleted = client.delete(f"/api/categories/{cat_id}")
+    # has subcategory but unused — delete category removes subs
+    assert deleted.status_code == 200

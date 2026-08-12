@@ -1,0 +1,18 @@
+# Axis Bank account/credit-card alerts
+name: axis_alerts
+priority: 85
+sender_patterns:
+  - "alerts@axis\\.bank\\.in"
+  - "axisbank|axis\\.bank"
+subject_patterns:
+  - "credit transaction alert for axis bank"
+  - "debit transaction alert for axis bank"
+  - "was credited to your a/c"
+  - "was debited from your a/c"
+  - "spent on credit card"
+body_patterns:
+  - "credited with inr"
+  - "amount credited"
+  - "neft/[a-z0-9]+/sala"
+  - "upi/p2a/"
+  - "upilite/"

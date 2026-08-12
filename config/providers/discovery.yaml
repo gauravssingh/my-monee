@@ -1,0 +1,53 @@
+# Global discovery heuristics — not bank-specific.
+# Provider YAML files can add sender/subject hints without replacing these.
+
+version: 1
+
+# Gmail search fragments combined with OR (plus lookback/watermark)
+query_terms:
+  - "transaction"
+  - "spent"
+  - "debited"
+  - "credited"
+  - "payment successful"
+  - "payment received"
+  - "UPI"
+  - "refund"
+  - "EMI"
+  - "withdrawal"
+  - "INR"
+  - "Rs."
+  - "₹"
+
+# Soft signals used after fetch (regex, case-insensitive)
+include_subject_patterns:
+  - "transaction"
+  - "debited"
+  - "credited"
+  - "spent"
+  - "payment"
+  - "upi"
+  - "refund"
+  - "emi"
+  - "withdraw"
+  - "alert"
+  - "successful"
+
+include_body_patterns:
+  - "₹\\s*[\\d,]+"
+  - "rs\\.?\\s*[\\d,]+"
+  - "inr\\s*[\\d,]+"
+  - "debited"
+  - "credited"
+  - "upi ref"
+  - "txn\\s*(id|ref)"
+
+exclude_subject_patterns:
+  - "newsletter"
+  - "otp for"
+  - "one.?time.?password"
+  - "verification code"
+  - "login alert(?!.*transaction)"
+
+exclude_sender_patterns:
+  - "noreply@.*(promo|marketing|offers)"

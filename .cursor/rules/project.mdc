@@ -1,0 +1,28 @@
+---
+description: Core project context for the local-first expense tracker
+alwaysApply: true
+---
+
+# Expense Tracker
+
+Local-first macOS app: Gmail alerts → parse → classify → dashboard at `http://127.0.0.1:8477`.
+
+## Stack
+
+Python FastAPI + SQLAlchemy/SQLite backend; React/Vite/TS frontend in `web/` served from `web/dist`.
+
+## Must preserve
+
+- Axis income only when channel ref ends in `/Sala` (or `/Salary`); other Axis credits are not income
+- Salary pay period: credit after day 2 → next month; days 1–2 → current month
+- Income metrics use `transaction_type == "income"` only
+- Gmail OAuth PKCE `code_verifier` must survive start→callback (Keychain pending)
+- Redirect URI: `http://127.0.0.1:8477/oauth/callback`
+
+## After changes
+
+- Tests: `pytest`
+- UI: `cd web && npm run build` then restart server/launchd
+- No secrets in git
+
+See `CLAUDE.md` and `AGENTS.md` for full memory.

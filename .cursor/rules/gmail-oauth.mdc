@@ -1,0 +1,15 @@
+---
+description: Gmail OAuth and sync pitfalls
+globs: src/expense_tracker/ingestion/gmail/**/*.py,src/expense_tracker/api/routes/gmail.py,web/src/pages/SettingsPage.tsx
+alwaysApply: false
+---
+
+# Gmail OAuth / Sync
+
+- Scope: `gmail.readonly` only
+- Credentials: Settings paste UI or `~/Library/Application Support/ExpenseTracker/gmail_credentials.json`
+- Tokens: Keychain service `ExpenseTracker`
+- Pending OAuth must store `state`, `code_verifier`, `redirect_uri` until `complete_oauth`
+- Callback route should return clear HTML success/error (not a blank page)
+- If Google Cloud hides redirect URIs, use a **Web application** OAuth client and add `http://127.0.0.1:8477/oauth/callback`
+- Sync is incremental and idempotent via the ingestion pipeline — do not invent a parallel store path

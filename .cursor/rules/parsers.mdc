@@ -1,0 +1,19 @@
+---
+description: Axis / bank email parser conventions
+globs: src/expense_tracker/parsers/**/*.py,config/providers/**/*.yaml,tests/test_axis*.py
+alwaysApply: false
+---
+
+# Parsers
+
+- Register provider parsers in `parsers/bootstrap.py` **before** `GenericHeuristicParser`
+- Prefer provider YAML in `config/providers/` for discovery; put hard classification logic in Python parsers
+- Axis salary: `SALARY_REF` matching `NEFT|IMPS|RTGS/.../Sala(ry)?`
+- Non-salary Axis credits → transfer/refund + `needs_review` / `excludes_from_spending` as appropriate — never auto-income
+- Axis declined card alerts (`Transaction declined…`) → `not_a_transaction`, exclude from spending/review
+- Scapia Federal card alerts are **debits** (purchases). Never treat “Credit Card” wording as money-in. Parser: `parsers/scapia.py`
+- Direction heuristics must not use bare `\bcredit\b` / `\bdebit\b` (card-type false positives)
+- Amount regexes must accept leading decimals (`INR .52`)
+- Include `UPILITE` alongside UPI/NEFT/IMPS/RTGS channel tokens
+- Enrichment fields go through `classification/enrichment.py` via pipeline persist
+- Backfill: `python -m expense_tracker.reclassify_axis` or `python -m expense_tracker.reclassify_scapia` with `force_reparse`

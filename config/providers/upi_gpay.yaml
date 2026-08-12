@@ -1,0 +1,17 @@
+# Example provider hints — generic UPI / Google Pay style notifications.
+name: upi_gpay
+priority: 70
+sender_patterns:
+  - "noreply@google\\.com"
+  - "googlepay"
+  - "phonepe"
+  - "paytm"
+subject_patterns:
+  - "paid\\s+.*using"
+  - "you paid"
+  - "payment of"
+  - "received.*upi"
+body_patterns:
+  - "upi"
+  - "google pay"
+  - "phonepe"

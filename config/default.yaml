@@ -1,0 +1,46 @@
+# Personal Expense Tracker — defaults
+# Override with ~/Library/Application Support/ExpenseTracker/config.local.yaml
+
+app:
+  name: ExpenseTracker
+  host: 127.0.0.1
+  port: 8477
+  data_dir: null  # null → ~/Library/Application Support/ExpenseTracker
+
+database:
+  filename: expense_tracker.db
+  echo: false
+
+logging:
+  level: INFO
+  # null → <data_dir>/logs/expense_tracker.log
+  file: null
+
+scheduler:
+  enabled: false
+  interval_minutes: 15
+
+gmail:
+  enabled: true
+  # null → <data_dir>/gmail_credentials.json (OAuth Desktop client secrets)
+  credentials_file: null
+  scopes:
+    - https://www.googleapis.com/auth/gmail.readonly
+  # First sync / full backfill start date (Gmail after:YYYY/MM/DD)
+  sync_after_date: "2026/01/01"
+  # Used only if sync_after_date is null
+  initial_lookback_days: 90
+  max_messages_per_sync: 2000
+
+privacy:
+  allow_external_ai: false
+  store_raw_email_bodies: false
+  mask_identifiers: true
+
+classification:
+  auto_threshold: 0.85
+  review_threshold: 0.55
+
+dashboard:
+  default_currency: INR
+  month_start_day: 1

@@ -1,0 +1,38 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+web/node_modules/
+web/dist/
+
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# OAuth credentials and tokens (keep outside the repository)
+credentials.json
+gmail_credentials.json
+client_secret*.json
+token.json
+token*.json
+
+# Local runtime overrides / secrets
+config.local.yaml
+config/*.local.yaml
+**/config.local.yaml
+.claude.local.md
+
+# Per-machine macOS service definition; commit the .example template instead
+scripts/launchd/com.personal.expense-tracker.plist

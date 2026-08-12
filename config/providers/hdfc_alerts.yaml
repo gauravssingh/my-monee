@@ -1,0 +1,11 @@
+# Example provider hints — HDFC-style alerts (extensible, not hard-coded into ingestion).
+name: hdfc_alerts
+priority: 80
+sender_patterns:
+  - "alerts@hdfcbank\\.net"
+  - "hdfcbank"
+subject_patterns:
+  - "alert\\s*:.*transaction"
+  - "Rs\\.?\\s*[\\d,]+.*debited"
+  - "Rs\\.?\\s*[\\d,]+.*spent"
+body_patterns: []

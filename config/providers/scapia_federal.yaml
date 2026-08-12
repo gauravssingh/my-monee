@@ -1,0 +1,12 @@
+# Scapia Federal Credit Card alerts (Federal Bank)
+name: scapia_federal
+priority: 90
+sender_patterns:
+  - "scapiacards@federalbank\\.co\\.in"
+  - "scapia"
+subject_patterns:
+  - "transaction was successful"
+  - "refund"
+body_patterns:
+  - "scapia federal"
+  - "card ending in"

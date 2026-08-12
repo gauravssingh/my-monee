@@ -1,0 +1,19 @@
+---
+description: React dashboard UI conventions
+globs: web/src/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+# Frontend
+
+- API client: `web/src/api.ts` — keep types aligned with backend serializers
+- Pages: Overview, Transactions / Needs Review, Settings (System)
+- Needs Review: checkbox multi-select + `ClassifyPanel` (not inline picklists)
+- Income card: click → `IncomeTrendModal` (pay-period chart + MoM)
+- Transaction rows: debit amount red, credit amount green via `.tx-row.debit|.credit`
+
+## Design
+
+- Stay within existing `styles.css` language
+- Do not add purple/cream “AI dashboard” themes, metric card color rainbows, or decorative glow/pill clusters
+- Rebuild before verifying in the served app: `cd web && npm run build`
