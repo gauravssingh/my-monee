@@ -6,6 +6,47 @@ Local-first personal finance intelligence for macOS. Connect Gmail once; continu
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full design (stack, schema, Gmail, classification, privacy, roadmap).
 
+## Gemini AI Smart Suggestions (Optional)
+
+MyMonee includes an optional, human-in-the-loop AI suggestion assistant powered by the official `google-genai` SDK and Gemini Flash models.
+
+### Privacy-First Hard Gate
+- **External AI is disabled (`allow_external_ai: false`) by default.** No transaction data leaves your Mac unless you explicitly opt in.
+- The API key is **never stored** in the database, configuration files, or logs. It is read strictly from the `GEMINI_API_KEY` environment variable (or `.env`).
+
+### Enabling AI Suggestions
+1. Install dependencies:
+   ```bash
+   pip install google-genai>=2.3.0
+   ```
+2. Set your API key in `.env`:
+   ```bash
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
+3. Enable in `~/Library/Application Support/ExpenseTracker/config.local.yaml`:
+   ```yaml
+   privacy:
+     allow_external_ai: true
+
+   ai:
+     enabled: true
+     provider: gemini
+     model: gemini-2.5-flash
+   ```
+
+### What is Sent / Withheld
+- **Sanitized Data Sent:** Transaction amount, currency, direction (debit/credit), merchant raw/normalized name, brief description, and payment method, alongside MyMonee's category taxonomy.
+- **Deliberately Withheld:** Gmail bodies/HTML, OAuth credentials, tokens, full account/card numbers, passwords, and PII.
+
+### How it Works
+- When reviewing transactions in **Needs Review**, Gemini provides structured suggestions constrained strictly to your existing database category IDs.
+- Clicking **Accept Suggestion** pre-fills the standard category controls. Saving routes through MyMonee's authoritative verification and correction audit trail.
+- All AI operations are recorded in the `ai_operations` audit table for transparency and offline supervised evaluation.
+
+## License
+
+Personal use.
+
 ## Current status
 
 **Phase 2 — Gmail ingestion** is done. Early **Phase 4** groundwork is in place.

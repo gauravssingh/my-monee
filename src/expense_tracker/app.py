@@ -5,25 +5,31 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from expense_tracker.api.routes import (
+    accounts,
+    ai,
     categories,
     data_issues,
     gmail,
     health,
+    merchants,
     overview,
+    recurring,
     system,
     transactions,
-    accounts,
-    merchants,
-    recurring,
 )
 from expense_tracker.config import Settings, get_settings
 from expense_tracker.db.session import init_db
+from expense_tracker.logging_setup import setup_logging
 from expense_tracker.parsers.bootstrap import bootstrap_parsers
 
 logger = logging.getLogger(__name__)
@@ -42,6 +48,7 @@ def _web_dist_dir() -> Path | None:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    setup_logging(settings)
     init_db(settings)
     bootstrap_parsers()
 
@@ -74,6 +81,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(merchants.router)
     app.include_router(recurring.router)
+    app.include_router(ai.router)
 
     dist = _web_dist_dir()
     if dist is not None:

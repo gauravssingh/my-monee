@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type CategoryTree } from "../api";
 import { useConfirm } from "../hooks/useConfirm";
 import { useToast } from "../hooks/useToast";
+
+const EXPENSE_TYPES = [
+  { value: "all", label: "All" },
+  { value: "essential", label: "Essential" },
+  { value: "discretionary", label: "Discretionary" },
+  { value: "financial", label: "Financial" },
+  { value: "investment", label: "Investment" },
+  { value: "transfer", label: "Transfer" },
+];
 
 function CategoryDeleteButton({ disabled, onConfirm }: { disabled: boolean; onConfirm: () => void }) {
   const { armed, trigger } = useConfirm(onConfirm);
@@ -14,7 +23,7 @@ function CategoryDeleteButton({ disabled, onConfirm }: { disabled: boolean; onCo
       aria-label={armed ? "Confirm delete category" : "Delete category"}
       title={armed ? "Click again to confirm deletion" : "Delete category"}
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14">
         <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         <path d="M8 6V4h8v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         <path d="M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
@@ -24,14 +33,44 @@ function CategoryDeleteButton({ disabled, onConfirm }: { disabled: boolean; onCo
   );
 }
 
-function SubCategoryChip({ name, disabled, onConfirm }: { name: string; disabled: boolean; onConfirm: () => void }) {
+function SubCategoryChip({
+  name,
+  disabled,
+  onConfirm,
+}: {
+  name: string;
+  disabled: boolean;
+  onConfirm: () => void;
+}) {
   const { armed, trigger } = useConfirm(onConfirm);
   return (
-    <span className="sub-chip">
+    <span
+      className="sub-chip"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "2px 8px",
+        borderRadius: 4,
+        background: armed ? "var(--debit-soft, #fef2f2)" : "var(--surface, #f8fafc)",
+        border: `1px solid ${armed ? "var(--danger, #ef4444)" : "var(--line, #e2e8f0)"}`,
+        fontSize: "0.8125rem",
+        color: armed ? "var(--danger, #ef4444)" : "var(--ink, #1e293b)",
+      }}
+    >
       {name}
       <button
         type="button"
-        className={`sub-chip-x${armed ? " armed" : ""}`}
+        className="icon-action"
+        style={{
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+          padding: "0 2px",
+          color: "inherit",
+          fontSize: "1rem",
+          lineHeight: 1,
+        }}
         title={armed ? `Click again to remove ${name}` : `Remove ${name}`}
         disabled={disabled}
         onClick={trigger}
@@ -46,6 +85,8 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryTree[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState("");
+  const [filterQuery, setFilterQuery] = useState("");
+  const [selectedType, setSelectedType] = useState("all");
   const [subdrafts, setSubdrafts] = useState<Record<string, string>>({});
   const { showToast } = useToast();
 
@@ -94,9 +135,9 @@ export default function CategoriesPage() {
   async function addSubcategory(categoryId: string) {
     const name = subdrafts[categoryId];
     if (!name?.trim()) return;
-    setBusy("sub");
+    setBusy(`sub-${categoryId}`);
     try {
-      await api.createSubcategory(categoryId, name);
+      await api.createSubcategory(categoryId, name.trim());
       setSubdrafts((prev) => ({ ...prev, [categoryId]: "" }));
       await refresh();
       showToast(`Subcategory "${name}" added`, "success");
@@ -108,7 +149,7 @@ export default function CategoriesPage() {
   }
 
   async function updateExpenseType(categoryId: string, expenseType: string) {
-    setBusy("type");
+    setBusy(`type-${categoryId}`);
     try {
       await api.updateCategoryExpenseType(categoryId, expenseType);
       await refresh();
@@ -133,16 +174,35 @@ export default function CategoriesPage() {
     }
   }
 
-  return (
-    <section className="panel section" style={{ display: "flex", flexDirection: "column" }}>
-      <h2>Categories</h2>
-      <p className="lead">Master list for auto-classification and review. Tag your master categories by expense type to generate insights.</p>
+  const filteredCategories = useMemo(() => {
+    return categories.filter((cat) => {
+      const matchesType =
+        selectedType === "all" || (cat.expense_type || "discretionary") === selectedType;
+      const q = filterQuery.toLowerCase().trim();
+      const matchesQuery =
+        !q ||
+        cat.name.toLowerCase().includes(q) ||
+        cat.subcategories.some((s) => s.name.toLowerCase().includes(q));
+      return matchesType && matchesQuery;
+    });
+  }, [categories, selectedType, filterQuery]);
 
-      <div className="settings-categories" style={{ maxWidth: 800, marginTop: 24 }}>
-        <div className="toolbar" style={{ marginBottom: 20 }}>
+  return (
+    <section className="panel section" style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "calc(100vh - 180px)" }}>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: "0 0 4px" }}>Categories &amp; Hierarchy</h2>
+        <p className="lead" style={{ margin: 0, fontSize: "0.875rem" }}>
+          Master taxonomy used for classification and spending insights ({categories.length} master categories).
+        </p>
+      </div>
+
+      {/* Add Category and Search Toolbars */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8 }}>
           <input
             className="input"
-            placeholder="New master category"
+            style={{ flex: 1 }}
+            placeholder="Add new master category…"
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void addCategory()}
@@ -152,75 +212,141 @@ export default function CategoriesPage() {
             type="button"
             disabled={busy !== null || !newCategory.trim()}
             onClick={() => void addCategory()}
+            style={{ whiteSpace: "nowrap" }}
           >
-            {busy === "cat" ? "Adding…" : "Add category"}
+            {busy === "cat" ? "Adding…" : "Add Category"}
           </button>
         </div>
 
-        <div className="category-admin">
-          {categories.map((cat) => (
-            <div className="category-admin-item" key={cat.id}>
-              <div className="category-admin-head">
-                <div>
-                  <strong>{cat.name}</strong>
-                  <select 
-                    style={{ marginLeft: 12, padding: "2px 6px", fontSize: "0.85rem", borderRadius: 4 }}
-                    value={cat.expense_type || "discretionary"}
-                    onChange={(e) => void updateExpenseType(cat.id, e.target.value)}
-                    disabled={busy !== null}
-                  >
-                    <option value="essential">Essential</option>
-                    <option value="discretionary">Discretionary</option>
-                    <option value="financial">Financial</option>
-                    <option value="investment">Investment</option>
-                    <option value="transfer">Transfer</option>
-                  </select>
-                  <span className="metric-hint" style={{ display: "block", marginTop: 4 }}>
-                    {cat.subcategories.length} sub · {cat.transaction_count} txs
-                    {cat.is_system ? " · system" : ""}
-                  </span>
-                </div>
-                {!cat.is_system && (
-                  <CategoryDeleteButton
-                    disabled={busy !== null}
-                    onConfirm={() => void removeCategory(cat.id)}
-                  />
-                )}
-              </div>
-              <div className="category-admin-subs">
-                {cat.subcategories.map((sub) => (
-                  <SubCategoryChip
-                    key={sub.id}
-                    name={sub.name}
-                    disabled={busy !== null}
-                    onConfirm={() => void removeSubcategory(sub.id)}
-                  />
-                ))}
-              </div>
-              <div className="toolbar" style={{ marginTop: 12, marginBottom: 0 }}>
-                <input
-                  className="input"
-                  style={{ padding: "4px 8px", fontSize: "0.9rem" }}
-                  placeholder="Add subcategory"
-                  value={subdrafts[cat.id] || ""}
-                  onChange={(e) =>
-                    setSubdrafts((prev) => ({ ...prev, [cat.id]: e.target.value }))
-                  }
-                  onKeyDown={(e) => e.key === "Enter" && void addSubcategory(cat.id)}
-                />
-                <button
-                  className="btn"
-                  type="button"
-                  style={{ padding: "4px 12px", fontSize: "0.9rem" }}
-                  disabled={busy !== null || !(subdrafts[cat.id] || "").trim()}
-                  onClick={() => void addSubcategory(cat.id)}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          ))}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            className="input"
+            style={{ flex: 1, fontSize: "0.875rem", padding: "6px 10px" }}
+            placeholder="Filter categories or subcategories…"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+          />
+          <div className="segmented" style={{ flexShrink: 0 }}>
+            {EXPENSE_TYPES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                className={`segmented-btn${selectedType === t.value ? " active" : ""}`}
+                onClick={() => setSelectedType(t.value)}
+                style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
+      </div>
+
+      {/* Categories List */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          paddingRight: 4,
+          minHeight: 0,
+        }}
+      >
+        {filteredCategories.length === 0 && (
+          <div style={{ padding: 24, textAlign: "center", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+            No categories match your filter.
+          </div>
+        )}
+
+        {filteredCategories.map((cat) => (
+          <div
+            key={cat.id}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: "1px solid var(--line, #e2e8f0)",
+              background: "var(--surface, #ffffff)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <strong style={{ fontSize: "0.9375rem", color: "var(--ink)" }}>{cat.name}</strong>
+                <select
+                  style={{
+                    padding: "2px 6px",
+                    fontSize: "0.75rem",
+                    borderRadius: 4,
+                    border: "1px solid var(--line)",
+                    background: "var(--bg)",
+                    color: "var(--ink-muted)",
+                    cursor: "pointer",
+                  }}
+                  value={cat.expense_type || "discretionary"}
+                  onChange={(e) => void updateExpenseType(cat.id, e.target.value)}
+                  disabled={busy !== null}
+                >
+                  <option value="essential">Essential</option>
+                  <option value="discretionary">Discretionary</option>
+                  <option value="financial">Financial</option>
+                  <option value="investment">Investment</option>
+                  <option value="transfer">Transfer</option>
+                </select>
+                <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                  {cat.transaction_count} txs {cat.is_system ? "· system" : ""}
+                </span>
+              </div>
+              {!cat.is_system && (
+                <CategoryDeleteButton
+                  disabled={busy !== null}
+                  onConfirm={() => void removeCategory(cat.id)}
+                />
+              )}
+            </div>
+
+            {/* Subcategories */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+              {cat.subcategories.map((sub) => (
+                <SubCategoryChip
+                  key={sub.id}
+                  name={sub.name}
+                  disabled={busy !== null}
+                  onConfirm={() => void removeSubcategory(sub.id)}
+                />
+              ))}
+              {cat.subcategories.length === 0 && (
+                <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontStyle: "italic" }}>
+                  No subcategories
+                </span>
+              )}
+            </div>
+
+            {/* Inline Add Subcategory */}
+            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+              <input
+                className="input"
+                style={{ flex: 1, fontSize: "0.8125rem", padding: "4px 8px" }}
+                placeholder={`Add subcategory to ${cat.name}…`}
+                value={subdrafts[cat.id] || ""}
+                onChange={(e) => setSubdrafts((prev) => ({ ...prev, [cat.id]: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && void addSubcategory(cat.id)}
+              />
+              <button
+                className="btn"
+                type="button"
+                style={{ padding: "4px 10px", fontSize: "0.8125rem", height: "auto" }}
+                disabled={busy !== null || !(subdrafts[cat.id] || "").trim()}
+                onClick={() => void addSubcategory(cat.id)}
+              >
+                {busy === `sub-${cat.id}` ? "…" : "Add"}
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

@@ -1340,17 +1340,13 @@ textarea.input {
 .settings-categories {
   display: flex;
   flex-direction: column;
-  height: var(--settings-stack-height);
   min-height: 0;
 }
 
 .category-admin {
-  display: grid;
-  flex: 1;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .category-admin-item {

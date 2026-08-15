@@ -50,6 +50,21 @@ export type Bill = {
   status: string;
 };
 
+export interface AISuggestion {
+  transaction_id: string;
+  category_id: string;
+  subcategory_id: string | null;
+  category_name: string;
+  subcategory_name: string | null;
+  confidence: number;
+  signals: string[];
+  cached: boolean;
+  provider: string;
+  model: string;
+  prompt_version: string;
+  operation_id: string;
+}
+
 export type Overview = {
   period: { year: number; month: number };
   currency: string;
@@ -191,7 +206,7 @@ export type DataIssueSummaryGroup = {
   latest: string | null;
 };
 
-export type SystemStatus = {
+export interface SystemStatus {
   app: {
     name: string;
     host: string;
@@ -201,6 +216,9 @@ export type SystemStatus = {
     gmail_enabled: boolean;
     scheduler_enabled: boolean;
     allow_external_ai: boolean;
+    ai_enabled?: boolean;
+    ai_provider?: string;
+    ai_model?: string;
     currency: string;
     upi_handles: string[];
   };
@@ -337,6 +355,12 @@ export const api = {
   },
   getTransactionsByMerchant: (merchant_id: string) =>
     api.transactions({ merchant_id }),
+  getAiSuggestion: (transactionId: string, forceRefresh?: boolean) =>
+    request<AISuggestion>("/api/ai/classify-transaction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction_id: transactionId, force_refresh: !!forceRefresh }),
+    }),
   classifyTransaction: (id: string, body: { category_id: string; subcategory_id?: string | null }) =>
     request<Transaction>(`/api/transactions/${encodeURIComponent(id)}/classify`, {
       method: "PATCH",

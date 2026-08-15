@@ -86,6 +86,30 @@ def get_transactions(
     )
 
 
+@router.post("/sample")
+def post_sample(
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    from datetime import datetime, timezone
+    from expense_tracker.db.models import Transaction, new_id
+    tx = Transaction(
+        id=new_id(),
+        source="sample",
+        transaction_date=datetime.now(timezone.utc),
+        amount=500.0,
+        currency="INR",
+        direction="debit",
+        merchant_raw="Sample Merchant",
+        merchant_normalized="Sample",
+        description="Sample transaction",
+        needs_review=True,
+    )
+    session.add(tx)
+    session.commit()
+    session.refresh(tx)
+    return serialize_transaction(tx)
+
+
 @router.post("/classify-bulk")
 def post_classify_bulk(
     body: BulkClassifyBody,

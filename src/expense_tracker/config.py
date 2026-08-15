@@ -68,6 +68,19 @@ class GmailConfig(BaseModel):
     max_messages_per_sync: int = 2000
 
 
+class AIConfig(BaseModel):
+    enabled: bool = False
+    provider: str = "gemini"
+    model: str = "gemini-3.7-flash"
+    fallback_models: list[str] = Field(
+        default_factory=lambda: [
+            "gemini-3.7-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+        ]
+    )
+
+
 class PrivacyConfig(BaseModel):
     allow_external_ai: bool = False
     store_raw_email_bodies: bool = False
@@ -104,6 +117,7 @@ class Settings(BaseSettings):
     classification: ClassificationConfig = Field(default_factory=ClassificationConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     banking: BankingConfig = Field(default_factory=BankingConfig)
+    ai: AIConfig = Field(default_factory=AIConfig)
 
     def resolved_data_dir(self) -> Path:
         path = self.app.data_dir or default_data_dir()

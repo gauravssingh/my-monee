@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -19,6 +20,8 @@ from expense_tracker.db.models import (
     Transaction,
     utcnow,
 )
+
+logger = logging.getLogger(__name__)
 from expense_tracker.domain.enums import DataIssueStatus, EmailParseStatus, TransactionType
 from expense_tracker.ingestion.gmail.links import gmail_web_url
 
@@ -263,8 +266,24 @@ def classify_transaction(
     tx.classification_signals = signals
     _apply_category_side_effects(tx, category, subcategory)
     tx.updated_at = utcnow()
+    
+    from expense_tracker.services.ai import track_user_classification_feedback
+    track_user_classification_feedback(
+        session,
+        transaction_id=tx.id,
+        chosen_category_id=category.id,
+        chosen_subcategory_id=subcategory.id if subcategory else None,
+    )
+
     session.flush()
     session.refresh(tx, attribute_names=["category", "subcategory"])
+    logger.info(
+        "Classified transaction %s -> %s (sub: %s, correction: %s)",
+        tx.id,
+        category.name,
+        subcategory.name if subcategory else "none",
+        "yes" if correction else "no",
+    )
     return tx
 
 
@@ -296,6 +315,13 @@ def classify_transactions_bulk(
             raise HTTPException(status_code=400, detail="Subcategory not found")
         if subcategory.category_id != category.id:
             raise HTTPException(status_code=400, detail="Subcategory does not belong to category")
+
+    logger.info(
+        "Bulk classifying %d transactions -> category %s (sub: %s)",
+        len(ids),
+        category.name,
+        subcategory.name if subcategory_id and subcategory else "none",
+    )
 
     updated: list[Transaction] = []
     for tid in ids:
@@ -353,6 +379,7 @@ def exclude_as_non_transaction(session: Session, transaction_id: str) -> Transac
 
     session.flush()
     session.refresh(tx, attribute_names=["category", "subcategory"])
+    logger.info("Excluded transaction %s as non-transaction email", tx.id)
     return tx
 
 

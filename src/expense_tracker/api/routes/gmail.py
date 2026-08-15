@@ -171,6 +171,75 @@ def oauth_callback(
     )
 
 
+@router.post("/api/ingestion/demo")
+def ingestion_demo(
+    session: Session = Depends(db_session),
+    settings: Settings = Depends(settings_dep),
+) -> dict[str, Any]:
+    from datetime import datetime, timezone
+    from expense_tracker.ingestion.gmail.client import FixtureMessageSource, GmailMessage
+    from expense_tracker.ingestion.pipeline import run_ingestion_pipeline, run_ingestion_result_dict
+
+    demo_messages = [
+        GmailMessage(
+            id="demo-1",
+            thread_id="t-1",
+            sender="alerts@hdfcbank.net",
+            subject="INR 2,499.50 debited",
+            snippet="INR 2,499.50 debited from A/c XX8899",
+            received_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+            label_ids=["INBOX"],
+            headers={},
+            body_text="INR 2,499.50 debited from A/c XX8899 on 01-08-2026 towards RAZ*SWIGGY. UPI Ref: 9988776655",
+            body_html=None,
+        ),
+        GmailMessage(
+            id="demo-2",
+            thread_id="t-2",
+            sender="alerts@axisbank.com",
+            subject="Transaction alert for Axis Bank Card",
+            snippet="Your Axis Bank Credit Card ending 1234 was used",
+            received_at=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            label_ids=["INBOX"],
+            headers={},
+            body_text="Your Axis Bank Credit Card ending 1234 was used for INR 4,999.00 at AMAZON INDIA on 02-08-2026. Ref: 11223344.",
+            body_html=None,
+        ),
+        GmailMessage(
+            id="demo-3",
+            thread_id="t-3",
+            sender="alerts@scapia.cards",
+            subject="Transaction on Scapia Federal Credit Card",
+            snippet="Spent INR 1,250.00 on Scapia Card",
+            received_at=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            label_ids=["INBOX"],
+            headers={},
+            body_text="Spent INR 1,250.00 on Scapia Card at UBER INDIA on 03-08-2026. Ref: 55667788.",
+            body_html=None,
+        ),
+        GmailMessage(
+            id="demo-4",
+            thread_id="t-4",
+            sender="newsletter@updates.com",
+            subject="Your weekly digest",
+            snippet="Here is your newsletter update",
+            received_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
+            label_ids=["INBOX"],
+            headers={},
+            body_text="Here is your newsletter update.",
+            body_html=None,
+        ),
+    ]
+
+    source = FixtureMessageSource(demo_messages)
+    result = run_ingestion_pipeline(
+        session,
+        settings,
+        source=source,
+    )
+    return run_ingestion_result_dict(result)
+
+
 @router.post("/api/gmail/disconnect")
 def gmail_disconnect(settings: Settings = Depends(settings_dep)) -> dict[str, bool]:
     clear_credentials()

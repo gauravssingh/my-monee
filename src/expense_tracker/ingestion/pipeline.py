@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from expense_tracker.config import Settings
@@ -353,10 +353,19 @@ def run_ingestion_pipeline(
     result = PipelineResult(run_id=run.id, status=IngestionRunStatus.RUNNING)
     max_messages = max_messages or settings.gmail.max_messages_per_sync
 
+    logger.info(
+        "Starting ingestion pipeline (max_messages=%s, after_date=%s, ignore_watermark=%s, force_reparse=%s)",
+        max_messages,
+        after_date,
+        ignore_watermark,
+        force_reparse,
+    )
+
     try:
         if source is None:
             source = GmailApiSource(settings)
     except Exception as exc:
+        logger.error("Gmail client initialization failed: %s", exc)
         result.auth_errors = 1
         result.status = IngestionRunStatus.FAILED
         result.error_summary = str(exc)
@@ -375,11 +384,13 @@ def run_ingestion_pipeline(
         after_date=after_date,
         ignore_watermark=ignore_watermark,
     )
+    logger.info("Gmail discovery query: '%s'", query)
     _log_event(session, run.id, event_type="query", message=f"Gmail query: {query}")
 
     try:
         message_ids = source.list_message_ids(query, max_results=max_messages)
     except Exception as exc:
+        logger.error("Failed to query Gmail messages: %s", exc)
         result.status = IngestionRunStatus.FAILED
         result.error_summary = f"list failed: {exc}"
         run.status = result.status
@@ -390,6 +401,7 @@ def run_ingestion_pipeline(
         return result
 
     result.emails_discovered = len(message_ids)
+    logger.info("Discovered %d candidate message(s) matching query", len(message_ids))
     newest_internal: int | None = None
 
     for message_id in message_ids:
@@ -401,6 +413,12 @@ def run_ingestion_pipeline(
                 and not force_reparse
             ):
                 result.emails_skipped += 1
+                if existing.parse_status == EmailParseStatus.PARSED:
+                    tx_count = session.scalar(
+                        select(func.count()).select_from(Transaction).where(Transaction.source_email_id == existing.id)
+                    ) or 1
+                    result.transactions_duplicated += tx_count
+                logger.debug("Skipped already processed message %s", message_id)
                 continue
 
             message = source.get_message(message_id)
@@ -420,6 +438,7 @@ def run_ingestion_pipeline(
                 )
                 result.emails_processed += 1
                 result.emails_skipped += 1
+                logger.debug("Message %s skipped: not a financial candidate (%s)", message_id, reason)
                 continue
 
             ctx = _to_email_context(message)
@@ -434,6 +453,7 @@ def run_ingestion_pipeline(
                 )
                 result.emails_processed += 1
                 result.transactions_rejected += 1
+                logger.warning("No parser matched message %s (provider: %s, score: %.2f)", message_id, provider, provider_score)
                 _log_event(
                     session,
                     run.id,
@@ -457,6 +477,7 @@ def run_ingestion_pipeline(
                     parse_error=str(exc),
                 )
                 result.emails_processed += 1
+                logger.warning("Parse error on message %s via %s: %s", message_id, plugin.name, exc)
                 _log_event(
                     session,
                     run.id,
@@ -477,6 +498,7 @@ def run_ingestion_pipeline(
                 )
                 result.emails_processed += 1
                 result.transactions_rejected += 1
+                logger.debug("Parser %s returned 0 transactions for message %s", plugin.name, message_id)
                 continue
 
             _upsert_email(
@@ -495,6 +517,7 @@ def run_ingestion_pipeline(
                     force_update=force_reparse,
                 )
             result.emails_processed += 1
+            logger.debug("Parsed message %s into %d tx via %s (score=%.2f)", message_id, len(parsed_list), plugin.name, score)
             _log_event(
                 session,
                 run.id,
@@ -546,6 +569,18 @@ def run_ingestion_pipeline(
     run.error_summary = result.error_summary
     run.extra_json = {"query": query, "emails_skipped": result.emails_skipped}
     session.flush()
+
+    logger.info(
+        "Ingestion pipeline completed [%s]: discovered=%d processed=%d extracted=%d skipped=%d duplicated=%d parse_errors=%d auth_errors=%d",
+        result.status,
+        result.emails_discovered,
+        result.emails_processed,
+        result.transactions_extracted,
+        result.emails_skipped,
+        result.transactions_duplicated,
+        result.parsing_errors,
+        result.auth_errors,
+    )
     return result
 
 

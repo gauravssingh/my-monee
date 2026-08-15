@@ -333,7 +333,10 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         "review": {
             "needs_review_count": int(needs_review_count),
             "needs_review_amount": _as_float(needs_review_amount),
-        }
+        },
+        "current_month_spending": current_spend,
+        "needs_review_count": int(needs_review_count),
+        "transaction_count": int(tx_count),
     }
 
 

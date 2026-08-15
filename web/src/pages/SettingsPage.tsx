@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   api,
@@ -46,9 +46,6 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [parsedCreds, setParsedCreds] = useState<Record<string, any> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const settingsStackRef = useRef<HTMLDivElement>(null);
-  const [settingsStackHeight, setSettingsStackHeight] = useState<number>();
-
   const refresh = useCallback(async () => {
     const [system, gmailStatus] = await Promise.all([
       api.system(),
@@ -61,17 +58,6 @@ export default function SettingsPage() {
   useEffect(() => {
     refresh().catch((err: Error) => setError(err.message));
   }, [refresh]);
-
-  useEffect(() => {
-    const stack = settingsStackRef.current;
-    if (!stack) return;
-
-    const updateHeight = () => setSettingsStackHeight(stack.getBoundingClientRect().height);
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(stack);
-    return () => observer.disconnect();
-  }, [status, gmail]);
 
   async function saveCredentials() {
     if (!parsedCreds) return;
@@ -185,15 +171,8 @@ export default function SettingsPage() {
         )}
       </header>
 
-      <div
-        className="settings-grid"
-        style={
-          settingsStackHeight
-            ? ({ "--settings-stack-height": `${settingsStackHeight}px` } as CSSProperties)
-            : undefined
-        }
-      >
-        <div className="settings-stack" ref={settingsStackRef}>
+      <div className="settings-grid">
+        <div className="settings-stack">
           <section className="panel section">
           <h2>Gmail</h2>
 
@@ -350,8 +329,23 @@ export default function SettingsPage() {
             />
           </section>
 
-          <CategoriesPage />
+          <section className="panel section">
+            <h2>AI Intelligence</h2>
+            <p className="lead">
+              Configure AI capabilities via your <code>config.local.yaml</code> file and <code>GEMINI_API_KEY</code> environment variable. MyMonee does not store AI API keys in the database.
+            </p>
+            <StatusRows
+              rows={[
+                ["External AI Permitted", status.app.allow_external_ai ? "Yes" : "No", true],
+                ["AI Features Enabled", status.app.ai_enabled ? "Yes" : "No", true],
+                ["AI Provider", status.app.ai_provider || "gemini", true],
+                ["AI Model", status.app.ai_model || "gemini-3.7-flash", true],
+              ]}
+            />
+          </section>
         </div>
+
+        <CategoriesPage />
       </div>
     </>
   );

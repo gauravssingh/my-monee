@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { CategoryTree, Transaction } from "../api";
+import { api, type AISuggestion, type CategoryTree, type Transaction } from "../api";
 import { formatDate, formatMoney } from "../format";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { useConfirm } from "../hooks/useConfirm";
@@ -35,6 +35,10 @@ export default function ClassifyPanel({
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
 
+  const [aiSuggestion, setAiSuggestion] = useState<AISuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   useModalChrome(open, onClose, closeRef);
   const onBackdropClick = useBackdropClose(open, onClose);
   const { armed: excludeArmed, trigger: triggerExclude } = useConfirm(onExclude);
@@ -44,6 +48,27 @@ export default function ClassifyPanel({
     if (!open) return;
     setCategoryId("");
     setSubcategoryId("");
+    setAiSuggestion(null);
+    setAiError(null);
+
+    // If a single transaction is open, fetch AI suggestion if available
+    if (transactions.length === 1) {
+      const tx = transactions[0];
+      setAiLoading(true);
+      api.getAiSuggestion(tx.id)
+        .then((sug) => {
+          setAiSuggestion(sug);
+        })
+        .catch((err: Error) => {
+          // If external AI is disabled or key missing, silently ignore or record
+          if (err.message && !err.message.includes("External AI is disabled")) {
+            setAiError(err.message);
+          }
+        })
+        .finally(() => {
+          setAiLoading(false);
+        });
+    }
   }, [open, transactions]);
 
   const selectedCategory = useMemo(
@@ -126,6 +151,72 @@ export default function ClassifyPanel({
               <p className="metric-hint">and {remaining} more…</p>
             )}
           </section>
+
+          {count === 1 && (
+            <section className="classify-ai-section" style={{ marginBottom: 16 }}>
+              {aiLoading && (
+                <div style={{ padding: "12px 16px", borderRadius: 8, border: "1px dashed var(--line)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
+                  Consulting Gemini for category suggestion…
+                </div>
+              )}
+              {aiError && (
+                <div style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
+                  <span>AI Suggestion unavailable ({aiError})</span>
+                </div>
+              )}
+              {aiSuggestion && (
+                <div
+                  style={{
+                    padding: "14px 16px",
+                    borderRadius: 8,
+                    border: "1px solid var(--accent, #0c6e5c)",
+                    background: "var(--accent-soft, #e8f5f1)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--accent, #0c6e5c)" }}>
+                        ✨ AI Suggestion ({aiSuggestion.provider === "gemini" ? "Gemini" : aiSuggestion.provider})
+                      </span>
+                      <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                        {Math.round(aiSuggestion.confidence * 100)}% confidence
+                      </span>
+                      {aiSuggestion.cached && (
+                        <span style={{ fontSize: "0.6875rem", background: "var(--surface)", padding: "1px 6px", borderRadius: 4, color: "var(--ink-muted)", border: "1px solid var(--line)" }}>
+                          cached
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      style={{ padding: "4px 12px", fontSize: "0.8125rem", height: "auto" }}
+                      onClick={() => {
+                        setCategoryId(aiSuggestion.category_id);
+                        setSubcategoryId(aiSuggestion.subcategory_id || "");
+                      }}
+                    >
+                      Accept Suggestion
+                    </button>
+                  </div>
+                  <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--ink)" }}>
+                    {aiSuggestion.category_name}
+                    {aiSuggestion.subcategory_name ? ` › ${aiSuggestion.subcategory_name}` : ""}
+                  </div>
+                  {aiSuggestion.signals && aiSuggestion.signals.length > 0 && (
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.8125rem", color: "var(--ink-muted)", lineHeight: 1.4 }}>
+                      {aiSuggestion.signals.map((sig, i) => (
+                        <li key={i}>{sig}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
 
           <section>
             <h3 className="classify-section-title">Category</h3>

@@ -553,6 +553,29 @@ class Budget(Base):
     current_spent: Mapped[float] = mapped_column(Numeric(18, 4), default=0)
 
 
+class AIOperation(Base):
+    __tablename__ = "ai_operations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    operation_type: Mapped[str] = mapped_column(String(64), nullable=False) # e.g. classification
+    provider: Mapped[str] = mapped_column(String(64), nullable=False) # e.g. gemini
+    model: Mapped[str] = mapped_column(String(64), nullable=False) # e.g. gemini-2.5-flash
+    prompt_version: Mapped[str | None] = mapped_column(String(64))
+
+    source_type: Mapped[str] = mapped_column(String(64)) # e.g. transaction
+    source_id: Mapped[str] = mapped_column(String(36))
+
+    input_hash: Mapped[str | None] = mapped_column(String(128))
+    input_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    output_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    confidence: Mapped[float | None] = mapped_column(Float)
+    status: Mapped[str] = mapped_column(String(32), default="suggested") # suggested, accepted, corrected, ignored, failed, invalid
+    validation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 @event.listens_for(Transaction, "before_update")
 def _touch_transaction_updated_at(mapper, connection, target: Transaction) -> None:  # noqa: ARG001
     target.updated_at = utcnow()

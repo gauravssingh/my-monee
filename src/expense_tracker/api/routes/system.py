@@ -27,6 +27,9 @@ def system_status(
         "gmail_enabled": settings.gmail.enabled,
         "scheduler_enabled": settings.scheduler.enabled,
         "allow_external_ai": settings.privacy.allow_external_ai,
+        "ai_enabled": settings.ai.enabled,
+        "ai_provider": settings.ai.provider,
+        "ai_model": settings.ai.model,
         "currency": settings.dashboard.default_currency,
         "upi_handles": settings.banking.upi_handles,
     }
