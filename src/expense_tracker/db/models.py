@@ -12,6 +12,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -42,6 +43,7 @@ class Category(Base):
     slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     sort_order: Mapped[int] = mapped_column(default=0)
     is_system: Mapped[bool] = mapped_column(Boolean, default=True)
+    expense_type: Mapped[str] = mapped_column(String(32), default="discretionary")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     subcategories: Mapped[list[Subcategory]] = relationship(back_populates="category")
@@ -67,7 +69,10 @@ class Merchant(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    canonical_name: Mapped[str | None] = mapped_column(String(255))
     normalized_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    category_hint: Mapped[str | None] = mapped_column(String(100))
+    merchant_type: Mapped[str | None] = mapped_column(String(32))
     default_category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
     default_subcategory_id: Mapped[str | None] = mapped_column(ForeignKey("subcategories.id"))
     notes: Mapped[str | None] = mapped_column(Text)
@@ -123,6 +128,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    financial_event_id: Mapped[str | None] = mapped_column(ForeignKey("financial_events.id"))
     source: Mapped[str] = mapped_column(String(100), nullable=False, default="manual")
     source_email_id: Mapped[str | None] = mapped_column(ForeignKey("emails.id"))
     source_thread_id: Mapped[str | None] = mapped_column(String(128))
@@ -353,6 +359,198 @@ class AppSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+
+
+
+class Institution(Base):
+    __tablename__ = "institutions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    institution_type: Mapped[str | None] = mapped_column(String(64))
+    country: Mapped[str | None] = mapped_column(String(2))
+    logo_reference: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    institution_id: Mapped[str | None] = mapped_column(ForeignKey("institutions.id"))
+    account_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), default="INR")
+    account_number_masked: Mapped[str | None] = mapped_column(String(64))
+    card_last4: Mapped[str | None] = mapped_column(String(4))
+    upi_identifier_masked: Mapped[str | None] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(String(32), default="active")
+    is_asset: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_liability: Mapped[bool] = mapped_column(Boolean, default=False)
+    credit_limit: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    opening_balance: Mapped[float] = mapped_column(Numeric(18, 4), default=0)
+    opening_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    current_balance: Mapped[float] = mapped_column(Numeric(18, 4), default=0)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class FinancialEvent(Base):
+    __tablename__ = "financial_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(String(100), default="manual")
+    source_reference: Mapped[str | None] = mapped_column(String(255))
+    description: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), default="completed")
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class Posting(Base):
+    __tablename__ = "postings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    event_id: Mapped[str] = mapped_column(ForeignKey("financial_events.id"), nullable=False)
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
+    amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    direction: Mapped[str] = mapped_column(String(16), nullable=False) # debit/credit
+    posting_type: Mapped[str] = mapped_column(String(32), nullable=False) # expense, liability_decrease, asset_decrease, etc
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+
+class IncomeSource(Base):
+    __tablename__ = "income_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    frequency: Mapped[str] = mapped_column(String(32)) # monthly, weekly, etc
+    next_expected_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+
+
+class RecurringTransaction(Base):
+    __tablename__ = "recurring_transactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    merchant_id: Mapped[str | None] = mapped_column(ForeignKey("merchants.id"))
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
+
+    expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    amount_variance: Mapped[float | None] = mapped_column(Float)
+
+    frequency: Mapped[str] = mapped_column(String(32))
+    interval_days: Mapped[int | None] = mapped_column(default=30)
+    expected_day: Mapped[int | None] = mapped_column(Integer)
+    date_tolerance_days: Mapped[int | None] = mapped_column(Integer, default=4)
+
+    next_expected_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    status: Mapped[str] = mapped_column(String(32), default="detected") # detected, active, paused, cancelled, ignored
+
+    matching_rules_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class TransactionRecurringLink(Base):
+    __tablename__ = "transaction_recurring_links"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id"), nullable=False)
+    recurring_transaction_id: Mapped[str] = mapped_column(ForeignKey("recurring_transactions.id"), nullable=False)
+    match_type: Mapped[str] = mapped_column(String(32), default="auto")  # auto, manual
+    confidence: Mapped[float | None] = mapped_column(Float)
+    matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "transaction_id",
+            "recurring_transaction_id",
+            name="uq_tx_recurring_link",
+        ),
+    )
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    recurring_transaction_id: Mapped[str] = mapped_column(ForeignKey("recurring_transactions.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    
+    amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    annual_cost: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    
+    last_paid_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_paid_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    next_expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    
+    status: Mapped[str] = mapped_column(String(32), default="detected") # detected, active, paused, cancelled, ignored
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class Bill(Base):
+    __tablename__ = "bills"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    recurring_transaction_id: Mapped[str] = mapped_column(ForeignKey("recurring_transactions.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    
+    bill_type: Mapped[str] = mapped_column(String(32), default="OTHER") # UTILITY, SUBSCRIPTION, INSURANCE, RENT, LOAN, CREDIT_CARD, OTHER
+    autopay: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    minimum_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    average_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    median_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    max_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    amount_stddev: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    
+    last_paid_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_paid_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    next_expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    
+    status: Mapped[str] = mapped_column(String(32), default="detected") # detected, active, paused, cancelled, ignored
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    period: Mapped[str] = mapped_column(String(32), default="monthly")
+    category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
+    amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    rollover: Mapped[bool] = mapped_column(Boolean, default=False)
+    current_spent: Mapped[float] = mapped_column(Numeric(18, 4), default=0)
 
 
 @event.listens_for(Transaction, "before_update")

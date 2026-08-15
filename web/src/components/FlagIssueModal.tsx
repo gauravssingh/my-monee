@@ -88,22 +88,26 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-header">
-          <div>
-            <h2 id={titleId}>{count === 1 ? "Flag a data issue" : `Flag ${count} transactions`}</h2>
-            <p className="metric-hint">
-              Reports a problem with this data without changing it. Flags are grouped for bulk
-              review under Data Issues.
-            </p>
+        <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
+            </div>
+            <div>
+              <h2 id={titleId} style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>{count === 1 ? "Flag a data issue" : `Flag ${count} transactions`}</h2>
+              <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+                Reports a problem with this data without changing it. Flags are grouped for bulk review under Data Issues.
+              </p>
+            </div>
           </div>
-          <div className="modal-actions">
-            <button className="btn" type="button" onClick={onClose} disabled={saving}>
-              Cancel
+          <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
+            <button type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal" disabled={saving}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
 
-        <div className="modal-body flag-issue-body">
+        <div className="modal-body flag-issue-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
           <section className="classify-preview">
             <h3 className="classify-section-title">{count === 1 ? "Transaction" : "Selected"}</h3>
             <ul className="classify-preview-list">
@@ -176,10 +180,14 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
 
           {error && <p className="error">{error}</p>}
 
-          <div className="classify-panel-footer">
-            <button
-              className="btn primary"
-              type="button"
+        </div>
+        <footer style={{ padding: "20px 32px", borderTop: "1px solid var(--line)", background: "var(--surface)", display: "flex", justifyContent: "flex-end", alignItems: "center", borderRadius: "0 0 8px 8px" }}>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button type="button" className="btn quiet" onClick={onClose} style={{ padding: "10px 20px" }} disabled={saving}>Cancel</button>
+            <button 
+              type="button" 
+              className="btn primary" 
+              style={{ padding: "10px 24px" }}
               disabled={saving}
               onClick={() =>
                 onSubmit({
@@ -193,7 +201,7 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
               {saving ? "Flagging…" : count === 1 ? "Flag issue" : `Flag ${count} transactions`}
             </button>
           </div>
-        </div>
+        </footer>
       </div>
     </div>,
     document.body,

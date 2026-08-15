@@ -18,6 +18,9 @@ from expense_tracker.api.routes import (
     overview,
     system,
     transactions,
+    accounts,
+    merchants,
+    recurring,
 )
 from expense_tracker.config import Settings, get_settings
 from expense_tracker.db.session import init_db
@@ -68,6 +71,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(gmail.router)
     app.include_router(categories.router)
     app.include_router(data_issues.router)
+    app.include_router(accounts.router)
+    app.include_router(merchants.router)
+    app.include_router(recurring.router)
 
     dist = _web_dist_dir()
     if dist is not None:

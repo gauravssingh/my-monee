@@ -53,7 +53,7 @@ input {
 .app-shell {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 28px 20px 64px;
+  padding: 0 20px 64px;
 }
 
 .topbar {
@@ -61,8 +61,14 @@ input {
   align-items: end;
   justify-content: space-between;
   gap: 24px;
+  padding: 28px 0 16px;
   margin-bottom: 28px;
   animation: rise 0.4s ease both;
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  background-color: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
 
 .brand-mark {
@@ -96,13 +102,74 @@ input {
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.nav a:hover,
-.nav a.active {
+.nav a:hover {
   color: var(--ink);
 }
 
 .nav a.active {
   border-color: var(--accent);
+  color: var(--accent);
+}
+
+.nav-dropdown {
+  position: relative;
+  display: inline-block;
+  padding: 4px 0;
+}
+
+.nav-dropdown-toggle {
+  cursor: pointer;
+  color: var(--ink-muted);
+  transition: color 0.15s ease;
+  user-select: none;
+}
+
+.nav-dropdown:hover .nav-dropdown-toggle {
+  color: var(--ink);
+}
+
+.nav-dropdown-content {
+  display: none;
+  position: absolute;
+  background: var(--surface) !important;
+  opacity: 1 !important;
+  min-width: 240px;
+  box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.2) !important;
+  border-radius: 8px;
+  border: 1px solid var(--line) !important;
+  padding: 12px 0;
+  z-index: 99999 !important;
+  top: 100%;
+  left: 0;
+  margin-top: 0;
+}
+
+.nav-dropdown:hover .nav-dropdown-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-dropdown-content::before {
+  content: "";
+  position: absolute;
+  top: -20px;
+  left: -10px;
+  right: -10px;
+  height: 20px;
+  background: transparent;
+}
+
+.nav-dropdown-content a {
+  padding: 8px 16px;
+  border-bottom: none !important;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  margin: 0 8px;
+}
+
+.nav-dropdown-content a:hover,
+.nav-dropdown-content a.active {
+  background-color: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -341,6 +408,11 @@ td {
   padding: 10px 8px;
   border-bottom: 1px solid var(--line);
   font-size: 0.85rem;
+  transition: background-color 0.15s ease;
+}
+
+tbody tr:hover td {
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 th.num,
@@ -1399,4 +1471,39 @@ textarea.input {
     grid-template-columns: 1fr;
     gap: 4px;
   }
+}
+
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 999999;
+}
+
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 500;
+  font-size: 0.95rem;
+  border: 1px solid var(--line);
+}
+
+.toast-success {
+  border-left: 4px solid var(--credit);
+}
+
+.toast-error {
+  border-left: 4px solid var(--danger);
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }

@@ -71,38 +71,48 @@ export default function EmailViewerModal({
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="email-modal-header">
-          <div className="email-modal-heading">
-            <h2 id={titleId}>{message?.subject || (loading ? "Loading email…" : "Email")}</h2>
-            {message && metaBits.length > 0 && (
-              <p className="email-modal-meta">{metaBits.join(" · ")}</p>
-            )}
-            {transactionId && (
-              <button
-                type="button"
-                className="email-tx-id"
-                title="Copy transaction ID"
-                onClick={() => void copyTransactionId()}
-              >
-                <span className="email-tx-id-label">ID</span>
-                <code>{transactionId}</code>
-                <span className="email-tx-id-action">{copied ? "Copied" : "Copy"}</span>
-              </button>
-            )}
+        <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <h2 id={titleId} style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>
+                  {message?.subject || (loading ? "Loading email…" : "Email")}
+                </h2>
+                {transactionId && (
+                  <button
+                    type="button"
+                    className="email-tx-id"
+                    title="Copy transaction ID"
+                    onClick={() => void copyTransactionId()}
+                    style={{ margin: 0 }}
+                  >
+                    <span className="email-tx-id-label">ID</span>
+                    <code>{transactionId}</code>
+                    <span className="email-tx-id-action">{copied ? "Copied" : "Copy"}</span>
+                  </button>
+                )}
+              </div>
+              <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
+                {message && metaBits.length > 0 ? metaBits.join(" · ") : "Email details"}
+              </p>
+            </div>
           </div>
-          <div className="email-modal-actions">
+          <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
             {message?.gmail_url && (
-              <a className="btn quiet" href={message.gmail_url} target="_blank" rel="noreferrer">
-                Gmail
+              <a className="btn quiet" href={message.gmail_url} target="_blank" rel="noreferrer" style={{ marginRight: 8 }}>
+                Open in Gmail
               </a>
             )}
-            <button ref={closeRef} className="btn" type="button" onClick={onClose}>
-              Close
+            <button ref={closeRef} type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
 
-        <div className="email-modal-body">
+        <div className="email-modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
           {loading && <p className="email-modal-status">Fetching from Gmail…</p>}
           {error && <p className="error">{error}</p>}
           {!loading && !error && message && (

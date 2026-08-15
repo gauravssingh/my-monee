@@ -84,6 +84,16 @@ class DashboardConfig(BaseModel):
     month_start_day: int = 1
 
 
+class BankingConfig(BaseModel):
+    upi_handles: list[str] = Field(
+        default_factory=lambda: [
+            "okaxis", "okicici", "oksbi", "okhdfcbank", 
+            "ybl", "ibl", "axl", "paytm", "apl",
+            "sbi", "hdfcbank", "icici", "axisbank", 
+            "upi", "pnb", "kotak", "barodampay"
+        ]
+    )
+
 class Settings(BaseSettings):
     app: AppConfig = Field(default_factory=AppConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -93,6 +103,7 @@ class Settings(BaseSettings):
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     classification: ClassificationConfig = Field(default_factory=ClassificationConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
+    banking: BankingConfig = Field(default_factory=BankingConfig)
 
     def resolved_data_dir(self) -> Path:
         path = self.app.data_dir or default_data_dir()

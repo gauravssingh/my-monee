@@ -106,9 +106,9 @@ def test_overview_income_uses_pay_period(tmp_path: Path) -> None:
         session.commit()
 
         overview = get_overview(session, now=datetime(2026, 8, 12, tzinfo=timezone.utc))
-        assert overview["income"] == 110000.0
-        assert overview["previous_month_income"] == 100000.0
-        assert overview["income_change_pct"] == 10.0
+        assert overview["summary"]["income"] == 110000.0
+        assert overview["month_comparison"]["previous_income"] == 100000.0
+        assert overview["month_comparison"]["income_change_pct"] == 10.0
 
         trend = income_trend(session, months=6, now=datetime(2026, 8, 12, tzinfo=timezone.utc))
         assert len(trend["points"]) == 6
@@ -140,6 +140,6 @@ def test_delayed_salary_on_second_counts_current_month(tmp_path: Path) -> None:
         )
         session.commit()
         overview = get_overview(session, now=datetime(2026, 8, 12, tzinfo=timezone.utc))
-        assert overview["income"] == 282330.0
+        assert overview["summary"]["income"] == 282330.0
     finally:
         session.close()

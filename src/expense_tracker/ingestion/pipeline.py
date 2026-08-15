@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from expense_tracker.config import Settings
 from expense_tracker.classification.enrichment import apply_parsed_enrichment
-from expense_tracker.db.models import Email, IngestionEvent, IngestionRun, SyncState, Transaction, utcnow
+from expense_tracker.db.models import Email, IngestionEvent, IngestionRun, SyncState, Transaction, utcnow, Account, Institution, FinancialEvent, Posting
 from expense_tracker.domain.enums import EmailParseStatus, IngestionRunStatus
 from expense_tracker.ingestion.discovery import DiscoveryRules, load_discovery_rules
 from expense_tracker.ingestion.fingerprint import transaction_fingerprint
@@ -173,6 +173,47 @@ def _apply_parsed_fields(tx: Transaction, parsed: ParsedTransaction, *, source: 
     tx.updated_at = utcnow()
 
 
+def _get_or_create_account(session: Session, parsed: ParsedTransaction) -> Account:
+    if parsed.account:
+        name = f"{parsed.account} Account"
+        acc_type = "BANK"
+        is_liability = False
+    elif parsed.card:
+        name = f"Credit Card {parsed.card}"
+        acc_type = "CREDIT_CARD"
+        is_liability = True
+    elif parsed.upi_id:
+        name = f"UPI {parsed.upi_id.split('@')[-1] if '@' in parsed.upi_id else parsed.upi_id}"
+        acc_type = "BANK"
+        is_liability = False
+    elif parsed.payment_method:
+        name = f"{parsed.payment_method} Account"
+        acc_type = "BANK"
+        is_liability = False
+    else:
+        name = "Default Cash Account"
+        acc_type = "CASH"
+        is_liability = False
+
+    acc = session.query(Account).filter_by(name=name).first()
+    if not acc:
+        inst = session.query(Institution).filter_by(name="Unknown Institution").first()
+        if not inst:
+            inst = Institution(name="Unknown Institution", institution_type="BANK")
+            session.add(inst)
+            session.flush()
+        acc = Account(
+            name=name,
+            institution_id=inst.id,
+            account_type=acc_type,
+            is_asset=not is_liability,
+            is_liability=is_liability,
+        )
+        session.add(acc)
+        session.flush()
+    return acc
+
+
 def _persist_parsed(
     session: Session,
     *,
@@ -226,9 +267,45 @@ def _persist_parsed(
         raw_email_reference=message.id,
     )
     _apply_parsed_fields(tx, parsed, source=source)
+    
+    # Ledger integration
+    acc = _get_or_create_account(session, parsed)
+    
+    event = FinancialEvent(
+        event_type="purchase" if parsed.direction == "debit" else "deposit",
+        event_date=parsed.transaction_date,
+        source=source,
+        description=parsed.description or parsed.merchant_raw or "Ingestion",
+    )
+    session.add(event)
+    session.flush()
+    
+    session.add(Posting(
+        event_id=event.id,
+        account_id=acc.id,
+        amount=parsed.amount,
+        direction=parsed.direction,
+        posting_type="asset_decrease" if parsed.direction == "debit" else "asset_increase"
+    ))
+    
+    tx.financial_event_id = event.id
+    
     session.add(tx)
     session.flush()
+    
+    # After apply_parsed_enrichment, the tx.category_id will be set if matched.
+    # We should add the category posting.
     apply_parsed_enrichment(session, tx, parsed)
+    
+    if tx.category_id:
+        session.add(Posting(
+            event_id=event.id,
+            category_id=tx.category_id,
+            amount=parsed.amount,
+            direction="credit" if parsed.direction == "debit" else "debit",
+            posting_type="expense" if parsed.direction == "debit" else "income"
+        ))
+
     result.transactions_extracted += 1
 
 

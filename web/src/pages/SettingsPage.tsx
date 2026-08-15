@@ -2,66 +2,14 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 import { createPortal } from "react-dom";
 import {
   api,
-  type CategoryTree,
   type GmailStatus,
   type IngestionResult,
   type SystemStatus,
 } from "../api";
 import { formatDateTime } from "../format";
-import { useConfirm } from "../hooks/useConfirm";
+import CategoriesPage from "./CategoriesPage";
 
-function CategoryDeleteButton({
-  disabled,
-  onConfirm,
-}: {
-  disabled: boolean;
-  onConfirm: () => void;
-}) {
-  const { armed, trigger } = useConfirm(onConfirm);
-  return (
-    <button
-      type="button"
-      className={`category-delete-button${armed ? " armed" : ""}`}
-      disabled={disabled}
-      onClick={trigger}
-      aria-label={armed ? "Confirm delete category" : "Delete category"}
-      title={armed ? "Click again to confirm deletion" : "Delete category"}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 6h18" />
-        <path d="M8 6V4h8v2" />
-        <path d="M19 6l-1 14H6L5 6" />
-        <path d="M10 11v5M14 11v5" />
-      </svg>
-    </button>
-  );
-}
 
-function SubCategoryChip({
-  name,
-  disabled,
-  onConfirm,
-}: {
-  name: string;
-  disabled: boolean;
-  onConfirm: () => void;
-}) {
-  const { armed, trigger } = useConfirm(onConfirm);
-  return (
-    <span className="sub-chip">
-      {name}
-      <button
-        type="button"
-        className={`sub-chip-x${armed ? " armed" : ""}`}
-        title={armed ? `Click again to remove ${name}` : `Remove ${name}`}
-        disabled={disabled}
-        onClick={trigger}
-      >
-        ×
-      </button>
-    </span>
-  );
-}
 
 function StatusRows({ rows }: { rows: Array<[string, string, boolean?]> }) {
   return (
@@ -92,7 +40,6 @@ function StatusRows({ rows }: { rows: Array<[string, string, boolean?]> }) {
 export default function SettingsPage() {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [gmail, setGmail] = useState<GmailStatus | null>(null);
-  const [categories, setCategories] = useState<CategoryTree[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<IngestionResult | null>(null);
@@ -101,18 +48,14 @@ export default function SettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const settingsStackRef = useRef<HTMLDivElement>(null);
   const [settingsStackHeight, setSettingsStackHeight] = useState<number>();
-  const [newCategory, setNewCategory] = useState("");
-  const [subdrafts, setSubdrafts] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
-    const [system, gmailStatus, cats] = await Promise.all([
+    const [system, gmailStatus] = await Promise.all([
       api.system(),
       api.gmailStatus(),
-      api.categories(),
     ]);
     setStatus(system);
     setGmail(gmailStatus);
-    setCategories(cats.items);
   }, []);
 
   useEffect(() => {
@@ -221,65 +164,6 @@ export default function SettingsPage() {
     }
   }
 
-
-
-  async function addCategory() {
-    if (!newCategory.trim()) return;
-    setBusy("cat");
-    setError(null);
-    try {
-      await api.createCategory(newCategory.trim());
-      setNewCategory("");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add category");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function removeCategory(id: string) {
-    setBusy(`del-cat-${id}`);
-    setError(null);
-    try {
-      await api.deleteCategory(id);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete category");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function addSubcategory(categoryId: string) {
-    const name = (subdrafts[categoryId] || "").trim();
-    if (!name) return;
-    setBusy(`sub-${categoryId}`);
-    setError(null);
-    try {
-      await api.createSubcategory(categoryId, name);
-      setSubdrafts((prev) => ({ ...prev, [categoryId]: "" }));
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add subcategory");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function removeSubcategory(id: string) {
-    setBusy(`del-sub-${id}`);
-    setError(null);
-    try {
-      await api.deleteSubcategory(id);
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete subcategory");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   if (error && !status) return <p className="error">Could not load settings: {error}</p>;
   if (!status || !gmail) return <p className="empty">Loading settings…</p>;
 
@@ -326,9 +210,25 @@ export default function SettingsPage() {
 
             {parsedCreds && createPortal(
               <div className="modal-backdrop">
-                <div className="modal-panel" role="dialog" aria-modal="true" style={{ width: "min(1200px, 95vw)", display: "flex", flexDirection: "column", padding: 24, gap: 16 }}>
-                  <h3 style={{ margin: 0 }}>Confirm OAuth Configuration</h3>
-                  <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: 4, overflow: "auto" }}>
+                <div className="modal-panel" role="dialog" aria-modal="true" style={{ width: "min(800px, 95vw)" }}>
+                  <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
+                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      </div>
+                      <div>
+                        <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>Confirm OAuth Configuration</h2>
+                        <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem" }}>Review the imported credentials before saving.</p>
+                      </div>
+                    </div>
+                    <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
+                      <button type="button" className="btn icon-btn" onClick={cancelCreds} aria-label="Close modal">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                    </div>
+                  </header>
+                  <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
+                    <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "auto" }}>
                     <table style={{ minWidth: "100%" }}>
                       <thead>
                         <tr>
@@ -348,24 +248,29 @@ export default function SettingsPage() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="toolbar" style={{ justifyContent: "flex-end", marginTop: 8 }}>
-                    <button
-                      className="btn"
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={cancelCreds}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="btn primary"
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => void saveCredentials()}
-                    >
-                      {busy === "creds" ? "Importing…" : "Confirm & Import"}
-                    </button>
                   </div>
+                  <footer style={{ padding: "20px 32px", borderTop: "1px solid var(--line)", background: "var(--surface)", display: "flex", justifyContent: "flex-end", alignItems: "center", borderRadius: "0 0 8px 8px" }}>
+                    <div className="toolbar" style={{ justifyContent: "flex-end" }}>
+                      <button
+                        className="btn quiet"
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={cancelCreds}
+                        style={{ padding: "10px 20px" }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="btn primary"
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => void saveCredentials()}
+                        style={{ padding: "10px 24px" }}
+                      >
+                        {busy === "creds" ? "Importing…" : "Confirm & Import"}
+                      </button>
+                    </div>
+                  </footer>
                 </div>
               </div>,
               document.body
@@ -444,84 +349,9 @@ export default function SettingsPage() {
               ]}
             />
           </section>
+
+          <CategoriesPage />
         </div>
-
-        <section className="panel section settings-categories">
-          <h2>Categories</h2>
-          <p className="lead">
-            Master list for auto-classification and review. Seeded defaults can be extended; custom
-            categories can be removed if unused.
-          </p>
-
-          <div className="toolbar">
-            <input
-              className="input"
-              placeholder="New category name"
-              value={newCategory}
-              onChange={(e) => setNewCategory(e.target.value)}
-            />
-            <button
-              className="btn primary"
-              type="button"
-              disabled={busy !== null || !newCategory.trim()}
-              onClick={() => void addCategory()}
-            >
-              {busy === "cat" ? "Adding…" : "Add category"}
-            </button>
-          </div>
-
-          <div className="category-admin">
-            {categories.map((cat) => (
-              <div className="category-admin-item" key={cat.id}>
-                <div className="category-admin-head">
-                  <div>
-                    <strong>{cat.name}</strong>
-                    <span className="metric-hint">
-                      {" "}
-                      · {cat.subcategories.length} sub · {cat.transaction_count} txs
-                      {cat.is_system ? " · system" : ""}
-                    </span>
-                  </div>
-                  {!cat.is_system && (
-                    <CategoryDeleteButton
-                      disabled={busy !== null}
-                      onConfirm={() => void removeCategory(cat.id)}
-                    />
-                  )}
-                </div>
-                <div className="category-admin-subs">
-                  {cat.subcategories.map((sub) => (
-                    <SubCategoryChip
-                      key={sub.id}
-                      name={sub.name}
-                      disabled={busy !== null}
-                      onConfirm={() => void removeSubcategory(sub.id)}
-                    />
-                  ))}
-                </div>
-                <div className="toolbar" style={{ marginTop: 8, marginBottom: 0 }}>
-                  <input
-                    className="input"
-                    placeholder="Add subcategory"
-                    value={subdrafts[cat.id] || ""}
-                    onChange={(e) =>
-                      setSubdrafts((prev) => ({ ...prev, [cat.id]: e.target.value }))
-                    }
-                  />
-                  <button
-                    className="btn"
-                    type="button"
-                    disabled={busy !== null || !(subdrafts[cat.id] || "").trim()}
-                    onClick={() => void addSubcategory(cat.id)}
-                  >
-                    Add
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
       </div>
     </>
   );

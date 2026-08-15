@@ -9,6 +9,7 @@ import {
 import ClassifyPanel from "../components/ClassifyPanel";
 import EmailViewerModal from "../components/EmailViewerModal";
 import FlagIssueModal from "../components/FlagIssueModal";
+import MarkRecurringModal from "../components/MarkRecurringModal";
 import SortHeader from "../components/SortHeader";
 import { formatDate, formatMoney, formatSource } from "../format";
 
@@ -194,6 +195,8 @@ export default function TransactionsPage({ needsReview = false }: Props) {
   const [flagTargets, setFlagTargets] = useState<Transaction[]>([]);
   const [flagSaving, setFlagSaving] = useState(false);
   const [flagError, setFlagError] = useState<string | null>(null);
+  const [recurringOpen, setRecurringOpen] = useState(false);
+  const [recurringTarget, setRecurringTarget] = useState<Transaction | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -441,6 +444,16 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     }
   }
 
+  function openRecurring(tx: Transaction) {
+    setRecurringTarget(tx);
+    setRecurringOpen(true);
+  }
+
+  function closeRecurring() {
+    setRecurringOpen(false);
+    setRecurringTarget(null);
+  }
+
   return (
     <section className="panel section">
       <h2>{needsReview ? "Needs review" : "Transactions"}</h2>
@@ -671,6 +684,17 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                       <button
                         className="icon-action"
                         type="button"
+                        title="Mark as recurring"
+                        aria-label="Mark as recurring"
+                        onClick={() => openRecurring(tx)}
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                          <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                        </svg>
+                      </button>
+                      <button
+                        className="icon-action"
+                        type="button"
                         title="Flag a data issue"
                         aria-label="Flag a data issue"
                         onClick={() => openFlag([tx])}
@@ -751,6 +775,16 @@ export default function TransactionsPage({ needsReview = false }: Props) {
         error={flagError}
         onClose={closeFlag}
         onSubmit={(body) => void submitFlag(body)}
+      />
+
+      <MarkRecurringModal
+        open={recurringOpen}
+        transaction={recurringTarget}
+        onClose={closeRecurring}
+        onSuccess={() => {
+          closeRecurring();
+          // Optional: refresh transactions
+        }}
       />
     </section>
   );

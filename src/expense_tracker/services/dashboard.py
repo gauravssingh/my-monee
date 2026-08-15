@@ -10,10 +10,11 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 
 IST = ZoneInfo("Asia/Kolkata")
 
-from expense_tracker.db.models import Category, Email, IngestionRun, SyncState, Transaction
+from expense_tracker.db.models import Account, Category, Email, IngestionRun, SyncState, Transaction
 
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
@@ -108,17 +109,23 @@ def income_for_pay_period(session: Session, year: int, month: int) -> float:
     return total
 
 
-def get_overview(session: Session, *, now: datetime | None = None) -> dict[str, Any]:
+def get_overview(session: Session, *, year: int | None = None, month: int | None = None, now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(IST)
-    start, end = _month_bounds(now.year, now.month)
-    py, pm = _prev_month(now.year, now.month)
+    if year and month:
+        y, m = year, month
+    else:
+        y, m = now.year, now.month
+
+    start, end = _month_bounds(y, m)
+    py, pm = _prev_month(y, m)
     prev_start, prev_end = _month_bounds(py, pm)
 
     current_spend = _as_float(session.scalar(_spending_query(start, end)))
     previous_spend = _as_float(session.scalar(_spending_query(prev_start, prev_end)))
-    income = income_for_pay_period(session, now.year, now.month)
+    income = income_for_pay_period(session, y, m)
     previous_income = income_for_pay_period(session, py, pm)
 
+    # Basic counts
     tx_count = session.scalar(
         select(func.count())
         .select_from(Transaction)
@@ -127,42 +134,206 @@ def get_overview(session: Session, *, now: datetime | None = None) -> dict[str, 
         .where(Transaction.is_duplicate.is_(False))
     ) or 0
 
-    largest = session.execute(
+    debit_count = session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.direction == "debit")
+        .where(Transaction.is_duplicate.is_(False))
+        .where(Transaction.excludes_from_spending.is_(False))
+    ) or 0
+
+    credit_count = session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.direction == "credit")
+        .where(Transaction.is_duplicate.is_(False))
+        .where(Transaction.excludes_from_spending.is_(False))
+    ) or 0
+
+    # Category breakdown
+    categories_db = session.execute(select(Category).order_by(Category.sort_order)).scalars().all()
+    cat_totals = dict(
+        session.execute(
+            select(Transaction.category_id, func.coalesce(func.sum(Transaction.amount), 0))
+            .where(Transaction.transaction_date >= start)
+            .where(Transaction.transaction_date <= end)
+            .where(Transaction.direction == "debit")
+            .where(Transaction.is_duplicate.is_(False))
+            .where(Transaction.excludes_from_spending.is_(False))
+            .where(Transaction.category_id.is_not(None))
+            .group_by(Transaction.category_id)
+        ).all()
+    )
+    cat_counts = dict(
+        session.execute(
+            select(Transaction.category_id, func.count(Transaction.id))
+            .where(Transaction.transaction_date >= start)
+            .where(Transaction.transaction_date <= end)
+            .where(Transaction.direction == "debit")
+            .where(Transaction.is_duplicate.is_(False))
+            .where(Transaction.excludes_from_spending.is_(False))
+            .where(Transaction.category_id.is_not(None))
+            .group_by(Transaction.category_id)
+        ).all()
+    )
+
+    prev_cat_totals = dict(
+        session.execute(
+            select(Transaction.category_id, func.coalesce(func.sum(Transaction.amount), 0))
+            .where(Transaction.transaction_date >= prev_start)
+            .where(Transaction.transaction_date <= prev_end)
+            .where(Transaction.direction == "debit")
+            .where(Transaction.is_duplicate.is_(False))
+            .where(Transaction.excludes_from_spending.is_(False))
+            .where(Transaction.category_id.is_not(None))
+            .group_by(Transaction.category_id)
+        ).all()
+    )
+
+    category_breakdown = []
+    for cat in categories_db:
+        tot = _as_float(cat_totals.get(cat.id, 0))
+        prev_tot = _as_float(prev_cat_totals.get(cat.id, 0))
+        if tot > 0 or prev_tot > 0:
+            category_breakdown.append({
+                "category_id": cat.id,
+                "category": cat.name,
+                "expense_type": cat.expense_type,
+                "total": tot,
+                "previous_total": prev_tot,
+                "count": int(cat_counts.get(cat.id, 0)),
+                "percentage": round((tot / current_spend * 100) if current_spend > 0 else 0, 1)
+            })
+    category_breakdown.sort(key=lambda x: x["total"], reverse=True)
+
+    # Daily spending
+    daily_data = session.execute(
+        select(
+            func.date(Transaction.transaction_date).label("date"),
+            func.coalesce(func.sum(Transaction.amount), 0).label("total")
+        )
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.direction == "debit")
+        .where(Transaction.is_duplicate.is_(False))
+        .where(Transaction.excludes_from_spending.is_(False))
+        .group_by(func.date(Transaction.transaction_date))
+        .order_by("date")
+    ).all()
+    daily_spending = [{"date": row.date.strftime("%Y-%m-%d") if hasattr(row.date, 'strftime') else str(row.date), "spent": _as_float(row.total)} for row in daily_data]
+
+    # Top Merchants
+    merchant_data = session.execute(
+        select(
+            func.coalesce(Transaction.merchant_normalized, Transaction.merchant_raw).label("merchant"),
+            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.count(Transaction.id).label("count")
+        )
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.direction == "debit")
+        .where(Transaction.is_duplicate.is_(False))
+        .where(Transaction.excludes_from_spending.is_(False))
+        .group_by("merchant")
+        .order_by(func.sum(Transaction.amount).desc())
+        .limit(10)
+    ).all()
+    top_merchants = [{"merchant": row.merchant or "Unknown", "total": _as_float(row.total), "count": row.count} for row in merchant_data if row.merchant]
+
+    # Largest transactions
+    largest_txs = session.scalars(
         select(Transaction)
+        .options(joinedload(Transaction.category))
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
         .where(Transaction.direction == "debit")
         .where(Transaction.is_duplicate.is_(False))
         .where(Transaction.excludes_from_spending.is_(False))
         .order_by(Transaction.amount.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+        .limit(10)
+    ).all()
+    largest_transactions = [
+        {
+            "id": tx.id,
+            "date": tx.transaction_date.isoformat(),
+            "merchant": tx.merchant_normalized or tx.merchant_raw or "Unknown",
+            "category": tx.category.name if tx.category else "Uncategorized",
+            "amount": _as_float(tx.amount),
+            "account": tx.account or "Unknown"
+        }
+        for tx in largest_txs
+    ]
 
-    needs_review = session.scalar(
-        select(func.count()).select_from(Transaction).where(Transaction.needs_review.is_(True))
+    # Account Breakdown
+    account_data = session.execute(
+        select(
+            Transaction.account.label("name"),
+            func.coalesce(func.sum(Transaction.amount), 0).label("total")
+        )
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.direction == "debit")
+        .where(Transaction.is_duplicate.is_(False))
+        .where(Transaction.excludes_from_spending.is_(False))
+        .group_by(Transaction.account)
+        .order_by(func.sum(Transaction.amount).desc())
+    ).all()
+    account_breakdown = [
+        {
+            "account": row.name or "Unknown",
+            "total": _as_float(row.total),
+            "percentage": round((_as_float(row.total) / current_spend * 100) if current_spend > 0 else 0, 1)
+        }
+        for row in account_data if _as_float(row.total) > 0
+    ]
+
+    # Review
+    needs_review_count = session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.needs_review.is_(True))
+    ) or 0
+    
+    needs_review_amount = session.scalar(
+        select(func.coalesce(func.sum(Transaction.amount), 0))
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.needs_review.is_(True))
+        .where(Transaction.direction == "debit")
     ) or 0
 
     return {
-        "period": {"year": now.year, "month": now.month},
-        "current_month_spending": current_spend,
-        "previous_month_spending": previous_spend,
-        "income": income,
-        "previous_month_income": previous_income,
-        "income_change_pct": _pct_change(income, previous_income),
-        "net_cash_flow": income - current_spend,
-        "transaction_count": int(tx_count),
-        "largest_transaction": (
-            {
-                "id": largest.id,
-                "amount": _as_float(largest.amount),
-                "merchant": largest.merchant_normalized or largest.merchant_raw,
-                "date": largest.transaction_date.isoformat(),
-            }
-            if largest
-            else None
-        ),
-        "needs_review_count": int(needs_review),
+        "period": {"year": y, "month": m},
         "currency": "INR",
+        "summary": {
+            "spent": current_spend,
+            "income": income,
+            "net_cash_flow": income - current_spend,
+            "transaction_count": int(tx_count),
+            "debit_count": int(debit_count),
+            "credit_count": int(credit_count),
+        },
+        "month_comparison": {
+            "spent_change_pct": _pct_change(current_spend, previous_spend),
+            "income_change_pct": _pct_change(income, previous_income),
+            "previous_spent": previous_spend,
+            "previous_income": previous_income,
+        },
+        "category_breakdown": category_breakdown,
+        "daily_spending": daily_spending,
+        "top_merchants": top_merchants,
+        "largest_transactions": largest_transactions,
+        "account_breakdown": account_breakdown,
+        "review": {
+            "needs_review_count": int(needs_review_count),
+            "needs_review_amount": _as_float(needs_review_amount),
+        }
     }
 
 

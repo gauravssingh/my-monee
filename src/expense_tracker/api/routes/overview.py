@@ -10,8 +10,12 @@ router = APIRouter(prefix="/api/overview", tags=["overview"])
 
 
 @router.get("")
-def overview(session: Session = Depends(db_session)) -> dict[str, Any]:
-    return get_overview(session)
+def overview(
+    year: int | None = None,
+    month: int | None = None,
+    session: Session = Depends(db_session)
+) -> dict[str, Any]:
+    return get_overview(session, year=year, month=month)
 
 
 @router.get("/income-trend")

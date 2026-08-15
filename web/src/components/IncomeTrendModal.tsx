@@ -14,8 +14,7 @@ type Props = {
 };
 
 function momDetail(overview: Overview): ReactNode {
-  const { income, previous_month_income: previous, income_change_pct: changePct, currency } =
-    overview;
+  const { summary: { income }, month_comparison: { previous_income: previous, income_change_pct: changePct }, currency } = overview;
 
   if (income <= 0 && previous > 0) {
     return (
@@ -135,26 +134,27 @@ export default function IncomeTrendModal({
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-header">
-          <div>
-            <h2 id={titleId}>Income</h2>
-            <p className="metric-hint">
-              This Month · {month} · {formatMoney(overview.income, overview.currency)}
-            </p>
-            <p className="metric-hint" style={{ marginTop: 4 }}>
-              {momDetail(overview)}
-            </p>
-            <p className="metric-hint" style={{ marginTop: 4 }}>
-              Salary only · late-month credit counts for next month
-            </p>
+        <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div>
+              <h2 id={titleId} style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>Income</h2>
+              <div style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem", display: "flex", flexDirection: "column", gap: 2 }}>
+                <span>This Month · {month} · {formatMoney(overview.summary.income, overview.currency)}</span>
+                <span>{momDetail(overview)}</span>
+                <span>Salary only · late-month credit counts for next month</span>
+              </div>
+            </div>
           </div>
-          <div className="modal-actions">
-            <button ref={closeRef} className="btn" type="button" onClick={onClose}>
-              Close
+          <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
+            <button ref={closeRef} type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
-        <div className="modal-body">
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
           {loading && <p className="empty">Loading trend…</p>}
           {error && <p className="error">{error}</p>}
           {!loading && !error && trend && !hasData && (

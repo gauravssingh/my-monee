@@ -17,6 +17,8 @@ router = APIRouter(prefix="/api/categories", tags=["categories"])
 class NameBody(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
+class ExpenseTypeBody(BaseModel):
+    expense_type: str = Field(min_length=1, max_length=32)
 
 @router.get("")
 def get_categories(session: Session = Depends(db_session)) -> dict[str, Any]:
@@ -35,6 +37,15 @@ def patch_category(
     session: Session = Depends(db_session),
 ) -> dict[str, Any]:
     return category_service.rename_category(session, category_id, name=body.name)
+
+
+@router.patch("/{category_id}/expense_type")
+def patch_category_expense_type(
+    category_id: str,
+    body: ExpenseTypeBody,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    return category_service.set_category_expense_type(session, category_id, expense_type=body.expense_type)
 
 
 @router.delete("/{category_id}")

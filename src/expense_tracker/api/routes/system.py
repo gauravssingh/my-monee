@@ -28,6 +28,7 @@ def system_status(
         "scheduler_enabled": settings.scheduler.enabled,
         "allow_external_ai": settings.privacy.allow_external_ai,
         "currency": settings.dashboard.default_currency,
+        "upi_handles": settings.banking.upi_handles,
     }
     status = get_system_status(session, summary)
     status["gmail"]["connected"] = is_connected(settings)

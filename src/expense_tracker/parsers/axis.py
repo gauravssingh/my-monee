@@ -18,7 +18,7 @@ AXIS_SENDER = re.compile(r"alerts@axis\.bank\.in|axis\.bank\.in", re.I)
 
 # "by NEFT/CHASH00053023262/Sala" or Transaction Info line
 CHANNEL_REF = re.compile(
-    r"\b((?:NEFT|IMPS|RTGS|ACH(?:-DR|-CR)?|UPILITE|UPI(?:/P2A)?)\s*/\s*[A-Za-z0-9/.\- ]{2,60})",
+    r"\b((?:NEFT|IMPS|RTGS|ACH(?:-DR|-CR)?|UPILITE|UPI(?:/[A-Za-z0-9]+)?)\s*/\s*[A-Za-z0-9/.\-& ]{2,100})",
     re.I,
 )
 SALARY_REF = re.compile(r"(?:NEFT|IMPS|RTGS)\s*/[A-Za-z0-9/.\- ]*?\bSala(?:ry)?\b", re.I)
@@ -115,10 +115,10 @@ def classify_axis_credit(channel_ref: str | None, text: str) -> dict:
             method = "neft"
     # Prefer a readable counterparty from UPI/P2A/.../NAME/...
     merchant = channel_ref or "Account credit"
-    if channel_ref and "/P2A/" in channel_ref.upper():
+    if channel_ref and ("/P2A/" in channel_ref.upper() or "/P2M/" in channel_ref.upper()):
         parts = [p.strip() for p in channel_ref.split("/") if p.strip()]
-        if len(parts) >= 4:
-            merchant = parts[3]
+        if len(parts) >= 3:
+            merchant = parts[-1]
     return {
         "transaction_type": "transfer",
         "merchant_raw": merchant,
@@ -228,10 +228,22 @@ class AxisBankParser:
             return []
 
         channel_ref = extract_axis_channel_ref(text)
+        
+        merchant_raw = None
+        payment_method = "card" if "credit card" in subject.lower() else None
+
+        if channel_ref and direction == "debit":
+            upper_ref = channel_ref.upper()
+            if upper_ref.startswith("UPI"):
+                payment_method = "upi"
+                parts = [p.strip() for p in channel_ref.split("/") if p.strip()]
+                if len(parts) >= 3:
+                    merchant_raw = parts[-1]
+
         enrichment: dict = {
             "transaction_type": "purchase" if direction == "debit" else "other",
-            "merchant_raw": None,
-            "payment_method": "card" if "credit card" in subject.lower() else None,
+            "merchant_raw": merchant_raw,
+            "payment_method": payment_method,
             "is_transfer": False,
             "is_refund": False,
             "excludes_from_spending": False,

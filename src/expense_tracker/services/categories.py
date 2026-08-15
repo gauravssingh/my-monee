@@ -34,6 +34,7 @@ def list_categories(session: Session) -> list[dict[str, Any]]:
                 "slug": cat.slug,
                 "sort_order": cat.sort_order,
                 "is_system": cat.is_system,
+                "expense_type": cat.expense_type,
                 "transaction_count": int(tx_count),
                 "subcategories": [
                     {
@@ -64,6 +65,7 @@ def create_category(session: Session, *, name: str) -> dict[str, Any]:
         slug=slug,
         sort_order=int(max_order) + 1,
         is_system=False,
+        expense_type="discretionary",
     )
     session.add(cat)
     session.flush()
@@ -73,6 +75,7 @@ def create_category(session: Session, *, name: str) -> dict[str, Any]:
         "slug": cat.slug,
         "sort_order": cat.sort_order,
         "is_system": cat.is_system,
+        "expense_type": cat.expense_type,
         "transaction_count": 0,
         "subcategories": [],
     }
@@ -87,6 +90,16 @@ def rename_category(session: Session, category_id: str, *, name: str) -> dict[st
         raise HTTPException(status_code=400, detail="Category name is required")
     cat.name = name
     cat.slug = _slugify(name)
+    session.flush()
+    return next(c for c in list_categories(session) if c["id"] == category_id)
+
+def set_category_expense_type(session: Session, category_id: str, *, expense_type: str) -> dict[str, Any]:
+    cat = session.get(Category, category_id)
+    if cat is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    if expense_type not in ["essential", "discretionary", "financial", "investment", "transfer"]:
+        raise HTTPException(status_code=400, detail="Invalid expense type")
+    cat.expense_type = expense_type
     session.flush()
     return next(c for c in list_categories(session) if c["id"] == category_id)
 

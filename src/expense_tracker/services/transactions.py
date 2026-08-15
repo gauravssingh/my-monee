@@ -109,6 +109,7 @@ def list_transactions(
     date_to: date | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
+    merchant_id: str | None = None,
 ) -> dict[str, Any]:
     stmt = (
         select(Transaction)
@@ -140,6 +141,8 @@ def list_transactions(
     if date_to:
         end = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=timezone.utc)
         stmt = stmt.where(Transaction.transaction_date < end)
+    if merchant_id:
+        stmt = stmt.where(Transaction.merchant_entity_id == merchant_id)
 
     stmt = _apply_sort(stmt, sort_by, sort_dir)
 
