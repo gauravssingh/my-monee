@@ -1,3 +1,4 @@
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import DataIssuesPage from "./pages/DataIssuesPage";
 import OverviewPage from "./pages/OverviewPage";
@@ -6,6 +7,42 @@ import TransactionsPage from "./pages/TransactionsPage";
 import MerchantsPage from "./pages/MerchantsPage";
 import RecurringPage from "./pages/RecurringPage";
 import AccountsPage from "./pages/AccountsPage";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught render error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "40px 24px", maxWidth: "600px", margin: "0 auto", textAlign: "center" }}>
+          <h2 style={{ color: "var(--danger)" }}>Something went wrong loading this view.</h2>
+          <p style={{ color: "var(--ink-muted)", marginTop: "8px", fontSize: "0.9rem" }}>
+            {this.state.error?.message || "An unexpected rendering error occurred."}
+          </p>
+          <button
+            className="btn primary"
+            style={{ marginTop: "16px" }}
+            onClick={() => window.location.reload()}
+          >
+            Reload Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   return (
@@ -35,17 +72,19 @@ export default function App() {
         </nav>
       </header>
 
-      <Routes>
-        <Route path="/" element={<OverviewPage />} />
-        <Route path="/transactions" element={<TransactionsPage />} />
-        <Route path="/recurring" element={<RecurringPage />} />
-        <Route path="/merchants" element={<MerchantsPage />} />
-        <Route path="/review" element={<TransactionsPage needsReview />} />
-        <Route path="/data-issues" element={<DataIssuesPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/system" element={<Navigate to="/settings" replace />} />
-      </Routes>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/" element={<OverviewPage />} />
+          <Route path="/transactions" element={<TransactionsPage />} />
+          <Route path="/recurring" element={<RecurringPage />} />
+          <Route path="/merchants" element={<MerchantsPage />} />
+          <Route path="/review" element={<TransactionsPage needsReview />} />
+          <Route path="/data-issues" element={<DataIssuesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/system" element={<Navigate to="/settings" replace />} />
+        </Routes>
+      </ErrorBoundary>
     </div>
   );
 }

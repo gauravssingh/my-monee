@@ -168,15 +168,29 @@ function truncate(text: string | null | undefined, max: number): string | null {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+import { useSearchParams } from "react-router-dom";
+
 export default function TransactionsPage({ needsReview = false }: Props) {
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
-  const [q, setQ] = useState("");
-  const [debouncedQ, setDebouncedQ] = useState("");
+  const [totalDebit, setTotalDebit] = useState(0);
+  const [totalCredit, setTotalCredit] = useState(0);
+  const [q, setQ] = useState(() => searchParams.get("q") || "");
+  const [debouncedQ, setDebouncedQ] = useState(() => searchParams.get("q") || "");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(() => {
+    const param =
+      searchParams.get("category_ids") ||
+      searchParams.get("category_id") ||
+      searchParams.get("category") ||
+      "";
+    if (!param) return new Set();
+    return new Set(param.split(",").map((s) => s.trim()).filter(Boolean));
+  });
   const [offset, setOffset] = useState(0);
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get("date_from") || "");
+  const [dateTo, setDateTo] = useState(() => searchParams.get("date_to") || "");
   const [sortBy, setSortBy] = useState<SortBy>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [error, setError] = useState<string | null>(null);
@@ -197,6 +211,41 @@ export default function TransactionsPage({ needsReview = false }: Props) {
   const [flagError, setFlagError] = useState<string | null>(null);
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [recurringTarget, setRecurringTarget] = useState<Transaction | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcut '/' to focus search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "/" && document.activeElement !== searchInputRef.current && !(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Keep query params in sync on navigation
+  useEffect(() => {
+    const urlQ = searchParams.get("q") || "";
+    const urlCategory =
+      searchParams.get("category_ids") ||
+      searchParams.get("category_id") ||
+      searchParams.get("category") ||
+      "";
+    const urlFrom = searchParams.get("date_from") || "";
+    const urlTo = searchParams.get("date_to") || "";
+    setQ(urlQ);
+    setDebouncedQ(urlQ);
+    if (urlCategory) {
+      setSelectedCategoryIds(new Set(urlCategory.split(",").map((s) => s.trim()).filter(Boolean)));
+    } else {
+      setSelectedCategoryIds(new Set());
+    }
+    setDateFrom(urlFrom);
+    setDateTo(urlTo);
+    setOffset(0);
+  }, [searchParams]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -206,14 +255,50 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     return () => clearTimeout(t);
   }, [q]);
 
+  // Load categories on mount for filtering & classification
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .categories()
+      .then((data) => {
+        if (!cancelled) setCategories(data.items);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setError(err.message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function toggleCategory(catId: string) {
+    setSelectedCategoryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(catId)) {
+        next.delete(catId);
+      } else {
+        next.add(catId);
+      }
+      return next;
+    });
+    setOffset(0);
+  }
+
+  function clearCategories() {
+    setSelectedCategoryIds(new Set());
+    setOffset(0);
+  }
+
   const load = useCallback(async (signal?: AbortSignal) => {
     setError(null);
     try {
+      const catIds = Array.from(selectedCategoryIds);
       const data = await api.transactions(
         {
           needs_review: needsReview ? true : undefined,
           direction: directionFilter !== "all" ? directionFilter : undefined,
           q: debouncedQ.trim() || undefined,
+          category_ids: !needsReview && catIds.length > 0 ? catIds : undefined,
           date_from: dateFrom || undefined,
           date_to: dateTo || undefined,
           limit: needsReview ? 100 : 50,
@@ -225,12 +310,14 @@ export default function TransactionsPage({ needsReview = false }: Props) {
       );
       setItems(data.items);
       setTotal(data.total);
+      setTotalDebit(data.total_debit ?? 0);
+      setTotalCredit(data.total_credit ?? 0);
       setSelectedIds(new Set());
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Failed to load");
     }
-  }, [needsReview, debouncedQ, directionFilter, dateFrom, dateTo, offset, sortBy, sortDir]);
+  }, [needsReview, debouncedQ, selectedCategoryIds, directionFilter, dateFrom, dateTo, offset, sortBy, sortDir]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -251,22 +338,6 @@ export default function TransactionsPage({ needsReview = false }: Props) {
       setSortDir("asc");
     }
   }
-
-  useEffect(() => {
-    if (!needsReview) return;
-    let cancelled = false;
-    api
-      .categories()
-      .then((data) => {
-        if (!cancelled) setCategories(data.items);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [needsReview]);
 
   const selectedCount = selectedIds.size;
   const allSelected = items.length > 0 && selectedCount === items.length;
@@ -465,8 +536,9 @@ export default function TransactionsPage({ needsReview = false }: Props) {
 
       <div className="toolbar">
         <input
+          ref={searchInputRef}
           className="input"
-          placeholder="Search merchant or description"
+          placeholder="Search merchant or description (Press '/' to focus)"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -510,6 +582,56 @@ export default function TransactionsPage({ needsReview = false }: Props) {
           </svg>
         </button>
       </div>
+
+      {!needsReview && categories.length > 0 && (
+        <div className="category-filter-list" role="group" aria-label="Filter by Category">
+          <button
+            type="button"
+            className={`category-filter-tag ${selectedCategoryIds.size === 0 ? "active" : ""}`}
+            onClick={clearCategories}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`category-filter-tag ${selectedCategoryIds.has("uncategorized") ? "active" : ""}`}
+            onClick={() => toggleCategory("uncategorized")}
+          >
+            Uncategorized
+          </button>
+          {categories.map((c) => {
+            const isSelected = selectedCategoryIds.has(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                className={`category-filter-tag ${isSelected ? "active" : ""}`}
+                onClick={() => toggleCategory(c.id)}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+          {selectedCategoryIds.size > 0 && (
+            <button
+              type="button"
+              className="btn quiet"
+              style={{
+                fontSize: "0.78rem",
+                padding: "4px 8px",
+                color: "var(--ink-muted)",
+                cursor: "pointer",
+                background: "transparent",
+                border: "none",
+                textDecoration: "underline",
+              }}
+              onClick={clearCategories}
+            >
+              Reset ({selectedCategoryIds.size})
+            </button>
+          )}
+        </div>
+      )}
 
       {needsReview && selectedCount > 0 && (
         <div className="review-action-bar" role="region" aria-label="Bulk actions">
@@ -711,11 +833,67 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr style={{ borderTop: "2px solid var(--line)", background: "var(--surface)", fontWeight: 600 }}>
+                {needsReview && <td />}
+                <td>
+                  <strong>Total ({total} items)</strong>
+                </td>
+                <td />
+                <td className="num" style={{ whiteSpace: "nowrap" }}>
+                  {directionFilter === "debit" ? (
+                    <span style={{ color: "var(--ink)", fontWeight: 700 }}>{formatMoney(totalDebit)}</span>
+                  ) : directionFilter === "credit" ? (
+                    <span style={{ color: "var(--ok)", fontWeight: 700 }}>{formatMoney(totalCredit)}</span>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span style={{ color: "var(--ink)", fontWeight: 700 }}>{formatMoney(totalDebit)}</span>
+                      {totalCredit > 0 && (
+                        <span style={{ color: "var(--ok)", fontSize: "0.75rem", fontWeight: 500 }}>
+                          +{formatMoney(totalCredit)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </td>
+                <td />
+                <td />
+                <td />
+                <td />
+              </tr>
+            </tfoot>
           </table>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-            <p className="metric-hint" style={{ margin: 0 }}>
-              Showing {items.length} of {total}
-            </p>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 12,
+              marginTop: 14,
+              padding: "10px 16px",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: 6,
+              fontSize: "0.875rem",
+            }}
+          >
+            <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+              <span>
+                Showing <strong>{items.length}</strong> of <strong>{total}</strong>
+              </span>
+              <span style={{ color: "var(--line)" }}>|</span>
+              <span>
+                <span style={{ color: "var(--ink-muted)" }}>Total Spent: </span>
+                <strong>{formatMoney(totalDebit)}</strong>
+              </span>
+              {totalCredit > 0 && (
+                <span>
+                  <span style={{ color: "var(--ink-muted)" }}>Total Inflow: </span>
+                  <strong style={{ color: "var(--ok)" }}>{formatMoney(totalCredit)}</strong>
+                </span>
+              )}
+            </div>
             {total > (needsReview ? 100 : 50) && (
               <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <button
@@ -726,7 +904,8 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                   Previous
                 </button>
                 <span className="metric-hint">
-                  Page {Math.floor(offset / (needsReview ? 100 : 50)) + 1} of {Math.ceil(total / (needsReview ? 100 : 50))}
+                  Page {Math.floor(offset / (needsReview ? 100 : 50)) + 1} of{" "}
+                  {Math.ceil(total / (needsReview ? 100 : 50))}
                 </span>
                 <button
                   className="btn"

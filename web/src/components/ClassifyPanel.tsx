@@ -179,7 +179,7 @@ export default function ClassifyPanel({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--accent, #0c6e5c)" }}>
-                        ✨ AI Suggestion ({aiSuggestion.provider === "gemini" ? "Gemini" : aiSuggestion.provider})
+                        ✨ AI Suggestion ({aiSuggestion.model || "Gemini"})
                       </span>
                       <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
                         {Math.round(aiSuggestion.confidence * 100)}% confidence

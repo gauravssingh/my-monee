@@ -29,6 +29,9 @@ export type Merchant = {
   canonical_name: string | null;
   normalized_key: string;
   aliases: string[];
+  total_spent?: number;
+  spent_last_30d?: number;
+  transaction_count?: number;
 };
 
 export type Subscription = {
@@ -219,6 +222,7 @@ export interface SystemStatus {
     ai_enabled?: boolean;
     ai_provider?: string;
     ai_model?: string;
+    ai_fallback_models?: string[];
     currency: string;
     upi_handles: string[];
   };
@@ -332,6 +336,9 @@ export const api = {
       date_from?: string;
       date_to?: string;
       merchant_id?: string;
+      category_id?: string;
+      category_ids?: string[];
+      subcategory_id?: string;
       limit?: number;
       offset?: number;
       sort_by?: "date" | "amount" | "merchant" | "category" | "source" | "status";
@@ -346,12 +353,25 @@ export const api = {
     if (params?.date_from) qs.set("date_from", params.date_from);
     if (params?.date_to) qs.set("date_to", params.date_to);
     if (params?.merchant_id) qs.set("merchant_id", params.merchant_id);
+    if (params?.category_id) qs.set("category_id", params.category_id);
+    if (params?.category_ids && params.category_ids.length > 0) {
+      for (const cid of params.category_ids) {
+        qs.append("category_ids", cid);
+      }
+    }
+    if (params?.subcategory_id) qs.set("subcategory_id", params.subcategory_id);
     if (params?.limit != null) qs.set("limit", String(params.limit));
     if (params?.offset != null) qs.set("offset", String(params.offset));
     if (params?.sort_by) qs.set("sort_by", params.sort_by);
     if (params?.sort_dir) qs.set("sort_dir", params.sort_dir);
     const suffix = qs.toString() ? `?${qs}` : "";
-    return request<{ total: number; items: Transaction[] }>(`/api/transactions${suffix}`, { signal });
+    return request<{
+      total: number;
+      total_amount?: number;
+      total_debit?: number;
+      total_credit?: number;
+      items: Transaction[];
+    }>(`/api/transactions${suffix}`, { signal });
   },
   getTransactionsByMerchant: (merchant_id: string) =>
     api.transactions({ merchant_id }),

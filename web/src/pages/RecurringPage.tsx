@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Subscription, type Bill } from "../api";
-import { formatMoney } from "../format";
+import { formatDate, formatMoney } from "../format";
 
 export default function RecurringPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -31,111 +31,117 @@ export default function RecurringPage() {
     <>
       <header className="page-header">
         <div>
-          <h1>Recurring & Subscriptions</h1>
-          <p className="lead">Automatically detected fixed subscriptions and variable bills based on your transaction history.</p>
+          <h1 className="page-title">Recurring & Subscriptions</h1>
+          <p className="lead">Automatically detected fixed subscriptions and variable bills based on transaction history.</p>
         </div>
       </header>
       
-      <section className="metrics">
-        <article className="panel metric" style={{ background: "var(--accent-soft)" }}>
+      <section className="metrics" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+        <article className="metric">
           <div className="metric-label">Avg Monthly Subscriptions</div>
-          <div className="metric-value" style={{ color: "var(--accent)" }}>
+          <div className="metric-value">
             {formatMoney(totalMonthlySub)}
           </div>
-          <div className="metric-hint">Fixed, low variance recurring costs</div>
+          <div className="metric-hint">Fixed, low variance recurring commitments</div>
         </article>
-        <article className="panel metric">
+        <article className="metric">
           <div className="metric-label">Expected Variable Bills</div>
           <div className="metric-value">
             {formatMoney(totalBillsExpected)}
           </div>
-          <div className="metric-hint">Based on average past amounts</div>
+          <div className="metric-hint">Based on average past utility & card statements</div>
         </article>
       </section>
 
       <div className="grid-2">
-        <section className="panel section">
+        <section className="section">
           <h2>Fixed Subscriptions</h2>
           <p className="lead">Services with exact recurring amounts.</p>
           {subscriptions.length === 0 ? (
             <div className="empty">No subscriptions detected.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Service</th>
-                  <th>Freq</th>
-                  <th>Amount</th>
-                  <th>Next Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptions.map(s => (
-                  <tr key={s.id}>
-                    <td style={{ fontWeight: 600 }}>{s.name}</td>
-                    <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{s.billing_frequency}</td>
-                    <td>{formatMoney(s.amount)}</td>
-                    <td>{s.next_billing_date ? new Date(s.next_billing_date).toLocaleDateString() : "Unknown"}</td>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Service</th>
+                    <th>Freq</th>
+                    <th className="num">Amount</th>
+                    <th>Next Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {subscriptions.map(s => (
+                    <tr key={s.id}>
+                      <td style={{ fontWeight: 600 }}>{s.name}</td>
+                      <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{s.billing_frequency}</td>
+                      <td className="num tx-amount debit">−{formatMoney(s.amount)}</td>
+                      <td className="tx-date">{s.next_billing_date ? formatDate(s.next_billing_date) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
-        <section className="panel section">
+        <section className="section">
           <h2>Variable Bills</h2>
-          <p className="lead">Recurring payments with varying amounts.</p>
+          <p className="lead">Recurring payments with varying monthly amounts.</p>
           {bills.length === 0 ? (
             <div className="empty">No variable bills detected.</div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Biller</th>
-                  <th>Freq</th>
-                  <th>Avg Amount</th>
-                  <th>Due Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.map(b => (
-                  <tr key={b.id}>
-                    <td style={{ fontWeight: 600 }}>{b.name}</td>
-                    <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{b.frequency}</td>
-                    <td>{formatMoney(b.expected_amount)}</td>
-                    <td style={{ color: "var(--warn)" }}>
-                        {b.due_date ? new Date(b.due_date).toLocaleDateString() : "Unknown"}
-                    </td>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Biller</th>
+                    <th>Freq</th>
+                    <th className="num">Avg Amount</th>
+                    <th>Due Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {bills.map(b => (
+                    <tr key={b.id}>
+                      <td style={{ fontWeight: 600 }}>{b.name}</td>
+                      <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{b.frequency}</td>
+                      <td className="num tx-amount debit">−{formatMoney(b.expected_amount)}</td>
+                      <td className="tx-date" style={{ color: b.due_date ? "var(--warn)" : "var(--ink-muted)" }}>
+                        {b.due_date ? formatDate(b.due_date) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
         {detected.length > 0 && (
-          <section className="panel section" style={{ gridColumn: "1 / -1" }}>
+          <section className="section" style={{ gridColumn: "1 / -1", marginTop: 12 }}>
             <h2>Detected Recurring Candidates</h2>
-            <p className="lead">These transactions look like recurring charges, but are not yet confirmed.</p>
-            <table>
-              <thead>
-                <tr>
-                  <th>Merchant / Name</th>
-                  <th>Freq</th>
-                  <th>Expected Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detected.map((d, i) => (
-                  <tr key={d.id || i}>
-                    <td style={{ fontWeight: 600 }}>{d.name}</td>
-                    <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{d.frequency}</td>
-                    <td>{formatMoney(d.expected_amount)}</td>
+            <p className="lead">Transactions identified as candidate recurring commitments.</p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Merchant / Name</th>
+                    <th>Freq</th>
+                    <th className="num">Expected Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {detected.map((d, i) => (
+                    <tr key={d.id || i}>
+                      <td style={{ fontWeight: 600 }}>{d.name}</td>
+                      <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{d.frequency}</td>
+                      <td className="num tx-amount debit">−{formatMoney(d.expected_amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )}
       </div>

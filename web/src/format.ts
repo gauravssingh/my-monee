@@ -10,6 +10,25 @@ export function formatMoney(amount: number, currency = "INR"): string {
   }
 }
 
+export function formatCompactMoney(amount: number, currency = "INR"): string {
+  const sym = currency === "INR" ? "₹" : "$";
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "−" : "";
+  if (abs >= 1_000_000) {
+    return `${sign}${sym}${(abs / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (abs >= 100_000) {
+    return `${sign}${sym}${(abs / 1000).toFixed(0)}k`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}${sym}${(abs / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  }
+  if (abs > 0) {
+    return `${sign}${sym}${Math.round(abs)}`;
+  }
+  return `${sym}0`;
+}
+
 export function monthLabel(year: number, month: number): string {
   return new Date(year, month - 1, 1).toLocaleString("en-IN", {
     month: "long",

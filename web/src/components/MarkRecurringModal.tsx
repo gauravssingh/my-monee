@@ -62,38 +62,33 @@ export default function MarkRecurringModal({ open, transaction, onClose, onSucce
   return createPortal(
     <div className="modal-backdrop" role="presentation" onClick={onBackdropClick}>
       <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
-        <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
-            </div>
-            <div>
-              <h2 id={titleId} style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>Mark as recurring</h2>
-              <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem" }}>
-                Classify {transaction.merchant_normalized || "this transaction"} as a recurring bill or subscription.
-              </p>
-            </div>
+        <header className="modal-header">
+          <div>
+            <h2 id={titleId}>Mark as recurring</h2>
+            <p className="lead">
+              Classify {transaction.merchant_normalized || "this transaction"} as a recurring bill or subscription.
+            </p>
           </div>
-          <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
+          <div className="modal-actions">
             <button type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
         
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {error && <div className="error">{error}</div>}
           
-          <div className="form-group full-width">
-            <label style={{ display: "block", marginBottom: 8, fontWeight: 500 }}>Type</label>
+          <div className="field">
+            <label className="label" style={{ display: "block", marginBottom: 6, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)" }}>Type</label>
             <div className="segmented">
               <button type="button" className={`segmented-btn ${type === "subscription" ? "active" : ""}`} onClick={() => setType("subscription")}>Subscription (Fixed)</button>
               <button type="button" className={`segmented-btn ${type === "bill" ? "active" : ""}`} onClick={() => setType("bill")}>Bill (Variable)</button>
             </div>
           </div>
           
-          <div className="form-group full-width">
-            <label style={{ display: "block", marginBottom: 8, fontWeight: 500 }}>Name</label>
+          <div className="field">
+            <label className="label" style={{ display: "block", marginBottom: 6, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)" }}>Name</label>
             <input 
               className="input" 
               value={name} 
@@ -103,8 +98,8 @@ export default function MarkRecurringModal({ open, transaction, onClose, onSucce
             />
           </div>
           
-          <div className="form-group full-width">
-            <label style={{ display: "block", marginBottom: 8, fontWeight: 500 }}>Frequency</label>
+          <div className="field">
+            <label className="label" style={{ display: "block", marginBottom: 6, fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)" }}>Frequency</label>
             <select className="input" value={frequency} onChange={e => setFrequency(e.target.value)} style={{ width: "100%" }}>
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
@@ -113,13 +108,11 @@ export default function MarkRecurringModal({ open, transaction, onClose, onSucce
           </div>
         </div>
 
-        <footer style={{ padding: "20px 32px", borderTop: "1px solid var(--line)", background: "var(--surface)", display: "flex", justifyContent: "flex-end", alignItems: "center", borderRadius: "0 0 8px 8px" }}>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button type="button" className="btn quiet" onClick={onClose} style={{ padding: "10px 20px" }} disabled={saving}>Cancel</button>
-            <button type="button" className="btn primary" style={{ padding: "10px 24px" }} disabled={saving} onClick={handleSubmit}>
-              {saving ? "Saving..." : "Save Recurring"}
-            </button>
-          </div>
+        <footer className="modal-footer">
+          <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="button" className="btn primary" disabled={saving} onClick={handleSubmit}>
+            {saving ? "Saving..." : "Save Recurring"}
+          </button>
         </footer>
       </div>
     </div>,

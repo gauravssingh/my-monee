@@ -30,6 +30,7 @@ def system_status(
         "ai_enabled": settings.ai.enabled,
         "ai_provider": settings.ai.provider,
         "ai_model": settings.ai.model,
+        "ai_fallback_models": settings.ai.fallback_models,
         "currency": settings.dashboard.default_currency,
         "upi_handles": settings.banking.upi_handles,
     }

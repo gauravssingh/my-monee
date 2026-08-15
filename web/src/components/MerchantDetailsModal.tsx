@@ -78,24 +78,19 @@ export default function MerchantDetailsModal({ merchantId, merchantName, onClose
         style={{ width: "90%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-            </div>
-            <div>
-              <h2 id={titleId} style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>{merchantName}</h2>
-              <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem" }}>Transactions and receipts for this merchant.</p>
-            </div>
+        <header className="modal-header">
+          <div>
+            <h2 id={titleId}>{merchantName}</h2>
+            <p className="lead">Transactions and receipts for this merchant.</p>
           </div>
-          <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
+          <div className="modal-actions">
             <button ref={closeRef} type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
         
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {error && <div className="error">{error}</div>}
           
           {loading ? (

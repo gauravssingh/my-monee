@@ -190,24 +190,19 @@ export default function SettingsPage() {
             {parsedCreds && createPortal(
               <div className="modal-backdrop">
                 <div className="modal-panel" role="dialog" aria-modal="true" style={{ width: "min(800px, 95vw)" }}>
-                  <header className="modal-header" style={{ padding: "24px 32px", borderBottom: "1px solid var(--line)", alignItems: "flex-start" }}>
-                    <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: "var(--accent-soft)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                      </div>
-                      <div>
-                        <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)" }}>Confirm OAuth Configuration</h2>
-                        <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.875rem" }}>Review the imported credentials before saving.</p>
-                      </div>
+                  <header className="modal-header">
+                    <div>
+                      <h2>Confirm OAuth Configuration</h2>
+                      <p className="lead">Review the imported credentials before saving.</p>
                     </div>
-                    <div className="modal-actions" style={{ alignSelf: "flex-start", marginTop: 4 }}>
+                    <div className="modal-actions">
                       <button type="button" className="btn icon-btn" onClick={cancelCreds} aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                       </button>
                     </div>
                   </header>
-                  <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "32px" }}>
-                    <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: 8, overflow: "auto" }}>
+                  <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: "var(--radius)", overflow: "auto" }}>
                     <table style={{ minWidth: "100%" }}>
                       <thead>
                         <tr>
@@ -228,27 +223,23 @@ export default function SettingsPage() {
                     </table>
                   </div>
                   </div>
-                  <footer style={{ padding: "20px 32px", borderTop: "1px solid var(--line)", background: "var(--surface)", display: "flex", justifyContent: "flex-end", alignItems: "center", borderRadius: "0 0 8px 8px" }}>
-                    <div className="toolbar" style={{ justifyContent: "flex-end" }}>
-                      <button
-                        className="btn quiet"
-                        type="button"
-                        disabled={busy !== null}
-                        onClick={cancelCreds}
-                        style={{ padding: "10px 20px" }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="btn primary"
-                        type="button"
-                        disabled={busy !== null}
-                        onClick={() => void saveCredentials()}
-                        style={{ padding: "10px 24px" }}
-                      >
-                        {busy === "creds" ? "Importing…" : "Confirm & Import"}
-                      </button>
-                    </div>
+                  <footer className="modal-footer">
+                    <button
+                      className="btn quiet"
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={cancelCreds}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="btn primary"
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void saveCredentials()}
+                    >
+                      {busy === "creds" ? "Importing…" : "Confirm & Import"}
+                    </button>
                   </footer>
                 </div>
               </div>,
@@ -339,7 +330,14 @@ export default function SettingsPage() {
                 ["External AI Permitted", status.app.allow_external_ai ? "Yes" : "No", true],
                 ["AI Features Enabled", status.app.ai_enabled ? "Yes" : "No", true],
                 ["AI Provider", status.app.ai_provider || "gemini", true],
-                ["AI Model", status.app.ai_model || "gemini-3.7-flash", true],
+                ["Primary Model", status.app.ai_model || "gemini-3.7-flash", true],
+                [
+                  "Preference & Fallback Chain",
+                  status.app.ai_fallback_models && status.app.ai_fallback_models.length > 0
+                    ? status.app.ai_fallback_models.join(" → ")
+                    : `${status.app.ai_model || "gemini-3.7-flash"} → gemini-3.5-flash-lite → gemini-3.1-flash-lite`,
+                  true,
+                ],
               ]}
             />
           </section>

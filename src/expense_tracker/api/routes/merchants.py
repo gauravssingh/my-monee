@@ -15,17 +15,84 @@ class MergeRequest(BaseModel):
 
 @router.get("")
 def list_merchants(session: Session = Depends(db_session)) -> dict[str, Any]:
-    merchants = session.scalars(select(Merchant).order_by(Merchant.display_name)).all()
-    
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import case, func
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # Collect aliases by merchant
+    aliases_by_merchant: dict[str, list[str]] = {}
+    for a in session.scalars(select(MerchantAlias)).all():
+        aliases_by_merchant.setdefault(a.merchant_id, []).append(a.alias_raw)
+
+    stmt = (
+        select(
+            Merchant.id,
+            Merchant.display_name,
+            Merchant.canonical_name,
+            Merchant.normalized_key,
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            (Transaction.direction == "debit")
+                            & (Transaction.excludes_from_spending.is_(False))
+                            & (Transaction.is_duplicate.is_(False)),
+                            Transaction.amount,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("total_spent"),
+            func.coalesce(
+                func.sum(
+                    case(
+                        (
+                            (Transaction.direction == "debit")
+                            & (Transaction.excludes_from_spending.is_(False))
+                            & (Transaction.is_duplicate.is_(False))
+                            & (Transaction.transaction_date >= cutoff),
+                            Transaction.amount,
+                        ),
+                        else_=0,
+                    )
+                ),
+                0,
+            ).label("spent_last_30d"),
+            func.count(Transaction.id).label("tx_count"),
+        )
+        .outerjoin(Transaction, Transaction.merchant_entity_id == Merchant.id)
+        .group_by(Merchant.id)
+        .order_by(
+            func.sum(
+                case(
+                    (
+                        (Transaction.direction == "debit")
+                        & (Transaction.excludes_from_spending.is_(False))
+                        & (Transaction.is_duplicate.is_(False)),
+                        Transaction.amount,
+                    ),
+                    else_=0,
+                )
+            ).desc(),
+            Merchant.display_name.asc(),
+        )
+    )
+
+    rows = session.execute(stmt).all()
+
     items = []
-    for m in merchants:
-        aliases = [a.alias_raw for a in m.aliases]
+    for r in rows:
         items.append({
-            "id": m.id,
-            "display_name": m.display_name,
-            "canonical_name": m.canonical_name,
-            "normalized_key": m.normalized_key,
-            "aliases": aliases,
+            "id": r.id,
+            "display_name": r.display_name,
+            "canonical_name": r.canonical_name,
+            "normalized_key": r.normalized_key,
+            "aliases": aliases_by_merchant.get(r.id, []),
+            "total_spent": float(r.total_spent or 0.0),
+            "spent_last_30d": float(r.spent_last_30d or 0.0),
+            "transaction_count": int(r.tx_count or 0),
         })
     return {"items": items}
 

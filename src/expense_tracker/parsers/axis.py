@@ -10,6 +10,7 @@ from expense_tracker.parsers.extract import (
     combined_text,
     extract_account,
     extract_card,
+    html_to_text,
     parse_amount,
     parse_date_near_amount,
 )
@@ -43,6 +44,42 @@ DECLINED_ALERT = re.compile(
 def is_axis_declined_alert(subject: str, text: str) -> bool:
     blob = f"{subject}\n{text}"
     return bool(DECLINED_ALERT.search(blob))
+
+
+def extract_axis_merchant(text: str) -> str | None:
+    """Extract merchant name from Axis Bank credit card or debit alerts."""
+    # 1. Explicit 'Merchant Name:' block
+    m = re.search(r"Merchant\s*Name\s*[:\-]?\s*[\n\r]*\s*([^\n\r\t]+)", text, re.I)
+    if m:
+        val = m.group(1).strip()
+        val = re.split(r"(?:Axis\s+Bank|Credit\s+Card|Date\s*&|Available\s+Limit|Total\s+Credit|Info[:\s])", val, flags=re.I)[0].strip()
+        if val and not val.lower().startswith(("axis bank", "inr", "dear ", "credit card")):
+            return val
+
+    # 2. 'spent ... at <Merchant>'
+    m = re.search(r"spent\s+.*?\s+at\s+([^\n\r\t,]+?)(?:\s+on\s+\d{2}|\s+using|\s+with|\s*$)", text, re.I)
+    if m:
+        val = m.group(1).strip()
+        val = re.split(r"(?:Axis\s+Bank|Credit\s+Card|Date\s*&|Available\s+Limit)", val, flags=re.I)[0].strip()
+        if val and not val.lower().startswith(("axis bank", "inr", "credit card")):
+            return val
+
+    # 3. 'at <Merchant> on <Date>'
+    m = re.search(r"\bat\s+([^\n\r\t,]+?)\s+on\s+\d{2}[-/]\d{2}[-/]\d{4}", text, re.I)
+    if m:
+        val = m.group(1).strip()
+        if val and not val.lower().startswith(("axis bank", "inr", "credit card")):
+            return val
+
+    # 4. Info: <Merchant>
+    m = re.search(r"\bInfo\s*[:\-]\s*([^\n\r\t]+)", text, re.I)
+    if m:
+        val = m.group(1).strip()
+        val = re.split(r"(?:Axis\s+Bank|Credit\s+Card|Date\s*&|Available\s+Limit)", val, flags=re.I)[0].strip()
+        if val and not val.lower().startswith(("axis bank", "inr", "credit card")):
+            return val
+
+    return None
 
 
 def _clean_channel_ref(raw: str) -> str:
@@ -239,6 +276,11 @@ class AxisBankParser:
                 parts = [p.strip() for p in channel_ref.split("/") if p.strip()]
                 if len(parts) >= 3:
                     merchant_raw = parts[-1]
+
+        if not merchant_raw:
+            merchant_raw = extract_axis_merchant(text)
+            if not merchant_raw and email.body_html:
+                merchant_raw = extract_axis_merchant(html_to_text(email.body_html))
 
         enrichment: dict = {
             "transaction_type": "purchase" if direction == "debit" else "other",

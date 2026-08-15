@@ -70,6 +70,9 @@ def get_transactions(
     sort_by: str | None = Query(None, pattern="^(date|amount|merchant|category|source|status)$"),
     sort_dir: str | None = Query(None, pattern="^(asc|desc)$"),
     merchant_id: str | None = None,
+    category_id: str | None = None,
+    category_ids: list[str] | None = Query(None),
+    subcategory_id: str | None = None,
 ) -> dict[str, Any]:
     return list_transactions(
         session,
@@ -83,6 +86,9 @@ def get_transactions(
         sort_by=sort_by,
         sort_dir=sort_dir,
         merchant_id=merchant_id,
+        category_id=category_id,
+        category_ids=category_ids,
+        subcategory_id=subcategory_id,
     )
 
 

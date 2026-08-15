@@ -8,13 +8,14 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, exists, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 
 IST = ZoneInfo("Asia/Kolkata")
 
-from expense_tracker.db.models import Account, Category, Email, IngestionRun, SyncState, Transaction
+from expense_tracker.db.models import Account, Category, DataIssueFlag, Email, IngestionRun, SyncState, Transaction
+from expense_tracker.domain.enums import DataIssueStatus
 
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
@@ -291,21 +292,30 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         for row in account_data if _as_float(row.total) > 0
     ]
 
-    # Review
+    # Review: actionable transactions needing review (excluding open data issues, not_a_transaction, and duplicates)
+    base_review_stmt = (
+        select(Transaction)
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(Transaction.needs_review.is_(True))
+        .where(Transaction.transaction_type != "not_a_transaction")
+        .where(Transaction.is_duplicate.is_(False))
+        .where(
+            ~exists(
+                select(DataIssueFlag.id).where(
+                    DataIssueFlag.transaction_id == Transaction.id,
+                    DataIssueFlag.status == DataIssueStatus.OPEN,
+                )
+            )
+        )
+    )
+
     needs_review_count = session.scalar(
-        select(func.count())
-        .select_from(Transaction)
-        .where(Transaction.transaction_date >= start)
-        .where(Transaction.transaction_date <= end)
-        .where(Transaction.needs_review.is_(True))
+        select(func.count()).select_from(base_review_stmt.subquery())
     ) or 0
-    
+
     needs_review_amount = session.scalar(
-        select(func.coalesce(func.sum(Transaction.amount), 0))
-        .where(Transaction.transaction_date >= start)
-        .where(Transaction.transaction_date <= end)
-        .where(Transaction.needs_review.is_(True))
-        .where(Transaction.direction == "debit")
+        select(func.coalesce(func.sum(base_review_stmt.subquery().c.amount), 0))
     ) or 0
 
     return {

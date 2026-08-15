@@ -90,10 +90,10 @@ function AccountModal({
   return createPortal(
     <div className="modal-backdrop" role="presentation" onClick={onBackdropClick}>
       <form className="modal-panel" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 650 }}>
-        <header className="modal-header" style={{ padding: "20px 24px", borderBottom: "1px solid var(--line)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <header className="modal-header">
           <div>
-            <h2 id={titleId} style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--ink)" }}>{account?.id ? "Edit Account" : "Add Account"}</h2>
-            <p style={{ margin: "4px 0 0 0", color: "var(--ink-muted)", fontSize: "0.85rem" }}>Add a bank, card, wallet, or other financial account.</p>
+            <h2 id={titleId}>{account?.id ? "Edit Account" : "Add Account"}</h2>
+            <p className="lead">Add a bank, card, wallet, or other financial account.</p>
           </div>
           <div className="modal-actions">
             <button ref={closeRef} type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
@@ -102,7 +102,7 @@ function AccountModal({
           </div>
         </header>
 
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 24, padding: "24px" }}>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           
           {/* Section: Basic Info */}
           <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -286,7 +286,7 @@ function AccountModal({
           </section>
         </div>
 
-        <footer style={{ padding: "16px 24px", borderTop: "1px solid var(--line)", background: "var(--surface)", display: "flex", justifyContent: "flex-end", alignItems: "center", borderRadius: "0 0 8px 8px", gap: 12 }}>
+        <footer className="modal-footer">
           <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>Cancel</button>
           <button type="submit" className="btn primary" disabled={saving}>
             {saving ? "Saving..." : "Save Account"}
@@ -380,16 +380,16 @@ export default function AccountsPage() {
         </div>
       </header>
 
-      <div className="panel table-wrap section">
-        <h3>Assets</h3>
-        <table className="table" style={{ marginTop: 12 }}>
+      <div className="section table-wrap">
+        <h2>Assets</h2>
+        <table style={{ marginTop: 8 }}>
           <thead>
             <tr>
               <th>Account Name</th>
               <th>Type</th>
               <th>Identifiers</th>
-              <th style={{ textAlign: "right" }}>Current Balance</th>
-              <th></th>
+              <th className="num">Current Balance</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -397,37 +397,35 @@ export default function AccountsPage() {
               <tr key={a.id}>
                 <td style={{ fontWeight: 600 }}>{a.name}</td>
                 <td><span className="badge">{a.account_type}</span></td>
-                <td style={{ color: "var(--ink-muted)", fontSize: "0.9rem" }}>
+                <td style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
                   {[a.account_number_masked, ...(a.upi_identifier_masked ? a.upi_identifier_masked.split(",").filter(s => s.trim()) : [])].filter(Boolean).join(" · ") || "—"}
                 </td>
-                <td style={{ textAlign: "right", fontWeight: 500 }}>{formatMoney(a.balance, a.currency)}</td>
-                <td style={{ textAlign: "right", paddingRight: 20 }}>
-                  <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                    <button className="btn quiet icon-btn" title="Edit Account" onClick={() => { setEditingAccount(a); setModalOpen(true); }} style={{ padding: 6 }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                    </button>
-                    <button className="btn quiet icon-btn" title="Delete Account" onClick={() => handleDelete(a.id)} style={{ padding: 6, color: "var(--danger)" }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                    </button>
-                  </div>
+                <td className="num tx-amount credit">{formatMoney(a.balance, a.currency)}</td>
+                <td className="row-actions">
+                  <button className="icon-action" type="button" title="Edit Account" aria-label={`Edit ${a.name}`} onClick={() => { setEditingAccount(a); setModalOpen(true); }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                  </button>
+                  <button className="icon-action danger" type="button" title="Delete Account" aria-label={`Delete ${a.name}`} onClick={() => handleDelete(a.id)} style={{ color: "var(--danger)" }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  </button>
                 </td>
               </tr>
             ))}
-            {assets.length === 0 && <tr><td colSpan={5} className="empty">No assets found</td></tr>}
+            {assets.length === 0 && <tr><td colSpan={5} className="empty">No assets recorded.</td></tr>}
           </tbody>
         </table>
       </div>
 
-      <div className="panel table-wrap section" style={{ marginTop: 24 }}>
-        <h3>Liabilities & Credit Cards</h3>
-        <table className="table" style={{ marginTop: 12 }}>
+      <div className="section table-wrap" style={{ marginTop: 32 }}>
+        <h2>Liabilities & Credit Cards</h2>
+        <table style={{ marginTop: 8 }}>
           <thead>
             <tr>
               <th>Account Name</th>
               <th>Type</th>
               <th>Identifiers</th>
-              <th style={{ textAlign: "right" }}>Current Balance</th>
-              <th></th>
+              <th className="num">Current Balance</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -435,23 +433,21 @@ export default function AccountsPage() {
               <tr key={a.id}>
                 <td style={{ fontWeight: 600 }}>{a.name}</td>
                 <td><span className="badge">{a.account_type}</span></td>
-                <td style={{ color: "var(--ink-muted)", fontSize: "0.9rem" }}>
+                <td style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
                   {[a.account_number_masked, a.card_last4].filter(Boolean).join(" · ") || "—"}
                 </td>
-                <td style={{ textAlign: "right", fontWeight: 500, color: "var(--danger)" }}>{formatMoney(a.balance, a.currency)}</td>
-                <td style={{ textAlign: "right", paddingRight: 20 }}>
-                  <div style={{ display: "flex", gap: 4, justifyContent: "flex-end" }}>
-                    <button className="btn quiet icon-btn" title="Edit Account" onClick={() => { setEditingAccount(a); setModalOpen(true); }} style={{ padding: 6 }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                    </button>
-                    <button className="btn quiet icon-btn" title="Delete Account" onClick={() => handleDelete(a.id)} style={{ padding: 6, color: "var(--danger)" }}>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                    </button>
-                  </div>
+                <td className="num tx-amount debit">{formatMoney(a.balance, a.currency)}</td>
+                <td className="row-actions">
+                  <button className="icon-action" type="button" title="Edit Account" aria-label={`Edit ${a.name}`} onClick={() => { setEditingAccount(a); setModalOpen(true); }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                  </button>
+                  <button className="icon-action danger" type="button" title="Delete Account" aria-label={`Delete ${a.name}`} onClick={() => handleDelete(a.id)} style={{ color: "var(--danger)" }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                  </button>
                 </td>
               </tr>
             ))}
-            {liabilities.length === 0 && <tr><td colSpan={5} className="empty">No liabilities found</td></tr>}
+            {liabilities.length === 0 && <tr><td colSpan={5} className="empty">No liabilities recorded.</td></tr>}
           </tbody>
         </table>
       </div>

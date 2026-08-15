@@ -161,3 +161,41 @@ def test_axis_declined_card_alert_is_excluded() -> None:
     assert tx.extra["excludes_from_spending"] is True
     assert tx.extra["needs_review"] is False
     assert tx.extra["classification_signals"]["rule"] == "axis_declined_transaction"
+
+
+def test_axis_credit_card_merchant_extraction() -> None:
+    parser = AxisBankParser()
+    body_text = """
+13-06-2026 Dear Gaurav Singh,
+Here's the summary of your Axis Bank Credit Card Transaction:
+Transaction Amount:
+INR 1264
+Merchant Name:
+AMAZON PAY
+Axis Bank Credit Card No.
+XX4951
+Date & Time:
+13-06-2026, 18:08:48 IST
+Available Limit*:
+INR 1148594.89
+Total Credit Limit*:
+INR 1193000
+"""
+    email = EmailContext(
+        message_id="axis-cc-amazon-1",
+        thread_id="t_cc_1",
+        sender="Axis Bank Alerts <alerts@axis.bank.in>",
+        subject="INR 1264 spent on credit card no. XX4951",
+        received_at=datetime(2026, 6, 13, 18, 8, 48, tzinfo=timezone.utc),
+        body_text=body_text,
+    )
+    assert parser.can_parse(email) >= 0.9
+    parsed = parser.parse(email)
+    assert len(parsed) == 1
+    tx = parsed[0]
+    assert tx.amount == Decimal("1264")
+    assert tx.direction == "debit"
+    assert tx.merchant_raw == "AMAZON PAY"
+    assert tx.card == "4951"
+    assert tx.transaction_date.day == 13
+    assert tx.transaction_date.month == 6

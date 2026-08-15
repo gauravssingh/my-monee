@@ -113,6 +113,9 @@ def list_transactions(
     sort_by: str | None = None,
     sort_dir: str | None = None,
     merchant_id: str | None = None,
+    category_id: str | None = None,
+    category_ids: list[str] | None = None,
+    subcategory_id: str | None = None,
 ) -> dict[str, Any]:
     stmt = (
         select(Transaction)
@@ -147,12 +150,50 @@ def list_transactions(
     if merchant_id:
         stmt = stmt.where(Transaction.merchant_entity_id == merchant_id)
 
-    stmt = _apply_sort(stmt, sort_by, sort_dir)
+    cats = list(category_ids or [])
+    if category_id:
+        if "," in category_id:
+            cats.extend([c.strip() for c in category_id.split(",") if c.strip()])
+        else:
+            cats.append(category_id)
 
-    total = len(session.execute(stmt).unique().scalars().all())
+    if cats:
+        has_uncat = "uncategorized" in cats
+        specific_cats = [c for c in cats if c != "uncategorized"]
+        if has_uncat and specific_cats:
+            stmt = stmt.where(
+                (Transaction.category_id.is_(None)) | (Transaction.category_id.in_(specific_cats))
+            )
+        elif has_uncat:
+            stmt = stmt.where(Transaction.category_id.is_(None))
+        elif specific_cats:
+            if len(specific_cats) == 1 and subcategory_id:
+                stmt = stmt.where(
+                    (Transaction.category_id == specific_cats[0])
+                    & (Transaction.subcategory_id == subcategory_id)
+                )
+            else:
+                stmt = stmt.where(Transaction.category_id.in_(specific_cats))
+
+    base_filtered_stmt = stmt
+    stmt = _apply_sort(base_filtered_stmt, sort_by, sort_dir)
+
+    subq = base_filtered_stmt.subquery()
+    total = session.scalar(select(func.count()).select_from(subq)) or 0
+    total_amount = session.scalar(select(func.coalesce(func.sum(subq.c.amount), 0))) or 0
+    total_debit = session.scalar(
+        select(func.coalesce(func.sum(subq.c.amount), 0)).where(subq.c.direction == "debit")
+    ) or 0
+    total_credit = session.scalar(
+        select(func.coalesce(func.sum(subq.c.amount), 0)).where(subq.c.direction == "credit")
+    ) or 0
+
     rows = session.execute(stmt.limit(limit).offset(offset)).unique().scalars().all()
     return {
-        "total": total,
+        "total": int(total),
+        "total_amount": _as_float(total_amount),
+        "total_debit": _as_float(total_debit),
+        "total_credit": _as_float(total_credit),
         "limit": limit,
         "offset": offset,
         "items": [serialize_transaction(tx) for tx in rows],

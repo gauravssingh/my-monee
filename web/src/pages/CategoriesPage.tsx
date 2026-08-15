@@ -51,11 +51,11 @@ function SubCategoryChip({
         alignItems: "center",
         gap: 4,
         padding: "2px 8px",
-        borderRadius: 4,
-        background: armed ? "var(--debit-soft, #fef2f2)" : "var(--surface, #f8fafc)",
-        border: `1px solid ${armed ? "var(--danger, #ef4444)" : "var(--line, #e2e8f0)"}`,
+        borderRadius: "var(--radius-sm, 4px)",
+        background: armed ? "var(--debit-soft)" : "var(--bg)",
+        border: `1px solid ${armed ? "var(--danger)" : "var(--line)"}`,
         fontSize: "0.8125rem",
-        color: armed ? "var(--danger, #ef4444)" : "var(--ink, #1e293b)",
+        color: armed ? "var(--danger)" : "var(--ink)",
       }}
     >
       {name}

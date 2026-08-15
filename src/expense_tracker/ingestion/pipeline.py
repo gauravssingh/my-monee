@@ -12,7 +12,20 @@ from sqlalchemy.orm import Session
 
 from expense_tracker.config import Settings
 from expense_tracker.classification.enrichment import apply_parsed_enrichment
-from expense_tracker.db.models import Email, IngestionEvent, IngestionRun, SyncState, Transaction, utcnow, Account, Institution, FinancialEvent, Posting
+from expense_tracker.db.models import (
+    Account,
+    Email,
+    FinancialEvent,
+    IngestionEvent,
+    IngestionRun,
+    Institution,
+    Merchant,
+    MerchantAlias,
+    Posting,
+    SyncState,
+    Transaction,
+    utcnow,
+)
 from expense_tracker.domain.enums import EmailParseStatus, IngestionRunStatus
 from expense_tracker.ingestion.discovery import DiscoveryRules, load_discovery_rules
 from expense_tracker.ingestion.fingerprint import transaction_fingerprint
@@ -130,7 +143,56 @@ def _upsert_email(
     return existing
 
 
-def _apply_parsed_fields(tx: Transaction, parsed: ParsedTransaction, *, source: str) -> None:
+def _resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | None) -> str | None:
+    if not raw and not norm:
+        return None
+    raw_val = raw or norm or "Unknown Merchant"
+    norm_val = norm or raw_val.lower().replace(" ", "_").strip() or "unknown_merchant"
+
+    # 1. Check if an alias matches raw
+    if raw:
+        alias = session.scalar(select(MerchantAlias).where(MerchantAlias.alias_raw == raw).limit(1))
+        if alias:
+            return alias.merchant_id
+
+    # 2. Check if Merchant exists by normalized_key
+    merchant = session.scalar(select(Merchant).where(Merchant.normalized_key == norm_val).limit(1))
+    if merchant:
+        return merchant.id
+
+    # 3. Create new Merchant entity
+    display_name = raw_val.upper() if len(raw_val) < 4 else raw_val.title()
+    merchant = Merchant(
+        display_name=display_name,
+        normalized_key=norm_val,
+        canonical_name=None,
+    )
+    session.add(merchant)
+    session.flush()
+
+    if raw:
+        try:
+            alias = MerchantAlias(
+                merchant_id=merchant.id,
+                alias_raw=raw,
+                alias_normalized=norm_val,
+                source="ingestion",
+            )
+            session.add(alias)
+            session.flush()
+        except Exception:
+            pass
+
+    return merchant.id
+
+
+def _apply_parsed_fields(
+    tx: Transaction,
+    parsed: ParsedTransaction,
+    *,
+    source: str,
+    session: Session | None = None,
+) -> None:
     desc = f"{parsed.description or ''} {parsed.merchant_raw or ''}".lower()
     is_refund = parsed.transaction_type == "refund" or (
         parsed.direction == "credit" and "refund" in desc
@@ -145,6 +207,10 @@ def _apply_parsed_fields(tx: Transaction, parsed: ParsedTransaction, *, source: 
     tx.transaction_type = parsed.transaction_type
     tx.merchant_raw = parsed.merchant_raw
     tx.merchant_normalized = normalize_merchant(parsed.merchant_raw)
+    if session is not None:
+        tx.merchant_entity_id = _resolve_merchant_entity_id(
+            session, tx.merchant_raw, tx.merchant_normalized
+        )
     tx.payment_method = parsed.payment_method
     tx.account = parsed.account
     tx.card = parsed.card
@@ -253,7 +319,7 @@ def _persist_parsed(
             existing.fingerprint = fingerprint
             existing.source_thread_id = message.thread_id
             existing.raw_email_reference = message.id
-            _apply_parsed_fields(existing, parsed, source=source)
+            _apply_parsed_fields(existing, parsed, source=source, session=session)
             apply_parsed_enrichment(session, existing, parsed)
         else:
             existing.updated_at = utcnow()
@@ -266,7 +332,7 @@ def _persist_parsed(
         fingerprint=fingerprint,
         raw_email_reference=message.id,
     )
-    _apply_parsed_fields(tx, parsed, source=source)
+    _apply_parsed_fields(tx, parsed, source=source, session=session)
     
     # Ledger integration
     acc = _get_or_create_account(session, parsed)
