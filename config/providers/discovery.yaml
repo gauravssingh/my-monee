@@ -62,6 +62,10 @@ exclude_sender_patterns:
   - ".*@bookmyshow\\.email"
   - "no-reply@razorpay\\.com"
   - ".*@razorpay\\.com"
+  - "noreply@phonepe\\.com"
+  - "reports@phonepe\\.com"
+  - ".*@phonepe\\.com"
+
 
 
 
