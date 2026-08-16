@@ -64,6 +64,14 @@ exclude_sender_patterns:
   - ".*@razorpay\\.com"
   - "order-update@amazon\\.in"
   - "return@amazon\\.in"
+  - ".*@swiggy\\.in"
+  - ".*@.*playstation\\.com"
+  - ".*@.*actcorp\\.in"
+  - ".*@mail\\.1mg\\.com"
+  - "sales@shopershop\\.in"
+  - ".*@vesta\\.threadloom\\.news"
+  - ".*@cleartax\\.in"
+
 
 
 
