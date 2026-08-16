@@ -55,4 +55,12 @@ exclude_subject_patterns:
 exclude_sender_patterns:
   - "noreply@.*(promo|marketing|offers)"
   - "eforex@axisbank\\.com"
+  - "alerts@bigbasket\\.com"
+  - "bbdailysupport@bigbasket\\.com"
+  - ".*@bigbasket\\.com"
+  - "tickets@bookmyshow\\.email"
+  - ".*@bookmyshow\\.email"
+
+
+
 
