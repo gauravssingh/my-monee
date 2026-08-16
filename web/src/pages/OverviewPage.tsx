@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type Overview, type AccountsResponse, type IncomeTrend } from "../api";
-import IncomeTrendModal from "../components/IncomeTrendModal";
+import { api, type Overview, type FinancialTrends } from "../api";
+import FinancialTrendModal, { type TrendMetricType } from "../components/FinancialTrendModal";
 import { formatMoney, formatCompactMoney, monthLabel, formatDate } from "../format";
 
 function getPeriodLabel(year: number, month: number) {
@@ -12,6 +12,35 @@ function getPeriodLabel(year: number, month: number) {
   return `${startStr} – ${endStr}`;
 }
 
+function getHumanSummary(overview: Overview, date: { year: number; month: number }) {
+  const spentL = (overview.summary.spent / 100000).toFixed(2);
+  const incomeL = (overview.summary.income / 100000).toFixed(2);
+  const netK = (Math.abs(overview.summary.net_cash_flow) / 1000).toFixed(1);
+  const prevMonthName = new Date(date.year, date.month - 2, 1).toLocaleDateString("en-GB", { month: "short" });
+
+  let diffText = "";
+  if (overview.month_comparison.spent_change_pct != null) {
+    const isLess = overview.month_comparison.spent_change_pct < 0;
+    const absPct = Math.abs(overview.month_comparison.spent_change_pct).toFixed(1);
+    diffText = `, ${absPct}% ${isLess ? "less" : "more"} than ${prevMonthName}`;
+  }
+
+  const consumerSpent = overview.summary.consumer_spent != null ? overview.summary.consumer_spent : overview.summary.spent;
+  const commitmentsSpent = overview.summary.commitments_spent || 0;
+
+  let compositionText = "";
+  if (commitmentsSpent > 0 && consumerSpent > 0) {
+    const consL = (consumerSpent / 100000).toFixed(2);
+    const commK = (commitmentsSpent / 1000).toFixed(1);
+    compositionText = ` (₹${consL}L living expenses + ₹${commK}k loan commitments)`;
+  }
+
+  const flowType = overview.summary.net_cash_flow >= 0 ? "positive cash flow" : "net deficit";
+  const flowSign = overview.summary.net_cash_flow >= 0 ? "+" : "-";
+
+  return `You spent ₹${spentL}L this month${compositionText}${diffText}. Income was ₹${incomeL}L, leaving a ${flowType} of ${flowSign}₹${netK}k.`;
+}
+
 export default function OverviewPage() {
   const navigate = useNavigate();
   const [date, setDate] = useState(() => {
@@ -19,22 +48,22 @@ export default function OverviewPage() {
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
   });
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [accounts, setAccounts] = useState<AccountsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAllCategories, setShowAllCategories] = useState(false);
-  const [hoveredDay, setHoveredDay] = useState<{ day: number; dateStr: string; spent: number } | null>(null);
+  const [showAllLiving, setShowAllLiving] = useState(false);
+  const [hoveredDay, setHoveredDay] = useState<{ day: number; dateStr: string; spent: number; count: number } | null>(null);
 
-  // Income trend modal state
-  const [incomeTrendOpen, setIncomeTrendOpen] = useState(false);
-  const [incomeTrend, setIncomeTrend] = useState<IncomeTrend | null>(null);
-  const [incomeTrendLoading, setIncomeTrendLoading] = useState(false);
-  const [incomeTrendError, setIncomeTrendError] = useState<string | null>(null);
+  // Financial trend modal state (Spent, Income, Net Cash Flow)
+  const [trendModalOpen, setTrendModalOpen] = useState(false);
+  const [trendMetric, setTrendMetric] = useState<TrendMetricType>("spent");
+  const [financialTrends, setFinancialTrends] = useState<FinancialTrends | null>(null);
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trendsError, setTrendsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setShowAllCategories(false);
+    setShowAllLiving(false);
 
     api
       .overview(date.year, date.month)
@@ -49,13 +78,6 @@ export default function OverviewPage() {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
-    api
-      .accounts()
-      .then((a) => {
-        if (!cancelled) setAccounts(a);
-      })
-      .catch(console.error);
 
     return () => {
       cancelled = true;
@@ -81,20 +103,21 @@ export default function OverviewPage() {
     setDate({ year: now.getFullYear(), month: now.getMonth() + 1 });
   }
 
-  function openIncomeTrend() {
-    setIncomeTrendOpen(true);
-    setIncomeTrendLoading(true);
-    setIncomeTrendError(null);
+  function openTrend(metric: TrendMetricType) {
+    setTrendMetric(metric);
+    setTrendModalOpen(true);
+    setTrendsLoading(true);
+    setTrendsError(null);
     api
-      .incomeTrend(6)
-      .then((trend) => {
-        setIncomeTrend(trend);
+      .financialTrends(12, date.year, date.month)
+      .then((t) => {
+        setFinancialTrends(t);
       })
       .catch((err: Error) => {
-        setIncomeTrendError(err.message);
+        setTrendsError(err.message);
       })
       .finally(() => {
-        setIncomeTrendLoading(false);
+        setTrendsLoading(false);
       });
   }
 
@@ -115,8 +138,18 @@ export default function OverviewPage() {
     return map;
   }, [overview]);
 
+  const dailyCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (overview?.daily_spending) {
+      for (const d of overview.daily_spending) {
+        map.set(d.date, d.count || (d.spent > 0 ? 1 : 0));
+      }
+    }
+    return map;
+  }, [overview]);
+
   const fullDailyData = useMemo(() => {
-    const data: Array<{ day: number; dateStr: string; spent: number }> = [];
+    const data: Array<{ day: number; dateStr: string; spent: number; count: number }> = [];
     for (let day = 1; day <= daysInMonth; day++) {
       const padM = String(date.month).padStart(2, "0");
       const padD = String(day).padStart(2, "0");
@@ -125,10 +158,11 @@ export default function OverviewPage() {
         day,
         dateStr,
         spent: dailyMap.get(dateStr) || 0,
+        count: dailyCountMap.get(dateStr) || 0,
       });
     }
     return data;
-  }, [daysInMonth, date.year, date.month, dailyMap]);
+  }, [daysInMonth, date.year, date.month, dailyMap, dailyCountMap]);
 
   type CategoryBreakdownItem = Overview["category_breakdown"][number];
 
@@ -169,39 +203,28 @@ export default function OverviewPage() {
   const spendingDiff = overview.summary.spent - overview.month_comparison.previous_spent;
   const incomeDiff = overview.summary.income - overview.month_comparison.previous_income;
 
-  const consumerCategories = overview.category_breakdown.filter((c) =>
-    ["essential", "discretionary"].includes(c.expense_type || "")
+  // Split Living Expenses vs Financial Commitments
+  const commitmentCategories = overview.category_breakdown.filter((c) =>
+    ["essential", "financial", "commitment"].includes(c.expense_type || "") ||
+    ["loans", "loan", "fees & interest", "fees-interest", "emi", "family"].includes(c.category.toLowerCase())
   );
-  const otherCategories = overview.category_breakdown.filter((c) =>
-    ["transfer", "financial", "investment"].includes(c.expense_type || "")
-  );
-  const uncategorizedCategories = overview.category_breakdown.filter(
-    (c) => !["essential", "discretionary", "transfer", "financial", "investment"].includes(c.expense_type || "")
+  const livingCategories = overview.category_breakdown.filter((c) =>
+    !commitmentCategories.some((cc) => cc.category_id === c.category_id) && c.total > 0
   );
 
-  function renderCategoryGroup(title: string, cats: Overview["category_breakdown"]) {
-    if (cats.length === 0) return null;
+  const livingTotal = livingCategories.reduce((acc, c) => acc + c.total, 0);
+  const commitmentTotal = commitmentCategories.reduce((acc, c) => acc + c.total, 0);
+
+  function renderCategoryList(cats: Overview["category_breakdown"], totalSum: number, isLivingGroup = false) {
+    if (cats.length === 0) return <p className="empty" style={{ fontSize: "0.85rem", padding: "8px 0" }}>None recorded</p>;
     const maxCat = Math.max(1, ...cats.map((c) => c.total));
-    const displayCats = showAllCategories ? cats : cats.slice(0, 5);
+    const displayCats = isLivingGroup && !showAllLiving ? cats.slice(0, 5) : cats;
 
     return (
-      <div style={{ marginBottom: "20px" }}>
-        <div
-          style={{
-            fontSize: "0.72rem",
-            fontWeight: 700,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            color: "var(--ink-muted)",
-            marginBottom: "10px",
-            paddingBottom: "4px",
-            borderBottom: "1px solid var(--line)",
-          }}
-        >
-          {title}
-        </div>
-        <div className="category-list">
-          {displayCats.map((c) => (
+      <div className="category-list">
+        {displayCats.map((c) => {
+          const groupPct = totalSum > 0 ? (c.total / totalSum) * 100 : 0;
+          return (
             <div
               key={c.category_id}
               className="category-row"
@@ -222,79 +245,141 @@ export default function OverviewPage() {
               </div>
               <div className="category-total" style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
                 <span style={{ color: "var(--ink-muted)", fontSize: "0.8rem", fontWeight: 500 }}>
-                  {c.percentage.toFixed(1)}%
+                  {groupPct.toFixed(1)}%
                 </span>
                 <span>{formatMoney(c.total, overview!.currency)}</span>
               </div>
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
     );
   }
 
+  // Increase/Decrease context helpers
+  const prevInc = biggestIncrease ? biggestIncrease.previous_total || 0 : 0;
+  const incContext = prevInc === 0 ? "New this month" : `vs ${formatMoney(prevInc, overview.currency)}`;
+
+  const prevDec = biggestDecrease ? biggestDecrease.previous_total || 0 : 0;
+  const decPct = prevDec > 0 && biggestDecrease ? Math.round(((prevDec - biggestDecrease.total) / prevDec) * 100) : null;
+  const decContext = decPct != null ? `↓ ${decPct}% vs last month` : `vs ${formatMoney(prevDec, overview.currency)}`;
+
+  const monthParamFrom = `${date.year}-${String(date.month).padStart(2, "0")}-01`;
+  const monthParamTo = `${date.year}-${String(date.month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
   return (
-    <div className="overview-page" style={{ animation: "rise 0.4s ease both" }}>
-      {/* Page Header with Month Selector */}
+    <div className="overview-page" style={{ animation: "rise 0.4s ease both", maxWidth: 1060, margin: "0 auto" }}>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ZONE 1: MONTH SUMMARY & FLOW                                  */}
+      {/* ───────────────────────────────────────────────────────────── */}
+
+      {/* Page Header with Restrained Typography & Month Controls */}
       <header
+        className="overview-header"
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-end",
           flexWrap: "wrap",
-          gap: "16px",
-          marginBottom: "20px",
+          gap: "14px",
+          marginBottom: "14px",
         }}
       >
         <div>
-          <h1 className="page-title" style={{ margin: 0 }}>Monthly Analysis</h1>
-          <p className="lead" style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontSize: "0.9rem" }}>
+          <h1 className="page-title" style={{ margin: 0, fontSize: "1.75rem", letterSpacing: "-0.02em" }}>
+            Monthly Analysis
+          </h1>
+          <p className="lead" style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontSize: "0.86rem" }}>
             {getPeriodLabel(date.year, date.month)}
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        {/* Minimal Restrained Month Switcher: ‹ Previous August 2026 Next › */}
+        <div className="month-navigator" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
           {!isCurrentMonth && (
-            <button className="btn quiet" onClick={goToCurrentMonth} disabled={loading}>
+            <button
+              type="button"
+              className="btn quiet"
+              onClick={goToCurrentMonth}
+              disabled={loading}
+              title="Jump to current month"
+              aria-label="Current month"
+              style={{ fontSize: "0.8rem", padding: "4px 8px", marginRight: 4 }}
+            >
               This Month
             </button>
           )}
-          <button className="btn quiet" onClick={prevMonth} disabled={loading} aria-label="Previous month">
-            ← Previous
+          <button
+            type="button"
+            className="btn quiet"
+            onClick={prevMonth}
+            disabled={loading}
+            title="Previous month"
+            aria-label="Previous month"
+            style={{ fontSize: "0.86rem", padding: "4px 8px", color: "var(--ink)" }}
+          >
+            ‹ Previous
           </button>
-          <strong style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", padding: "0 6px" }}>
+          <strong style={{ fontFamily: "var(--font-display)", fontSize: "1.02rem", padding: "0 8px", whiteSpace: "nowrap" }}>
             {monthLabel(date.year, date.month)}
           </strong>
-          <button className="btn quiet" onClick={nextMonth} disabled={loading} aria-label="Next month">
-            Next →
+          <button
+            type="button"
+            className="btn quiet"
+            onClick={nextMonth}
+            disabled={loading}
+            title="Next month"
+            aria-label="Next month"
+            style={{ fontSize: "0.86rem", padding: "4px 8px", color: "var(--ink)" }}
+          >
+            Next ›
           </button>
         </div>
       </header>
 
-      {/* Needs Review / Data Quality Banner */}
-      {overview.review.needs_review_count > 0 && (() => {
-        const padM = String(date.month).padStart(2, "0");
-        const from = `${date.year}-${padM}-01`;
-        const to = `${date.year}-${padM}-${String(daysInMonth).padStart(2, "0")}`;
-        return (
-          <div className="attention-banner" role="alert">
-            <div className="attention-banner-content">
-              <span className="attention-banner-icon" aria-hidden="true">⚠</span>
-              <span>
-                <strong>{overview.review.needs_review_count} transactions</strong> (
-                {formatMoney(overview.review.needs_review_amount, overview.currency)}) need classification
-              </span>
-            </div>
-            <Link to={`/review?date_from=${from}&date_to=${to}`} className="attention-banner-link">
-              Review →
-            </Link>
-          </div>
-        );
-      })()}
+      {/* Human Deterministic Summary Sentence */}
+      <div
+        style={{
+          fontSize: "0.93rem",
+          color: "var(--ink-muted)",
+          lineHeight: 1.5,
+          marginBottom: "18px",
+          padding: "10px 14px",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--radius)",
+        }}
+      >
+        <span style={{ color: "var(--ink)", fontWeight: 500 }}>
+          {getHumanSummary(overview, date)}
+        </span>
+      </div>
 
-      {/* Primary Financial Flow KPI Strip */}
-      <section className="metrics" aria-label="Monthly financial flow">
-        <article className="metric">
+      {/* Needs Review / Data Quality Banner (if any) */}
+      {overview.review.needs_review_count > 0 && (
+        <div className="attention-banner" role="alert" style={{ marginBottom: "16px" }}>
+          <div className="attention-banner-content">
+            <span className="attention-banner-icon" aria-hidden="true">⚠</span>
+            <span>
+              <strong>{overview.review.needs_review_count} transactions</strong> (
+              {formatMoney(overview.review.needs_review_amount, overview.currency)}) need classification
+            </span>
+          </div>
+          <Link to={`/review?date_from=${monthParamFrom}&date_to=${monthParamTo}`} className="attention-banner-link">
+            Review →
+          </Link>
+        </div>
+      )}
+
+      {/* Primary Financial Flow KPI Strip (Clean, Clickable for 6M trend, No TREND ↗ label) */}
+      <section className="metrics" aria-label="Monthly financial flow" style={{ marginBottom: "12px" }}>
+        <button
+          type="button"
+          className="metric-button"
+          onClick={() => openTrend("spent")}
+          title="Click to view 6-month spending trend"
+          aria-label="Total Spent, click to view 6-month trend"
+        >
           <div className="metric-label">Total Spent</div>
           <div className="metric-value">{formatMoney(overview.summary.spent, overview.currency)}</div>
           <div className="metric-hint">
@@ -307,19 +392,16 @@ export default function OverviewPage() {
               "vs last month —"
             )}
           </div>
-        </article>
+        </button>
 
         <button
           type="button"
           className="metric-button"
-          onClick={openIncomeTrend}
+          onClick={() => openTrend("income")}
           title="Click to view 6-month income trend"
           aria-label="Income, click to view 6-month trend"
         >
-          <div className="metric-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>Income</span>
-            <span style={{ fontSize: "0.68rem", color: "var(--accent)", fontWeight: 600 }}>Trend ↗</span>
-          </div>
+          <div className="metric-label">Income</div>
           <div className="metric-value" style={{ color: "var(--credit)" }}>
             {formatMoney(overview.summary.income, overview.currency)}
           </div>
@@ -335,7 +417,13 @@ export default function OverviewPage() {
           </div>
         </button>
 
-        <article className="metric">
+        <button
+          type="button"
+          className="metric-button"
+          onClick={() => openTrend("cash_flow")}
+          title="Click to view 6-month net cash flow trend"
+          aria-label="Net Cash Flow, click to view 6-month trend"
+        >
           <div className="metric-label">Net Cash Flow</div>
           <div
             className="metric-value"
@@ -347,105 +435,134 @@ export default function OverviewPage() {
             {formatMoney(overview.summary.net_cash_flow, overview.currency)}
           </div>
           <div className="metric-hint">Income − spending</div>
-        </article>
+        </button>
       </section>
 
-      {/* Supporting Metrics: Flow Volume & Financial Position */}
-      <section
+      {/* Inline Reconciled Transactions Volume Sub-line */}
+      <div
         style={{
-          display: "grid",
-          gridTemplateColumns: accounts ? "1fr 1fr" : "1fr",
-          gap: "16px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "8px",
+          fontSize: "0.84rem",
+          color: "var(--ink-muted)",
+          padding: "8px 12px",
+          background: "var(--surface-muted, rgba(0,0,0,0.02))",
+          borderRadius: "var(--radius-sm)",
           marginBottom: "28px",
+          border: "1px solid var(--line)",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "10px 16px",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--radius)",
-            background: "var(--surface)",
-          }}
-        >
-          <span style={{ fontSize: "0.85rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-            Transactions
-          </span>
-          <span style={{ fontSize: "0.92rem", fontWeight: 600 }}>
-            {overview.summary.transaction_count} total{" "}
-            <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>
-              ({overview.summary.debit_count} out · {overview.summary.credit_count} in)
+        <div>
+          <strong style={{ color: "var(--ink)" }}>{overview.summary.transaction_count} expenses recorded</strong>
+          {" · "}
+          <span>{formatMoney(overview.summary.spent, overview.currency)} out</span>
+          {overview.summary.excluded_count ? (
+            <span style={{ opacity: 0.85 }}>
+              {" · "}
+              {overview.summary.excluded_count} transfers & alerts filtered
             </span>
-          </span>
+          ) : null}
         </div>
+        <Link
+          to={`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}`}
+          style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600, fontSize: "0.82rem" }}
+        >
+          View all transactions →
+        </Link>
+      </div>
 
-        {accounts && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "10px 16px",
-              border: "1px solid var(--line)",
-              borderRadius: "var(--radius)",
-              background: "var(--surface)",
-            }}
-          >
-            <span style={{ fontSize: "0.85rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Net Worth Position
-            </span>
-            <span style={{ fontSize: "0.92rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
-              {formatMoney(accounts.net_worth, overview.currency)}{" "}
-              <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>
-                ({accounts.accounts.length} accounts)
-              </span>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ZONE 2: SPENDING ANALYSIS (Breakdown & Daily Pattern)         */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="grid-2" style={{ marginBottom: "28px", alignItems: "start" }}>
+        {/* Left: Spending Breakdown (Living Expenses vs Financial Commitments) */}
+        <section className="section" style={{ height: "100%" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
+            <h2 style={{ margin: 0 }}>Spending Breakdown</h2>
+            <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
+              {formatMoney(overview.summary.spent, overview.currency)} total
             </span>
           </div>
-        )}
-      </section>
 
-      {/* Spending Breakdown & Daily Spending Chart (60/40 grid) */}
-      <div className="grid-2" style={{ marginBottom: "28px" }}>
-        {/* Left: Spending Breakdown */}
-        <section className="section">
-          <h2>Spending Breakdown</h2>
           {overview.category_breakdown.length === 0 ? (
             <p className="empty">No spending recorded for this month.</p>
           ) : (
             <div>
-              {renderCategoryGroup("Consumer Spending", consumerCategories)}
-              {renderCategoryGroup("Other Cash Movements", otherCategories)}
-              {renderCategoryGroup("Other / Uncategorized", uncategorizedCategories)}
+              {/* Group 1: Living / Consumer Expenses */}
+              <div style={{ marginBottom: "20px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--ink-muted)",
+                    marginBottom: "10px",
+                    paddingBottom: "4px",
+                    borderBottom: "1px solid var(--line)",
+                  }}
+                >
+                  <span>Consumer & Living Spending</span>
+                  <span>{formatMoney(livingTotal, overview.currency)}</span>
+                </div>
+                {renderCategoryList(livingCategories, livingTotal, true)}
+                {livingCategories.length > 5 && (
+                  <div style={{ marginTop: "8px" }}>
+                    <button
+                      type="button"
+                      className="btn quiet"
+                      onClick={() => setShowAllLiving((prev) => !prev)}
+                      style={{ fontSize: "0.8rem", padding: "2px 6px" }}
+                    >
+                      {showAllLiving ? "Show top living categories ↑" : `View all ${livingCategories.length} categories →`}
+                    </button>
+                  </div>
+                )}
+              </div>
 
-              {overview.category_breakdown.length > 5 && (
-                <div style={{ marginTop: "12px", textAlign: "left" }}>
-                  <button
-                    type="button"
-                    className="btn quiet"
-                    onClick={() => setShowAllCategories((prev) => !prev)}
-                    style={{ fontSize: "0.85rem", padding: "4px 8px" }}
+              {/* Group 2: Financial Commitments & Loan Obligations */}
+              {commitmentCategories.length > 0 && (
+                <div>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "var(--ink-muted)",
+                      marginBottom: "10px",
+                      paddingBottom: "4px",
+                      borderBottom: "1px solid var(--line)",
+                    }}
                   >
-                    {showAllCategories ? "Show top categories ↑" : "View all categories →"}
-                  </button>
+                    <span>Financial Commitments & Loans</span>
+                    <span>{formatMoney(commitmentTotal, overview.currency)}</span>
+                  </div>
+                  {renderCategoryList(commitmentCategories, commitmentTotal, false)}
                 </div>
               )}
             </div>
           )}
         </section>
 
-        {/* Right: Daily Spending Chart */}
-        <section className="section" style={{ display: "flex", flexDirection: "column" }}>
+        {/* Right: Daily Spending Chart with Interactive Tooltip & Click-through */}
+        <section className="section" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
-            <h2>Daily Spending</h2>
+            <h2 style={{ margin: 0 }}>Daily Spending</h2>
             <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", textAlign: "right" }}>
               Avg {formatCompactMoney(avgDaily, overview.currency)} / day · Peak {formatCompactMoney(maxDaily, overview.currency)}
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "8px", height: "190px", marginTop: "8px" }}>
-            {/* Y-Axis Column */}
+          <div style={{ display: "flex", gap: "8px", height: "200px", marginTop: "8px" }}>
+            {/* Y-Axis Scale Column */}
             <div
               style={{
                 width: "44px",
@@ -469,41 +586,12 @@ export default function OverviewPage() {
 
             {/* Bars Canvas Container */}
             <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "flex-end", gap: "2px", paddingTop: "8px", paddingBottom: "2px" }}>
-              {/* Horizontal Grid lines */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  top: "2px",
-                  borderTop: "1px dashed var(--line)",
-                  opacity: 0.6,
-                  pointerEvents: "none",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  top: "50%",
-                  borderTop: "1px dashed var(--line)",
-                  opacity: 0.6,
-                  pointerEvents: "none",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  bottom: "2px",
-                  borderTop: "1px solid var(--line)",
-                  pointerEvents: "none",
-                }}
-              />
+              {/* Horizontal Reference Lines */}
+              <div style={{ position: "absolute", left: 0, right: 0, top: "2px", borderTop: "1px dashed var(--line)", opacity: 0.6, pointerEvents: "none" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: "1px dashed var(--line)", opacity: 0.6, pointerEvents: "none" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: "2px", borderTop: "1px solid var(--line)", pointerEvents: "none" }} />
 
-              {/* Average Reference Line */}
+              {/* Subtle Average Reference Line */}
               {avgDaily > 0 && maxDaily > 0 && (
                 <div
                   style={{
@@ -512,7 +600,7 @@ export default function OverviewPage() {
                     right: 0,
                     bottom: `${Math.min(100, (avgDaily / maxDaily) * 100)}%`,
                     borderTop: "1px dashed var(--accent)",
-                    opacity: 0.7,
+                    opacity: 0.65,
                     pointerEvents: "none",
                     zIndex: 0,
                   }}
@@ -530,6 +618,11 @@ export default function OverviewPage() {
                     key={d.day}
                     onMouseEnter={() => setHoveredDay(d)}
                     onMouseLeave={() => setHoveredDay(null)}
+                    onClick={() => {
+                      if (hasSpend) {
+                        navigate(`/transactions?date_from=${d.dateStr}&date_to=${d.dateStr}`);
+                      }
+                    }}
                     style={{
                       flex: 1,
                       display: "flex",
@@ -542,25 +635,32 @@ export default function OverviewPage() {
                       cursor: hasSpend ? "pointer" : "default",
                     }}
                   >
-                    {/* Floating Value Pill on hover */}
+                    {/* Rich Hover Tooltip (Date, Amount, Count) */}
                     {isHovered && hasSpend && (
                       <div
                         style={{
                           position: "absolute",
-                          bottom: `calc(${Math.max(4, heightPct)}% + 6px)`,
+                          bottom: `calc(${Math.max(6, heightPct)}% + 8px)`,
                           background: "var(--ink)",
                           color: "#fff",
-                          padding: "2px 6px",
+                          padding: "5px 9px",
                           borderRadius: "var(--radius-sm)",
-                          fontSize: "0.7rem",
+                          fontSize: "0.74rem",
                           fontVariantNumeric: "tabular-nums",
                           whiteSpace: "nowrap",
                           pointerEvents: "none",
-                          zIndex: 10,
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                          zIndex: 20,
+                          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                          textAlign: "center",
                         }}
                       >
-                        {formatMoney(d.spent, overview.currency)}
+                        <div style={{ fontWeight: 600 }}>{formatDate(d.dateStr)}</div>
+                        <div style={{ fontSize: "0.85rem", marginTop: 2 }}>{formatMoney(d.spent, overview.currency)}</div>
+                        {d.count > 0 && (
+                          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.7)", marginTop: 1 }}>
+                            {d.count} {d.count === 1 ? "transaction" : "transactions"} · click to view
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -580,7 +680,7 @@ export default function OverviewPage() {
             </div>
           </div>
 
-          {/* X Axis Labels */}
+          {/* X Axis Timeline Labels */}
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "var(--ink-muted)", paddingTop: "6px", marginLeft: "52px" }}>
             <span>Day 1</span>
             <span>Day 7</span>
@@ -592,15 +692,15 @@ export default function OverviewPage() {
         </section>
       </div>
 
-      {/* Month-over-Month Comparison */}
+      {/* Month-over-Month Comparison Strip ("VS LAST MONTH") with Deep Context */}
       <section className="section" style={{ marginBottom: "28px" }}>
-        <h2>VS LAST MONTH</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", padding: "12px 0" }}>
+        <h2 style={{ marginBottom: "14px" }}>VS LAST MONTH</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "16px" }}>
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
               Spending Change
             </div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "1.08rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
               <span className={spendingDiff > 0 ? "metric-delta down" : "metric-delta up"}>
                 {spendingDiff > 0 ? "+" : ""}
                 {formatMoney(spendingDiff, overview.currency)}
@@ -612,10 +712,10 @@ export default function OverviewPage() {
           </div>
 
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
               Income Change
             </div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "1.08rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
               <span className={incomeDiff >= 0 ? "metric-delta up" : "metric-delta down"}>
                 {incomeDiff > 0 ? "+" : ""}
                 {formatMoney(incomeDiff, overview.currency)}
@@ -627,17 +727,18 @@ export default function OverviewPage() {
           </div>
 
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
               Largest Increase
             </div>
-            <div style={{ fontSize: "0.95rem" }}>
+            <div style={{ fontSize: "0.92rem" }}>
               {biggestIncrease ? (
-                <span>
-                  <strong>{biggestIncrease.category}</strong>:{" "}
+                <div>
+                  <strong style={{ color: "var(--ink)" }}>{biggestIncrease.category}</strong>:{" "}
                   <span className="metric-delta down" style={{ fontVariantNumeric: "tabular-nums" }}>
                     +{formatMoney(maxInc, overview.currency)}
                   </span>
-                </span>
+                  <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 2 }}>{incContext}</div>
+                </div>
               ) : (
                 <span style={{ color: "var(--ink-muted)" }}>None</span>
               )}
@@ -645,17 +746,18 @@ export default function OverviewPage() {
           </div>
 
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
               Largest Decrease
             </div>
-            <div style={{ fontSize: "0.95rem" }}>
+            <div style={{ fontSize: "0.92rem" }}>
               {biggestDecrease ? (
-                <span>
-                  <strong>{biggestDecrease.category}</strong>:{" "}
+                <div>
+                  <strong style={{ color: "var(--ink)" }}>{biggestDecrease.category}</strong>:{" "}
                   <span className="metric-delta up" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {formatMoney(maxDec, overview.currency)}
                   </span>
-                </span>
+                  <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 2 }}>{decContext}</div>
+                </div>
               ) : (
                 <span style={{ color: "var(--ink-muted)" }}>None</span>
               )}
@@ -664,11 +766,16 @@ export default function OverviewPage() {
         </div>
       </section>
 
-      {/* Top Merchants & Payment Methods (50/50 grid) */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ZONE 3: OUTFLOW DETAILS (Merchants, Accounts, Largest TXs)     */}
+      {/* ───────────────────────────────────────────────────────────── */}
       <div className="grid-2" style={{ marginBottom: "28px" }}>
-        {/* Top Merchants */}
+        {/* Top Outflows / Payees */}
         <section className="section">
-          <h2>Top Merchants</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
+            <h2 style={{ margin: 0 }}>Top Outflows</h2>
+            <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>Top payees by volume</span>
+          </div>
           {overview.top_merchants.length === 0 ? (
             <p className="empty">No merchants recorded this month.</p>
           ) : (
@@ -676,27 +783,26 @@ export default function OverviewPage() {
               {overview.top_merchants.slice(0, 5).map((m, i) => (
                 <div
                   key={m.merchant || i}
+                  className="panel-hover"
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "8px 0",
+                    padding: "9px 6px",
                     borderBottom: "1px solid var(--line)",
                     cursor: "pointer",
+                    borderRadius: "var(--radius-sm)",
                   }}
-                  title={`View transactions for ${m.merchant || "merchant"}`}
+                  title={`View transactions for ${m.merchant || "payee"}`}
                   onClick={() => {
-                    const padM = String(date.month).padStart(2, "0");
-                    const from = `${date.year}-${padM}-01`;
-                    const to = `${date.year}-${padM}-${String(daysInMonth).padStart(2, "0")}`;
-                    navigate(`/transactions?date_from=${from}&date_to=${to}&q=${encodeURIComponent(m.merchant || "")}`);
+                    navigate(`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}&q=${encodeURIComponent(m.merchant || "")}`);
                   }}
                 >
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", paddingRight: "16px" }}>
                     <div style={{ fontWeight: 600, fontSize: "0.92rem" }}>
-                      {m.merchant || "Unidentified merchant"}
+                      {m.merchant || "Unidentified payee"}
                     </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+                    <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 1 }}>
                       {m.count} {m.count === 1 ? "transaction" : "transactions"}
                     </div>
                   </div>
@@ -709,96 +815,158 @@ export default function OverviewPage() {
           )}
         </section>
 
-        {/* Payment Methods */}
+        {/* Payment Methods (Quiet Percentages & Clickable Accounts) */}
         <section className="section">
-          <h2>Payment Methods</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
+            <h2 style={{ margin: 0 }}>Payment Methods</h2>
+            <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>Distribution of spend</span>
+          </div>
           {overview.account_breakdown.length === 0 ? (
             <p className="empty">No account breakdown data available.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column" }}>
-              {overview.account_breakdown.slice(0, 5).map((a, i) => (
-                <div
-                  key={a.account || i}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "8px 0",
-                    borderBottom: "1px solid var(--line)",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "6px" }}>
-                      {!a.account && (
-                        <span style={{ color: "var(--warn)", fontSize: "0.85rem" }} title="Data issue: transactions not linked to an account">
-                          ⚠
-                        </span>
-                      )}
-                      <span>{a.account || "Unknown account"}</span>
+              {overview.account_breakdown.slice(0, 5).map((a, i) => {
+                const isUnknown = !a.account || a.account === "Unknown";
+                return (
+                  <div
+                    key={a.account || i}
+                    className="panel-hover"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "9px 6px",
+                      borderBottom: "1px solid var(--line)",
+                      cursor: "pointer",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                    title={`View transactions for ${a.account || "this account"}`}
+                    onClick={() => {
+                      navigate(`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}&q=${encodeURIComponent(a.account || "")}`);
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                        {isUnknown ? (
+                          <span style={{ color: "var(--warning, #f59e0b)", fontSize: "0.82rem", fontWeight: 600 }}>
+                            ⚠ Unknown / Unlinked
+                          </span>
+                        ) : (
+                          <span>{a.account}</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 1 }}>
+                        {a.percentage.toFixed(1)}% of spending
+                      </div>
                     </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>
-                      {a.percentage.toFixed(1)}% of spend
+                    <div style={{ fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                      {formatMoney(a.total, overview.currency)}
                     </div>
                   </div>
-                  <div style={{ fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-                    {formatMoney(a.total, overview.currency)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
       </div>
 
-      {/* Largest Transactions */}
+      {/* Largest Transactions (5 Table Rows + Link to Full List) */}
       <section className="section" style={{ marginBottom: "28px" }}>
-        <h2>Largest Transactions</h2>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
+          <h2 style={{ margin: 0 }}>Largest Transactions</h2>
+          <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>Top individual outflows</span>
+        </div>
         {overview.largest_transactions.length > 0 ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Merchant / Description</th>
-                  <th>Category</th>
-                  <th>Account</th>
-                  <th className="num">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.largest_transactions.slice(0, 5).map((t) => (
-                  <tr
-                    key={t.id}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => {
-                      navigate(`/transactions?q=${encodeURIComponent(t.merchant || t.id)}`);
-                    }}
-                  >
-                    <td className="tx-date">{formatDate(t.date)}</td>
-                    <td style={{ fontWeight: 600 }}>{t.merchant || "Unidentified merchant"}</td>
-                    <td>{t.category || "Uncategorized"}</td>
-                    <td style={{ color: "var(--ink-muted)" }}>{t.account || "—"}</td>
-                    <td className="tx-amount num debit">
-                      −{formatMoney(t.amount, overview.currency)}
-                    </td>
+          <>
+            {/* Desktop Table */}
+            <div className="table-wrap tx-table-desktop">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Merchant / Description</th>
+                    <th>Category</th>
+                    <th>Account</th>
+                    <th className="num">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {overview.largest_transactions.slice(0, 5).map((t) => (
+                    <tr
+                      key={t.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => {
+                        navigate(`/transactions?q=${encodeURIComponent(t.merchant || t.id)}`);
+                      }}
+                    >
+                      <td className="tx-date">{formatDate(t.date)}</td>
+                      <td style={{ fontWeight: 600 }}>{t.merchant || "Unidentified merchant"}</td>
+                      <td>
+                        <span className="badge">{t.category || "Uncategorized"}</span>
+                      </td>
+                      <td style={{ color: "var(--ink-muted)" }}>{t.account || "—"}</td>
+                      <td className="tx-amount num debit">
+                        −{formatMoney(t.amount, overview.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="tx-cards-mobile">
+              {overview.largest_transactions.slice(0, 5).map((t) => (
+                <article
+                  key={t.id}
+                  className="tx-card"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => {
+                    navigate(`/transactions?q=${encodeURIComponent(t.merchant || t.id)}`);
+                  }}
+                >
+                  <div className="tx-card-header">
+                    <div>
+                      <div className="tx-card-merchant">{t.merchant || "Unidentified merchant"}</div>
+                      <div className="tx-card-date">{formatDate(t.date)}</div>
+                    </div>
+                    <div className="tx-card-amount debit">−{formatMoney(t.amount, overview.currency)}</div>
+                  </div>
+                  <div className="tx-card-footer" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <span className="badge">{t.category || "Uncategorized"}</span>
+                      {t.account && <span className="tx-card-tag">{t.account}</span>}
+                    </div>
+                    <span style={{ fontSize: "0.78rem", color: "var(--accent)", fontWeight: 600 }}>View tx →</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {/* Bottom View All Link */}
+            <div style={{ marginTop: "14px", textAlign: "right" }}>
+              <Link
+                to={`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}`}
+                style={{ color: "var(--accent)", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}
+              >
+                View all {overview.summary.transaction_count} transactions →
+              </Link>
+            </div>
+          </>
         ) : (
           <p className="empty">No transactions recorded for this month.</p>
         )}
       </section>
 
-      {/* Income Trend Modal */}
-      <IncomeTrendModal
-        open={incomeTrendOpen}
-        loading={incomeTrendLoading}
-        error={incomeTrendError}
-        trend={incomeTrend}
+      {/* Financial Trend Modal (Spent, Income, Net Cash Flow) */}
+      <FinancialTrendModal
+        open={trendModalOpen}
+        loading={trendsLoading}
+        error={trendsError}
+        trends={financialTrends}
         overview={overview}
-        onClose={() => setIncomeTrendOpen(false)}
+        initialMetric={trendMetric}
+        onClose={() => setTrendModalOpen(false)}
       />
     </div>
   );

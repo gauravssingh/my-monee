@@ -9,14 +9,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from expense_tracker.api.routes import (
     accounts,
     ai,
+    auth,
     categories,
     data_issues,
     gmail,
@@ -24,15 +25,27 @@ from expense_tracker.api.routes import (
     merchants,
     overview,
     recurring,
+    statements,
     system,
     transactions,
 )
 from expense_tracker.config import Settings, get_settings
-from expense_tracker.db.session import init_db
+from expense_tracker.db.session import get_session_factory, init_db
 from expense_tracker.logging_setup import setup_logging
 from expense_tracker.parsers.bootstrap import bootstrap_parsers
+from expense_tracker.services.auth import is_auth_configured, verify_session_token
 
 logger = logging.getLogger(__name__)
+
+_AUTH_EXEMPT_PATHS = {"/api/health"}
+_AUTH_EXEMPT_PREFIXES = ("/api/auth/",)
+
+_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8477",
+    "http://localhost:8477",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+]
 
 
 def _web_dist_dir() -> Path | None:
@@ -59,13 +72,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
 
+    @app.middleware("http")
+    async def enforce_auth(request: Request, call_next):
+        path = request.url.path
+        if path.startswith("/api/") and path not in _AUTH_EXEMPT_PATHS and not path.startswith(
+            _AUTH_EXEMPT_PREFIXES
+        ):
+            db_session = get_session_factory()()
+            try:
+                if is_auth_configured(db_session):
+                    token = request.cookies.get(auth.COOKIE_NAME)
+                    if not token:
+                        authorization = request.headers.get("authorization")
+                        if authorization and authorization.startswith("Bearer "):
+                            token = authorization.removeprefix("Bearer ").strip()
+                    if not verify_session_token(db_session, token):
+                        return JSONResponse(
+                            status_code=401, content={"detail": "Authentication required"}
+                        )
+            finally:
+                db_session.close()
+        return await call_next(request)
+
+    # Registered after enforce_auth so it wraps outermost — CORS preflight
+    # (OPTIONS) responses must never be blocked by the auth check.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            f"http://{settings.app.host}:{settings.app.port}",
-            "http://127.0.0.1:5173",
-            "http://localhost:5173",
-        ],
+        allow_origins=_ALLOWED_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -81,7 +114,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(accounts.router)
     app.include_router(merchants.router)
     app.include_router(recurring.router)
+    app.include_router(statements.router)
     app.include_router(ai.router)
+    app.include_router(auth.router)
 
     dist = _web_dist_dir()
     if dist is not None:

@@ -9,6 +9,10 @@ def normalize_merchant(raw: str | None) -> str | None:
     if not raw:
         return None
     cleaned = raw.strip().upper()
+    if "RASMEC" in cleaned:
+        return "SBI Car Loan"
+    if "NATURALS KOMPALLY" in cleaned or "NATURALS ICE CREAM" in cleaned:
+        return "Naturals Ice Cream"
     cleaned = re.sub(r"^(RAZ\*|PYU\*|PAYTM\*|GPAY\*)", "", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.title() if cleaned else None

@@ -64,7 +64,11 @@ def apply_parsed_enrichment(
         tx.excludes_from_spending = bool(extra["excludes_from_spending"])
 
     # Keep income and transfers out of spending totals
-    if parsed.transaction_type == "income" or (
-        parsed.direction == "credit" and tx.is_transfer
+    if (
+        parsed.transaction_type in {"income", "transfer"}
+        or tx.is_transfer
+        or (parsed.direction == "credit" and tx.is_transfer)
     ):
         tx.excludes_from_spending = True
+        if parsed.transaction_type == "transfer":
+            tx.is_transfer = True

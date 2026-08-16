@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from expense_tracker.config import providers_dir
-from expense_tracker.ingestion.gmail.client import GmailMessage
+from expense_tracker.ingestion.gmail.client import GmailMessage, is_excluded_recipient_headers
 
 
 @dataclass
@@ -30,6 +30,14 @@ class ProviderHint:
         if any(p.search(body) for p in self.body_patterns):
             score += 0.25
         return min(score, 1.0)
+
+
+def is_excluded_recipient(message: GmailMessage | object) -> bool:
+    """Check if the email recipient is explicitly an excluded address (e.g. gauravsingh86@gmail.com without dots)."""
+    if hasattr(message, "is_excluded_recipient") and callable(message.is_excluded_recipient):
+        return message.is_excluded_recipient()
+    headers = getattr(message, "headers", None) or {}
+    return is_excluded_recipient_headers(headers if isinstance(headers, dict) else None)
 
 
 @dataclass
@@ -53,6 +61,9 @@ class DiscoveryRules:
         return " ".join(parts)
 
     def is_financial_candidate(self, message: GmailMessage | object) -> tuple[bool, str]:
+        if is_excluded_recipient(message):
+            return False, "excluded_recipient"
+
         sender = (getattr(message, "sender", None) or "").lower()
         subject = (getattr(message, "subject", None) or "").lower()
         body = (

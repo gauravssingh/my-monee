@@ -1,9 +1,14 @@
 import { useEffect, useState, useId, useRef } from "react";
 import { createPortal } from "react-dom";
-import { api, type Account } from "../api";
+import { Link } from "react-router-dom";
+import { api, type Account, type CreditCardStatement } from "../api";
 import { useToast } from "../hooks/useToast";
 import { formatMoney } from "../format";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
+import { StatementDetailModal } from "../components/StatementDetailModal";
+import { PasswordProfileModal } from "../components/PasswordProfileModal";
+import { UploadStatementModal } from "../components/UploadStatementModal";
+
 
 function AccountModal({
   open,
@@ -89,8 +94,16 @@ function AccountModal({
 
   return createPortal(
     <div className="modal-backdrop" role="presentation" onClick={onBackdropClick}>
-      <form className="modal-panel" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 650 }}>
-        <header className="modal-header">
+      <form
+        className="modal-panel"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        onSubmit={handleSubmit}
+        style={{ width: "100%", maxWidth: 650, display: "flex", flexDirection: "column", height: "min(760px, 86dvh)", maxHeight: "86dvh", boxSizing: "border-box" }}
+      >
+        <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
+
+        <header className="modal-header" style={{ flexShrink: 0 }}>
           <div>
             <h2 id={titleId}>{account?.id ? "Edit Account" : "Add Account"}</h2>
             <p className="lead">Add a bank, card, wallet, or other financial account.</p>
@@ -102,13 +115,13 @@ function AccountModal({
           </div>
         </header>
 
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20, flex: "1 1 0%", minHeight: 0, overflowY: "auto", width: "100%", boxSizing: "border-box" }}>
           
           {/* Section: Basic Info */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <section style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
             <h3 style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", margin: 0, fontWeight: 600 }}>BASIC INFORMATION</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div className="field">
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
+              <div className="field" style={{ width: "100%", minWidth: 0 }}>
                 <label className="label">Account Name <span style={{color: "var(--accent)"}}>*</span></label>
                 <input
                   type="text"
@@ -117,12 +130,13 @@ function AccountModal({
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                   placeholder="e.g. HDFC Checking"
+                  style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
                 />
               </div>
 
-              <div className="field">
+              <div className="field" style={{ width: "100%", minWidth: 0 }}>
                 <label className="label">Account Type</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, width: "100%", minWidth: 0 }}>
                   {[
                     { id: "BANK", label: "Bank" },
                     { id: "CREDIT_CARD", label: "Credit Card" },
@@ -164,10 +178,10 @@ function AccountModal({
           </section>
 
           {/* Section: Identifiers */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <section style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
             <h3 style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", margin: 0, fontWeight: 600 }}>IDENTIFIERS (OPTIONAL)</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div className="field">
+            <div className="account-form-grid">
+              <div className="field" style={{ width: "100%", minWidth: 0 }}>
                 <label className="label">Account Mask (Last 4)</label>
                 <input
                   type="text"
@@ -175,11 +189,12 @@ function AccountModal({
                   value={formData.account_number_masked || ""}
                   onChange={(e) => setFormData({ ...formData, account_number_masked: e.target.value })}
                   placeholder="e.g. x1234"
+                  style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
                 />
               </div>
               
               {formData.account_type === "CREDIT_CARD" ? (
-                <div className="field">
+                <div className="field" style={{ width: "100%", minWidth: 0 }}>
                   <label className="label">Card Last 4</label>
                   <input
                     type="text"
@@ -188,14 +203,15 @@ function AccountModal({
                     onChange={(e) => setFormData({ ...formData, card_last4: e.target.value })}
                     placeholder="e.g. 5678"
                     maxLength={4}
+                    style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
                   />
                 </div>
               ) : (
-                <div className="field">
+                <div className="field" style={{ width: "100%", minWidth: 0 }}>
                   <label className="label">UPI IDs / Phones</label>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", minWidth: 0 }}>
                     {(formData.upi_identifier_masked ? formData.upi_identifier_masked.split(",") : [""]).map((upi, i, arr) => (
-                      <div key={i} style={{ display: "flex", gap: 8 }}>
+                      <div key={i} style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
                         <input
                           type="text"
                           className="input"
@@ -206,6 +222,7 @@ function AccountModal({
                             setFormData({ ...formData, upi_identifier_masked: newUpis.join(",") });
                           }}
                           placeholder="e.g. user@okhdfcbank"
+                          style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}
                         />
                         {arr.length > 1 && (
                           <button 
@@ -241,19 +258,19 @@ function AccountModal({
           </section>
 
           {/* Section: Balances */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <section style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
             <h3 style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", margin: 0, fontWeight: 600 }}>BALANCES & LIMITS</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              <div className="field">
+            <div className="account-form-grid">
+              <div className="field" style={{ width: "100%", minWidth: 0 }}>
                 <label className="label">Opening Balance</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <div style={{ padding: "0 12px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.9rem", display: "flex", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
+                  <div style={{ padding: "0 10px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.85rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
                     ₹ INR
                   </div>
                   <input
                     type="number"
                     className="input"
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}
                     value={formData.opening_balance || ""}
                     onChange={(e) => setFormData({ ...formData, opening_balance: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
@@ -263,16 +280,16 @@ function AccountModal({
               </div>
 
               {formData.account_type === "CREDIT_CARD" && (
-                <div className="field">
+                <div className="field" style={{ width: "100%", minWidth: 0 }}>
                   <label className="label">Credit Limit</label>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <div style={{ padding: "0 12px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.9rem", display: "flex", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
+                    <div style={{ padding: "0 10px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.85rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
                       ₹ INR
                     </div>
                     <input
                       type="number"
                       className="input"
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}
                       value={formData.credit_limit || ""}
                       onChange={(e) => setFormData({ ...formData, credit_limit: parseFloat(e.target.value) || 0 })}
                       placeholder="e.g. 500000"
@@ -286,7 +303,7 @@ function AccountModal({
           </section>
         </div>
 
-        <footer className="modal-footer">
+        <footer className="modal-footer" style={{ flexShrink: 0, padding: "12px 18px max(16px, env(safe-area-inset-bottom, 16px))" }}>
           <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>Cancel</button>
           <button type="submit" className="btn primary" disabled={saving}>
             {saving ? "Saving..." : "Save Account"}
@@ -298,12 +315,577 @@ function AccountModal({
   );
 }
 
+function formatPeriod(startStr: string | null | undefined, endStr: string | null | undefined): string {
+  if (!startStr && !endStr) return "—";
+  if (startStr && endStr) {
+    try {
+      const d1 = new Date(startStr).toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+      return d1;
+    } catch {
+      return startStr;
+    }
+  }
+  return startStr || endStr || "—";
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatAccountType(type: string): string {
+  switch (type) {
+    case "BANK":
+      return "Bank";
+    case "CREDIT_CARD":
+      return "Credit Card";
+    case "WALLET":
+      return "Wallet";
+    case "CASH":
+      return "Cash";
+    case "INVESTMENT":
+      return "Investment";
+    case "LOAN":
+      return "Loan";
+    default:
+      return type ? type.charAt(0).toUpperCase() + type.slice(1).toLowerCase() : "Account";
+  }
+}
+
+function formatMaskedNumber(val: string | null | undefined): string {
+  if (!val) return "—";
+  return val.replace(/[*X]+/g, "••••");
+}
+
+function cleanAccountName(name: string): string {
+  if (!name) return "";
+  return name.replace(/\s*\([*X\d]+\)\s*$/, "").trim() || name;
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case "READY_FOR_EXTRACTION":
+    case "UNLOCKED":
+      return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600 }}>✓ Ready</span>;
+    case "PASSWORD_REQUIRED":
+      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>🔒 Locked</span>;
+    case "PASSWORD_FAILED":
+      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>⚠ Review</span>;
+    default:
+      return <span className="badge">{status}</span>;
+  }
+}
+
+function CreditCardAccountItem({
+  account,
+  onEdit,
+  onDelete,
+  onOpenStatementDetail,
+  onOpenPasswordProfile,
+  onOpenUploadStatement,
+}: {
+  account: Account;
+  onEdit: () => void;
+  onDelete: () => void;
+  onOpenStatementDetail: (stmt: CreditCardStatement) => void;
+  onOpenPasswordProfile: (acc: Account) => void;
+  onOpenUploadStatement: (acc: Account) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "statements">("overview");
+  const [statements, setStatements] = useState<CreditCardStatement[]>([]);
+  const [loadingStatements, setLoadingStatements] = useState(false);
+  const [stmtSortField, setStmtSortField] = useState<"period" | "date" | "received">("received");
+  const [stmtSortDir, setStmtSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleStmtSort = (field: "period" | "date" | "received") => {
+    if (stmtSortField === field) {
+      setStmtSortDir(stmtSortDir === "asc" ? "desc" : "asc");
+    } else {
+      setStmtSortField(field);
+      setStmtSortDir("desc");
+    }
+  };
+
+  const sortedStatements = [...statements].sort((a, b) => {
+    let cmp = 0;
+    if (stmtSortField === "received") {
+      const recA = a.email_received_at || a.discovered_at || a.created_at || "";
+      const recB = b.email_received_at || b.discovered_at || b.created_at || "";
+      cmp = recA.localeCompare(recB);
+    } else if (stmtSortField === "period") {
+      const dateA = a.statement_period_start || a.statement_period_end || "";
+      const dateB = b.statement_period_start || b.statement_period_end || "";
+      cmp = dateA.localeCompare(dateB);
+    } else if (stmtSortField === "date") {
+      const dateA = a.statement_date || "";
+      const dateB = b.statement_date || "";
+      cmp = dateA.localeCompare(dateB);
+    }
+    return stmtSortDir === "asc" ? cmp : -cmp;
+  });
+
+  const loadStatements = async () => {
+    setLoadingStatements(true);
+    try {
+      const res = await api.accountStatements(account.id);
+      setStatements(res.statements);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingStatements(false);
+    }
+  };
+
+  useEffect(() => {
+    if (expanded && activeTab === "statements") {
+      loadStatements();
+    }
+  }, [expanded, activeTab]);
+
+  const maskedCard = account.card_last4
+    ? `•••• ${account.card_last4}`
+    : (account.account_number_masked ? formatMaskedNumber(account.account_number_masked) : null);
+
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius-md)",
+        marginBottom: 12,
+        overflow: "hidden",
+      }}
+    >
+      {/* Account Header Row (Fully Clickable for progressive disclosure) */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 18px",
+          gap: 12,
+          flexWrap: "wrap",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 200, flex: 1 }}>
+          <div
+            style={{
+              width: 28,
+              height: 28,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--ink-muted)",
+              flexShrink: 0,
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+                transition: "transform 0.15s ease",
+              }}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span>{cleanAccountName(account.name)}</span>
+              {maskedCard && (
+                <span style={{ color: "var(--ink-muted)", fontWeight: 400, fontSize: "0.84rem", fontFamily: "var(--font-mono, monospace)" }}>
+                  {maskedCard}
+                </span>
+              )}
+            </div>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", marginTop: 2 }}>
+              {formatAccountType(account.account_type)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {/* Outstanding Amount (Links to Transactions) */}
+          <Link
+            to={`/transactions?account=${encodeURIComponent(account.name)}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{ textAlign: "right", textDecoration: "none", color: "inherit" }}
+            title={`View transactions for ${account.name}`}
+          >
+            <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+              OUTSTANDING
+            </div>
+            <div className="tx-amount debit" style={{ fontWeight: 700, fontSize: "1.08rem" }}>
+              {formatMoney(account.balance, account.currency)}
+            </div>
+          </Link>
+
+          {/* Edit / Delete actions */}
+          <div style={{ display: "flex", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+            <button
+              className="icon-action"
+              type="button"
+              title="Edit Account"
+              aria-label={`Edit ${account.name}`}
+              onClick={onEdit}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+            </button>
+            <button
+              className="icon-action danger"
+              type="button"
+              title="Delete Account"
+              aria-label={`Delete ${account.name}`}
+              onClick={onDelete}
+              style={{ color: "var(--danger)" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs navigation row */}
+      <div
+        style={{
+          display: "flex",
+          borderTop: "1px solid var(--line)",
+          background: "rgba(0, 0, 0, 0.02)",
+          padding: "0 18px",
+          gap: 8,
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("overview");
+            setExpanded(true);
+          }}
+          style={{
+            padding: "8px 14px",
+            border: "none",
+            borderBottom: activeTab === "overview" && expanded ? "2px solid var(--accent)" : "2px solid transparent",
+            background: "none",
+            fontSize: "0.82rem",
+            fontWeight: activeTab === "overview" && expanded ? 600 : 400,
+            color: activeTab === "overview" && expanded ? "var(--accent)" : "var(--ink-muted)",
+            cursor: "pointer",
+          }}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("statements");
+            setExpanded(true);
+          }}
+          style={{
+            padding: "8px 14px",
+            border: "none",
+            borderBottom: activeTab === "statements" && expanded ? "2px solid var(--accent)" : "2px solid transparent",
+            background: "none",
+            fontSize: "0.82rem",
+            fontWeight: activeTab === "statements" && expanded ? 600 : 400,
+            color: activeTab === "statements" && expanded ? "var(--accent)" : "var(--ink-muted)",
+            cursor: "pointer",
+          }}
+        >
+          Statements {statements.length > 0 ? `(${statements.length})` : ""}
+        </button>
+      </div>
+
+      {/* Expanded Tab Content */}
+      {expanded && (
+        <div style={{ padding: "14px 16px", borderTop: "1px solid var(--line)" }}>
+          {activeTab === "overview" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 14 }}>
+              <div>
+                <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Outstanding Balance</div>
+                <div className="tx-amount debit" style={{ fontSize: "1.05rem", fontWeight: 700, marginTop: 3 }}>
+                  {formatMoney(account.balance, account.currency)}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Credit Limit</div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, marginTop: 3 }}>
+                  {account.credit_limit ? formatMoney(account.credit_limit, account.currency) : "—"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Available Credit</div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 600, marginTop: 3, color: "var(--credit)" }}>
+                  {account.credit_limit ? formatMoney(Math.max(0, account.credit_limit - account.balance), account.currency) : "—"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Card Number</div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 500, marginTop: 3, fontFamily: "var(--font-mono, monospace)" }}>
+                  {maskedCard || "—"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Account Type</div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 500, marginTop: 3 }}>
+                  {formatAccountType(account.account_type)}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-end" }}>
+                <Link
+                  to={`/transactions?account=${encodeURIComponent(account.name)}`}
+                  className="btn quiet"
+                  style={{ fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5 }}
+                >
+                  <span>View Transactions</span>
+                  <span>→</span>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                  flexWrap: "wrap",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>Account & Card Statements</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="btn quiet"
+                    style={{ fontSize: "0.8rem", padding: "4px 10px" }}
+                    onClick={() => onOpenPasswordProfile(account)}
+                  >
+                    ⚙ Password Profile
+                  </button>
+                  <button
+                    type="button"
+                    className="btn quiet"
+                    style={{ fontSize: "0.8rem", padding: "4px 10px" }}
+                    onClick={() => onOpenUploadStatement(account)}
+                  >
+                    + Upload Statement
+                  </button>
+                </div>
+              </div>
+
+              {loadingStatements ? (
+                <div className="empty" style={{ padding: 20 }}>Loading statements...</div>
+              ) : statements.length > 0 ? (
+                <>
+                  {/* Desktop Statements Table */}
+                  <div className="tx-table-desktop" style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--line)" }}>
+                          <th
+                            style={{ textAlign: "left", padding: "8px 6px", cursor: "pointer", userSelect: "none" }}
+                            onClick={() => handleStmtSort("period")}
+                            title="Sort by Period"
+                          >
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <span>Period</span>
+                              <span style={{ fontSize: "0.72rem", opacity: stmtSortField === "period" ? 1 : 0.3 }}>
+                                {stmtSortField === "period" ? (stmtSortDir === "asc" ? "▲" : "▼") : "⇅"}
+                              </span>
+                            </div>
+                          </th>
+                          <th
+                            style={{ textAlign: "left", padding: "8px 6px", cursor: "pointer", userSelect: "none" }}
+                            onClick={() => handleStmtSort("date")}
+                            title="Sort by Statement Date"
+                          >
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <span>Statement Date</span>
+                              <span style={{ fontSize: "0.72rem", opacity: stmtSortField === "date" ? 1 : 0.3 }}>
+                                {stmtSortField === "date" ? (stmtSortDir === "asc" ? "▲" : "▼") : "⇅"}
+                              </span>
+                            </div>
+                          </th>
+                          <th
+                            style={{ textAlign: "left", padding: "8px 6px", cursor: "pointer", userSelect: "none" }}
+                            onClick={() => handleStmtSort("received")}
+                            title="Sort by Date Statement Email Was Received"
+                          >
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              <span>Received On</span>
+                              <span style={{ fontSize: "0.72rem", opacity: stmtSortField === "received" ? 1 : 0.3 }}>
+                                {stmtSortField === "received" ? (stmtSortDir === "asc" ? "▲" : "▼") : "⇅"}
+                              </span>
+                            </div>
+                          </th>
+                          <th style={{ textAlign: "left", padding: "8px 6px" }}>Status</th>
+                          <th style={{ textAlign: "right", padding: "8px 6px" }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedStatements.map((stmt) => (
+                          <tr
+                            key={stmt.id}
+                            style={{ borderBottom: "1px solid var(--line)", cursor: "pointer" }}
+                            onClick={() => onOpenStatementDetail(stmt)}
+                          >
+                            <td style={{ padding: "10px 6px", fontWeight: 500 }}>
+                              {formatPeriod(stmt.statement_period_start, stmt.statement_period_end)}
+                            </td>
+                            <td style={{ padding: "10px 6px", color: "var(--ink-muted)" }}>
+                              {formatDate(stmt.statement_date)}
+                            </td>
+                            <td style={{ padding: "10px 6px", color: "var(--ink-muted)", fontSize: "0.82rem" }}>
+                              {formatDate(stmt.email_received_at || stmt.discovered_at)}
+                            </td>
+                            <td style={{ padding: "10px 6px" }}>
+                              {getStatusBadge(stmt.status)}
+                            </td>
+                            <td style={{ padding: "10px 6px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <a
+                                  href={api.statementOriginalUrl(stmt.id, false)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="btn quiet"
+                                  style={{ fontSize: "0.76rem", padding: "3px 8px" }}
+                                >
+                                  Original
+                                </a>
+                                {stmt.has_unlocked_file ? (
+                                  <a
+                                    href={api.statementUnlockedUrl(stmt.id, false)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn quiet"
+                                    style={{ fontSize: "0.76rem", padding: "3px 8px" }}
+                                  >
+                                    Unlocked
+                                  </a>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="btn primary"
+                                    style={{ fontSize: "0.76rem", padding: "3px 8px" }}
+                                    onClick={() => onOpenStatementDetail(stmt)}
+                                  >
+                                    Unlock
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile Statements Cards */}
+                  <div className="tx-cards-mobile" style={{ marginTop: 8 }}>
+                    {sortedStatements.map((stmt) => (
+                      <article
+                        key={stmt.id}
+                        className="tx-card"
+                        style={{ cursor: "pointer", padding: "10px 12px" }}
+                        onClick={() => onOpenStatementDetail(stmt)}
+                      >
+                        <div className="tx-card-header" style={{ alignItems: "flex-start", gap: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: "0.88rem" }}>
+                              {formatPeriod(stmt.statement_period_start, stmt.statement_period_end)}
+                            </div>
+                            <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2 }}>
+                              Date: {formatDate(stmt.statement_date)} · Rcvd: {formatDate(stmt.email_received_at || stmt.discovered_at)}
+                            </div>
+                          </div>
+                          <div>
+                            {getStatusBadge(stmt.status)}
+                          </div>
+                        </div>
+                        <div className="tx-card-footer" style={{ borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                          <a
+                            href={api.statementOriginalUrl(stmt.id, false)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn quiet"
+                            style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                          >
+                            Original
+                          </a>
+                          {stmt.has_unlocked_file ? (
+                            <a
+                              href={api.statementUnlockedUrl(stmt.id, false)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn quiet"
+                              style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                            >
+                              Unlocked
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn primary"
+                              style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                              onClick={() => onOpenStatementDetail(stmt)}
+                            >
+                              Unlock
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="empty" style={{ padding: 20 }}>
+                  No statements discovered for this credit card yet.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [validHandles, setValidHandles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Account editing modal
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Partial<Account> | null>(null);
+  const [deleteTargetAccount, setDeleteTargetAccount] = useState<Account | null>(null);
+
+  // Statement & Password modals
+  const [selectedStatement, setSelectedStatement] = useState<CreditCardStatement | null>(null);
+  const [statementDetailOpen, setStatementDetailOpen] = useState(false);
+  const [passwordProfileAccount, setPasswordProfileAccount] = useState<Account | null>(null);
+  const [passwordProfileOpen, setPasswordProfileOpen] = useState(false);
+  const [uploadAccount, setUploadAccount] = useState<Account | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+
   const { showToast } = useToast();
 
   const loadData = async () => {
@@ -344,8 +926,7 @@ export default function AccountsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this account? This cannot be undone.")) return;
+  const performDelete = async (id: string) => {
     try {
       await api.deleteAccount(id);
       showToast("Account deleted", "success");
@@ -360,16 +941,61 @@ export default function AccountsPage() {
   const assets = accounts.filter(a => a.is_asset);
   const liabilities = accounts.filter(a => a.is_liability);
 
+  const totalAssetBalance = assets.reduce((sum, a) => sum + (a.balance || 0), 0);
+  const totalLiabilityBalance = liabilities.reduce((sum, a) => sum + (a.balance || 0), 0);
+
   return (
     <>
       <header className="page-header">
         <div>
           <h1>Accounts</h1>
-          <p className="lead">Manage your bank accounts, credit cards, and wallets.</p>
+          <p className="lead">
+            Manage your bank accounts, credit cards, and wallets.
+            <span style={{ opacity: 0.4, margin: "0 6px" }}>·</span>
+            <span style={{ color: "var(--ink-muted)" }}>
+              {assets.length} {assets.length === 1 ? "asset account" : "asset accounts"} · {liabilities.length} credit {liabilities.length === 1 ? "card" : "cards"}
+            </span>
+          </p>
         </div>
-        <div className="page-actions">
+        <div className="page-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Link
+            to="/statements"
+            className="btn quiet"
+            style={{
+              height: 38,
+              minHeight: 38,
+              padding: "0 14px",
+              borderRadius: 8,
+              fontSize: "14px",
+              fontWeight: 600,
+              border: "1px solid var(--line)",
+              background: "var(--surface)",
+              color: "var(--ink-muted)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              textDecoration: "none",
+              boxSizing: "border-box",
+            }}
+          >
+            <span>Statements Vault</span>
+            <span>→</span>
+          </Link>
           <button 
             className="btn primary"
+            type="button"
+            style={{
+              height: 38,
+              minHeight: 38,
+              padding: "0 14px",
+              borderRadius: 8,
+              fontSize: "14px",
+              fontWeight: 600,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxSizing: "border-box",
+            }}
             onClick={() => {
               setEditingAccount(null);
               setModalOpen(true);
@@ -380,76 +1006,192 @@ export default function AccountsPage() {
         </div>
       </header>
 
+      {/* Assets Section */}
       <div className="section table-wrap">
-        <h2>Assets</h2>
-        <table style={{ marginTop: 8 }}>
-          <thead>
-            <tr>
-              <th>Account Name</th>
-              <th>Type</th>
-              <th>Identifiers</th>
-              <th className="num">Current Balance</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map(a => (
-              <tr key={a.id}>
-                <td style={{ fontWeight: 600 }}>{a.name}</td>
-                <td><span className="badge">{a.account_type}</span></td>
-                <td style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                  {[a.account_number_masked, ...(a.upi_identifier_masked ? a.upi_identifier_masked.split(",").filter(s => s.trim()) : [])].filter(Boolean).join(" · ") || "—"}
-                </td>
-                <td className="num tx-amount credit">{formatMoney(a.balance, a.currency)}</td>
-                <td className="row-actions">
-                  <button className="icon-action" type="button" title="Edit Account" aria-label={`Edit ${a.name}`} onClick={() => { setEditingAccount(a); setModalOpen(true); }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                  </button>
-                  <button className="icon-action danger" type="button" title="Delete Account" aria-label={`Delete ${a.name}`} onClick={() => handleDelete(a.id)} style={{ color: "var(--danger)" }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                  </button>
-                </td>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Bank Accounts & Assets</h2>
+            <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", marginTop: 2 }}>
+              {assets.length} {assets.length === 1 ? "account" : "accounts"}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Total Balance</div>
+            <div className="tx-amount credit" style={{ fontWeight: 700, fontSize: "1.1rem" }}>
+              {formatMoney(totalAssetBalance)}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop Table View (>= 768px) */}
+        <div className="tx-table-desktop">
+          <table style={{ marginTop: 8 }}>
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Type</th>
+                <th>Identifier</th>
+                <th className="num">Current Balance</th>
+                <th />
               </tr>
-            ))}
-            {assets.length === 0 && <tr><td colSpan={5} className="empty">No assets recorded.</td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {assets.map(a => {
+                const maskedNum = a.account_number_masked ? formatMaskedNumber(a.account_number_masked) : null;
+                const upiList = a.upi_identifier_masked ? a.upi_identifier_masked.split(",").map(s => s.trim()).filter(Boolean) : [];
+
+                return (
+                  <tr key={a.id}>
+                    <td style={{ fontWeight: 600 }}>
+                      <Link
+                        to={`/transactions?account=${encodeURIComponent(a.name)}`}
+                        style={{ textDecoration: "none", color: "var(--ink)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        title={`View transactions for ${a.name}`}
+                      >
+                        <span>{cleanAccountName(a.name)}</span>
+                        <span style={{ fontSize: "0.75rem", opacity: 0.5 }}>↗</span>
+                      </Link>
+                    </td>
+                    <td>
+                      <span className="badge" style={{ fontWeight: 500, textTransform: "none", fontSize: "0.78rem" }}>
+                        {formatAccountType(a.account_type)}
+                      </span>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                        <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.84rem", color: "var(--ink)" }}>
+                          {maskedNum || "—"}
+                        </span>
+                        {upiList.length > 0 && (
+                          <span style={{ color: "var(--ink-muted)", fontSize: "0.76rem" }}>
+                            {upiList.join(" · ")}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="num">
+                      <Link
+                        to={`/transactions?account=${encodeURIComponent(a.name)}`}
+                        style={{ textDecoration: "none" }}
+                        title={`View transactions for ${a.name}`}
+                      >
+                        <span className="tx-amount credit" style={{ fontWeight: 600 }}>
+                          {formatMoney(a.balance, a.currency)}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="row-actions">
+                      <button className="icon-action" type="button" title="Edit Account" aria-label={`Edit ${a.name}`} onClick={() => { setEditingAccount(a); setModalOpen(true); }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                      </button>
+                      <button className="icon-action danger" type="button" title="Delete Account" aria-label={`Delete ${a.name}`} onClick={() => setDeleteTargetAccount(a)} style={{ color: "var(--danger)" }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {assets.length === 0 && <tr><td colSpan={5} className="empty">No assets recorded.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Card Layout (< 768px) */}
+        <div className="tx-cards-mobile" style={{ marginTop: 8 }}>
+          {assets.map(a => {
+            const maskedNum = a.account_number_masked ? formatMaskedNumber(a.account_number_masked) : null;
+            const upiList = a.upi_identifier_masked ? a.upi_identifier_masked.split(",").map(s => s.trim()).filter(Boolean) : [];
+
+            return (
+              <article key={a.id} className="tx-card">
+                <div className="tx-card-header">
+                  <div>
+                    <Link
+                      to={`/transactions?account=${encodeURIComponent(a.name)}`}
+                      style={{ textDecoration: "none", color: "inherit" }}
+                    >
+                      <div className="tx-card-merchant">{cleanAccountName(a.name)}</div>
+                    </Link>
+                    <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", marginTop: 2, display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
+                      {maskedNum && <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{maskedNum}</span>}
+                      {upiList.map(u => <span key={u}>{u}</span>)}
+                      {!maskedNum && upiList.length === 0 && <span>No identifiers</span>}
+                    </div>
+                  </div>
+                  <Link
+                    to={`/transactions?account=${encodeURIComponent(a.name)}`}
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div className="tx-card-amount credit">{formatMoney(a.balance, a.currency)}</div>
+                  </Link>
+                </div>
+                <div className="tx-card-footer" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                  <span className="badge" style={{ textTransform: "none", fontSize: "0.78rem" }}>
+                    {formatAccountType(a.account_type)}
+                  </span>
+                  <div className="tx-card-actions">
+                    <button className="btn quiet icon-btn" type="button" title="Edit Account" aria-label={`Edit ${a.name}`} onClick={() => { setEditingAccount(a); setModalOpen(true); }} style={{ width: 34, height: 34 }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    </button>
+                    <button className="btn quiet icon-btn" type="button" title="Delete Account" aria-label={`Delete ${a.name}`} onClick={() => setDeleteTargetAccount(a)} style={{ width: 34, height: 34, color: "var(--danger)" }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+          {assets.length === 0 && <div className="empty" style={{ padding: 16 }}>No assets recorded.</div>}
+        </div>
       </div>
 
-      <div className="section table-wrap" style={{ marginTop: 32 }}>
-        <h2>Liabilities & Credit Cards</h2>
-        <table style={{ marginTop: 8 }}>
-          <thead>
-            <tr>
-              <th>Account Name</th>
-              <th>Type</th>
-              <th>Identifiers</th>
-              <th className="num">Current Balance</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {liabilities.map(a => (
-              <tr key={a.id}>
-                <td style={{ fontWeight: 600 }}>{a.name}</td>
-                <td><span className="badge">{a.account_type}</span></td>
-                <td style={{ color: "var(--ink-muted)", fontSize: "0.88rem" }}>
-                  {[a.account_number_masked, a.card_last4].filter(Boolean).join(" · ") || "—"}
-                </td>
-                <td className="num tx-amount debit">{formatMoney(a.balance, a.currency)}</td>
-                <td className="row-actions">
-                  <button className="icon-action" type="button" title="Edit Account" aria-label={`Edit ${a.name}`} onClick={() => { setEditingAccount(a); setModalOpen(true); }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                  </button>
-                  <button className="icon-action danger" type="button" title="Delete Account" aria-label={`Delete ${a.name}`} onClick={() => handleDelete(a.id)} style={{ color: "var(--danger)" }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {liabilities.length === 0 && <tr><td colSpan={5} className="empty">No liabilities recorded.</td></tr>}
-          </tbody>
-        </table>
+      {/* Credit Cards & Liabilities Section */}
+      <div className="section" style={{ marginTop: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <h2 style={{ margin: 0 }}>Credit Cards & Liabilities</h2>
+            <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", marginTop: 2 }}>
+              {liabilities.length} {liabilities.length === 1 ? "card" : "cards"}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Total Outstanding</div>
+            <div className="tx-amount debit" style={{ fontWeight: 700, fontSize: "1.1rem" }}>
+              {formatMoney(totalLiabilityBalance)}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          {liabilities.map((acc) => (
+            <CreditCardAccountItem
+              key={acc.id}
+              account={acc}
+              onEdit={() => {
+                setEditingAccount(acc);
+                setModalOpen(true);
+              }}
+              onDelete={() => setDeleteTargetAccount(acc)}
+              onOpenStatementDetail={(stmt) => {
+                setSelectedStatement(stmt);
+                setStatementDetailOpen(true);
+              }}
+              onOpenPasswordProfile={(a) => {
+                setPasswordProfileAccount(a);
+                setPasswordProfileOpen(true);
+              }}
+              onOpenUploadStatement={(a) => {
+                setUploadAccount(a);
+                setUploadOpen(true);
+              }}
+            />
+          ))}
+          {liabilities.length === 0 && (
+            <div className="empty" style={{ padding: 24, background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)" }}>
+              No liabilities or credit cards recorded.
+            </div>
+          )}
+        </div>
       </div>
 
       <AccountModal
@@ -460,6 +1202,91 @@ export default function AccountsPage() {
         showToast={showToast}
         validHandles={validHandles}
       />
+
+      {/* Delete Account Safe Confirmation Modal */}
+      {deleteTargetAccount && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setDeleteTargetAccount(null)}>
+          <div
+            className="modal-panel"
+            role="dialog"
+            aria-modal="true"
+            style={{ width: "min(480px, 100%)", padding: 24, boxSizing: "border-box" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: "rgba(239, 68, 68, 0.12)",
+                  color: "var(--danger)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Delete Account?</h3>
+                <div style={{ color: "var(--ink-muted)", fontSize: "0.85rem", marginTop: 2 }}>{deleteTargetAccount.name}</div>
+              </div>
+            </div>
+            <p style={{ fontSize: "0.88rem", color: "var(--ink)", lineHeight: 1.5, margin: "16px 0" }}>
+              This will not delete existing imported transactions, but the account will no longer be available for new classifications and statements.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button type="button" className="btn quiet" onClick={() => setDeleteTargetAccount(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn"
+                style={{ background: "var(--danger)", color: "#fff", border: "none", padding: "6px 14px" }}
+                onClick={() => {
+                  const id = deleteTargetAccount.id;
+                  setDeleteTargetAccount(null);
+                  void performDelete(id);
+                }}
+              >
+                Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <StatementDetailModal
+        open={statementDetailOpen}
+        statement={selectedStatement}
+        onClose={() => setStatementDetailOpen(false)}
+        onStatementUpdated={(updated) => {
+          setSelectedStatement(updated);
+        }}
+      />
+
+      <PasswordProfileModal
+        open={passwordProfileOpen}
+        account={passwordProfileAccount}
+        onClose={() => setPasswordProfileOpen(false)}
+        onSaved={() => {
+          showToast("Password profile updated", "success");
+        }}
+      />
+
+      <UploadStatementModal
+        open={uploadOpen}
+        accounts={accounts}
+        defaultAccountId={uploadAccount?.id}
+        onClose={() => setUploadOpen(false)}
+        onUploaded={(stmt) => {
+          setSelectedStatement(stmt);
+          setStatementDetailOpen(true);
+        }}
+      />
     </>
   );
 }
+

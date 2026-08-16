@@ -143,3 +143,21 @@ def test_delayed_salary_on_second_counts_current_month(tmp_path: Path) -> None:
         assert overview["summary"]["income"] == 282330.0
     finally:
         session.close()
+
+
+def test_financial_trends_points(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    init_db(settings)
+    session = get_session_factory()()
+    try:
+        from expense_tracker.services.dashboard import financial_trends
+        trends = financial_trends(session, months=6, year=2026, month=8)
+        assert trends["currency"] == "INR"
+        assert len(trends["points"]) == 6
+        assert trends["points"][-1]["label"] == "Aug 2026"
+        assert "spent" in trends["points"][-1]
+        assert "income" in trends["points"][-1]
+        assert "net_cash_flow" in trends["points"][-1]
+    finally:
+        session.close()
+

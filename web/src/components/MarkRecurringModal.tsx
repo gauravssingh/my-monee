@@ -61,8 +61,17 @@ export default function MarkRecurringModal({ open, transaction, onClose, onSucce
 
   return createPortal(
     <div className="modal-backdrop" role="presentation" onClick={onBackdropClick}>
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
-        <header className="modal-header">
+      <div
+        className="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", flexDirection: "column", height: "min(640px, 86dvh)", maxHeight: "86dvh" }}
+      >
+        <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
+
+        <header className="modal-header" style={{ flexShrink: 0 }}>
           <div>
             <h2 id={titleId}>Mark as recurring</h2>
             <p className="lead">
@@ -76,7 +85,7 @@ export default function MarkRecurringModal({ open, transaction, onClose, onSucce
           </div>
         </header>
         
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20, flex: "1 1 0%", minHeight: 0, overflowY: "auto" }}>
           {error && <div className="error">{error}</div>}
           
           <div className="field">
@@ -108,7 +117,7 @@ export default function MarkRecurringModal({ open, transaction, onClose, onSucce
           </div>
         </div>
 
-        <footer className="modal-footer">
+        <footer className="modal-footer" style={{ flexShrink: 0, padding: "12px 18px max(16px, env(safe-area-inset-bottom, 16px))" }}>
           <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>Cancel</button>
           <button type="button" className="btn primary" disabled={saving} onClick={handleSubmit}>
             {saving ? "Saving..." : "Save Recurring"}

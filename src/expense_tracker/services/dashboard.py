@@ -14,7 +14,7 @@ from sqlalchemy.orm import joinedload
 
 IST = ZoneInfo("Asia/Kolkata")
 
-from expense_tracker.db.models import Account, Category, DataIssueFlag, Email, IngestionRun, SyncState, Transaction
+from expense_tracker.db.models import Account, Category, DataIssueFlag, Email, IngestionRun, Merchant, SyncState, Transaction
 from expense_tracker.domain.enums import DataIssueStatus
 
 
@@ -50,14 +50,27 @@ def _pct_change(current: float, previous: float) -> float | None:
     return round(((current - previous) / previous) * 100.0, 1)
 
 
+def _valid_spending_filters() -> list[Any]:
+    open_issue_subq = select(DataIssueFlag.transaction_id).where(
+        DataIssueFlag.status == DataIssueStatus.OPEN,
+        DataIssueFlag.issue_type.in_(["not_a_transaction", "duplicate"]),
+    )
+    return [
+        Transaction.direction == "debit",
+        Transaction.is_duplicate.is_(False),
+        Transaction.is_transfer.is_(False),
+        Transaction.excludes_from_spending.is_(False),
+        Transaction.transaction_type.notin_(["not_a_transaction", "declined", "transfer"]),
+        ~Transaction.id.in_(open_issue_subq),
+    ]
+
+
 def _spending_query(start: datetime, end: datetime) -> Select[Any]:
     return (
         select(func.coalesce(func.sum(Transaction.amount), 0))
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
-        .where(Transaction.direction == "debit")
-        .where(Transaction.is_duplicate.is_(False))
-        .where(Transaction.excludes_from_spending.is_(False))
+        .where(*_valid_spending_filters())
     )
 
 
@@ -135,14 +148,23 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         .where(Transaction.is_duplicate.is_(False))
     ) or 0
 
+    # Same filter set as current_spend, so transaction_count always matches
+    # the number of rows actually summed into "spent".
     debit_count = session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(Transaction.transaction_date >= start)
+        .where(Transaction.transaction_date <= end)
+        .where(*_valid_spending_filters())
+    ) or 0
+
+    raw_debit_count = session.scalar(
         select(func.count())
         .select_from(Transaction)
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
         .where(Transaction.direction == "debit")
         .where(Transaction.is_duplicate.is_(False))
-        .where(Transaction.excludes_from_spending.is_(False))
     ) or 0
 
     credit_count = session.scalar(
@@ -162,9 +184,7 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
             select(Transaction.category_id, func.coalesce(func.sum(Transaction.amount), 0))
             .where(Transaction.transaction_date >= start)
             .where(Transaction.transaction_date <= end)
-            .where(Transaction.direction == "debit")
-            .where(Transaction.is_duplicate.is_(False))
-            .where(Transaction.excludes_from_spending.is_(False))
+            .where(*_valid_spending_filters())
             .where(Transaction.category_id.is_not(None))
             .group_by(Transaction.category_id)
         ).all()
@@ -174,9 +194,7 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
             select(Transaction.category_id, func.count(Transaction.id))
             .where(Transaction.transaction_date >= start)
             .where(Transaction.transaction_date <= end)
-            .where(Transaction.direction == "debit")
-            .where(Transaction.is_duplicate.is_(False))
-            .where(Transaction.excludes_from_spending.is_(False))
+            .where(*_valid_spending_filters())
             .where(Transaction.category_id.is_not(None))
             .group_by(Transaction.category_id)
         ).all()
@@ -187,9 +205,7 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
             select(Transaction.category_id, func.coalesce(func.sum(Transaction.amount), 0))
             .where(Transaction.transaction_date >= prev_start)
             .where(Transaction.transaction_date <= prev_end)
-            .where(Transaction.direction == "debit")
-            .where(Transaction.is_duplicate.is_(False))
-            .where(Transaction.excludes_from_spending.is_(False))
+            .where(*_valid_spending_filters())
             .where(Transaction.category_id.is_not(None))
             .group_by(Transaction.category_id)
         ).all()
@@ -215,35 +231,51 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
     daily_data = session.execute(
         select(
             func.date(Transaction.transaction_date).label("date"),
-            func.coalesce(func.sum(Transaction.amount), 0).label("total")
+            func.coalesce(func.sum(Transaction.amount), 0).label("total"),
+            func.count(Transaction.id).label("count"),
         )
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
-        .where(Transaction.direction == "debit")
-        .where(Transaction.is_duplicate.is_(False))
-        .where(Transaction.excludes_from_spending.is_(False))
+        .where(*_valid_spending_filters())
         .group_by(func.date(Transaction.transaction_date))
         .order_by("date")
     ).all()
-    daily_spending = [{"date": row.date.strftime("%Y-%m-%d") if hasattr(row.date, 'strftime') else str(row.date), "spent": _as_float(row.total)} for row in daily_data]
+    daily_spending = [
+        {
+            "date": row.date.strftime("%Y-%m-%d") if hasattr(row.date, "strftime") else str(row.date),
+            "spent": _as_float(row.total),
+            "count": int(row.count),
+        }
+        for row in daily_data
+    ]
 
     # Top Merchants
+    merchant_name_expr = func.coalesce(
+        Merchant.display_name,
+        Merchant.canonical_name,
+        Transaction.merchant_normalized,
+        Transaction.merchant_raw,
+        "Unknown",
+    )
     merchant_data = session.execute(
         select(
-            func.coalesce(Transaction.merchant_normalized, Transaction.merchant_raw).label("merchant"),
+            merchant_name_expr.label("merchant"),
             func.coalesce(func.sum(Transaction.amount), 0).label("total"),
             func.count(Transaction.id).label("count")
         )
+        .outerjoin(Merchant, Transaction.merchant_entity_id == Merchant.id)
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
-        .where(Transaction.direction == "debit")
-        .where(Transaction.is_duplicate.is_(False))
-        .where(Transaction.excludes_from_spending.is_(False))
+        .where(*_valid_spending_filters())
         .group_by("merchant")
         .order_by(func.sum(Transaction.amount).desc())
         .limit(10)
     ).all()
-    top_merchants = [{"merchant": row.merchant or "Unknown", "total": _as_float(row.total), "count": row.count} for row in merchant_data if row.merchant]
+    top_merchants = [
+        {"merchant": row.merchant or "Unknown", "total": _as_float(row.total), "count": row.count}
+        for row in merchant_data
+        if row.merchant and row.merchant != "Unknown"
+    ]
 
     # Largest transactions
     largest_txs = session.scalars(
@@ -251,17 +283,27 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         .options(joinedload(Transaction.category))
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
-        .where(Transaction.direction == "debit")
-        .where(Transaction.is_duplicate.is_(False))
-        .where(Transaction.excludes_from_spending.is_(False))
+        .where(*_valid_spending_filters())
         .order_by(Transaction.amount.desc())
         .limit(10)
     ).all()
+
+    merchant_ids = [tx.merchant_entity_id for tx in largest_txs if tx.merchant_entity_id]
+    merchants_map = {
+        m.id: m.display_name or m.canonical_name
+        for m in session.scalars(select(Merchant).where(Merchant.id.in_(merchant_ids))).all()
+    } if merchant_ids else {}
+
     largest_transactions = [
         {
             "id": tx.id,
             "date": tx.transaction_date.isoformat(),
-            "merchant": tx.merchant_normalized or tx.merchant_raw or "Unknown",
+            "merchant": (
+                merchants_map.get(tx.merchant_entity_id)
+                or tx.merchant_normalized
+                or tx.merchant_raw
+                or "Unknown"
+            ),
             "category": tx.category.name if tx.category else "Uncategorized",
             "amount": _as_float(tx.amount),
             "account": tx.account or "Unknown"
@@ -277,9 +319,7 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         )
         .where(Transaction.transaction_date >= start)
         .where(Transaction.transaction_date <= end)
-        .where(Transaction.direction == "debit")
-        .where(Transaction.is_duplicate.is_(False))
-        .where(Transaction.excludes_from_spending.is_(False))
+        .where(*_valid_spending_filters())
         .group_by(Transaction.account)
         .order_by(func.sum(Transaction.amount).desc())
     ).all()
@@ -318,16 +358,37 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         select(func.coalesce(func.sum(base_review_stmt.subquery().c.amount), 0))
     ) or 0
 
+    # Categorize commitments vs consumer living spend
+    # Commitments include Loans, Fees & Interest, and recurring Family Support (Anil Kumar Singh)
+    commitments_spend = sum(
+        c["total"] for c in category_breakdown
+        if (
+            c.get("expense_type") in ("essential", "financial", "commitment")
+            or c.get("category", "").lower() in ("loans", "loan", "fees & interest", "fees-interest", "emi", "family")
+        )
+    )
+    consumer_spend = max(0.0, current_spend - commitments_spend)
+    raw_tx_count = int(tx_count)
+    active_expense_count = int(debit_count)
+    # Debits that were excluded from "spent" (transfers, refunds, flagged,
+    # not_a_transaction/declined) — not all non-debit activity, so ordinary
+    # credits don't inflate this count.
+    excluded_count = max(0, int(raw_debit_count) - active_expense_count)
+
     return {
         "period": {"year": y, "month": m},
         "currency": "INR",
         "summary": {
             "spent": current_spend,
+            "consumer_spent": consumer_spend,
+            "commitments_spent": commitments_spend,
             "income": income,
             "net_cash_flow": income - current_spend,
-            "transaction_count": int(tx_count),
-            "debit_count": int(debit_count),
+            "transaction_count": active_expense_count,
+            "debit_count": active_expense_count,
             "credit_count": int(credit_count),
+            "total_recorded_count": raw_tx_count,
+            "excluded_count": excluded_count,
         },
         "month_comparison": {
             "spent_change_pct": _pct_change(current_spend, previous_spend),
@@ -346,8 +407,43 @@ def get_overview(session: Session, *, year: int | None = None, month: int | None
         },
         "current_month_spending": current_spend,
         "needs_review_count": int(needs_review_count),
-        "transaction_count": int(tx_count),
+        "transaction_count": active_expense_count,
     }
+
+
+def financial_trends(
+    session: Session,
+    *,
+    months: int = 6,
+    year: int | None = None,
+    month: int | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if year and month:
+        ref_year, ref_month = int(year), int(month)
+    else:
+        now = now or datetime.now(IST)
+        ref_year, ref_month = now.year, now.month
+
+    months = max(1, min(int(months), 24))
+    points: list[dict[str, Any]] = []
+    for offset in range(-(months - 1), 1):
+        y, m = _shift_month(ref_year, ref_month, offset)
+        start, end = _month_bounds(y, m)
+        spent = _as_float(session.scalar(_spending_query(start, end)))
+        income = income_for_pay_period(session, y, m)
+        cash_flow = income - spent
+        points.append(
+            {
+                "year": y,
+                "month": m,
+                "label": datetime(y, m, 1).strftime("%b %Y"),
+                "spent": spent,
+                "income": income,
+                "net_cash_flow": cash_flow,
+            }
+        )
+    return {"months": len(points), "currency": "INR", "points": points}
 
 
 def income_trend(
@@ -370,7 +466,7 @@ def income_trend(
                 "income": total,
             }
         )
-    return {"months": months, "currency": "INR", "points": points}
+    return {"months": len(points), "currency": "INR", "points": points}
 
 
 def spending_by_category(session: Session, *, year: int | None = None, month: int | None = None, now: datetime | None = None) -> list[dict[str, Any]]:
@@ -389,9 +485,7 @@ def spending_by_category(session: Session, *, year: int | None = None, month: in
             select(Transaction.category_id, func.coalesce(func.sum(Transaction.amount), 0))
             .where(Transaction.transaction_date >= start)
             .where(Transaction.transaction_date <= end)
-            .where(Transaction.direction == "debit")
-            .where(Transaction.is_duplicate.is_(False))
-            .where(Transaction.excludes_from_spending.is_(False))
+            .where(*_valid_spending_filters())
             .where(Transaction.category_id.is_not(None))
             .group_by(Transaction.category_id)
         ).all()
@@ -401,9 +495,7 @@ def spending_by_category(session: Session, *, year: int | None = None, month: in
             select(Transaction.category_id, func.count(Transaction.id))
             .where(Transaction.transaction_date >= start)
             .where(Transaction.transaction_date <= end)
-            .where(Transaction.direction == "debit")
-            .where(Transaction.is_duplicate.is_(False))
-            .where(Transaction.excludes_from_spending.is_(False))
+            .where(*_valid_spending_filters())
             .where(Transaction.category_id.is_not(None))
             .group_by(Transaction.category_id)
         ).all()

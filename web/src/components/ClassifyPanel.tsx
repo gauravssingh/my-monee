@@ -90,10 +90,13 @@ export default function ClassifyPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", flexDirection: "column", height: "min(760px, 86dvh)", maxHeight: "86dvh" }}
       >
-        <header className="modal-header">
+        <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
+
+        <header className="modal-header" style={{ flexShrink: 0, background: "var(--surface)" }}>
           <div>
-            <h2 id={titleId}>
+            <h2 id={titleId} style={{ fontSize: "1.15rem", fontWeight: 700 }}>
               {count === 1 ? "Classify transaction" : `Classify ${count} transactions`}
             </h2>
             <p className="metric-hint">
@@ -101,13 +104,20 @@ export default function ClassifyPanel({
             </p>
           </div>
           <div className="modal-actions">
-            <button ref={closeRef} className="btn" type="button" onClick={onClose} disabled={saving}>
-              Cancel
+            <button
+              ref={closeRef}
+              className="btn icon-btn"
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
 
-        <div className="modal-body classify-panel-body">
+        <div className="modal-body classify-panel-body" style={{ overflowY: "auto", flex: 1, WebkitOverflowScrolling: "touch" }}>
           <section className="classify-preview">
             <h3 className="classify-section-title">Selected</h3>
             <ul className="classify-preview-list">
@@ -125,21 +135,20 @@ export default function ClassifyPanel({
                     <span className="classify-preview-merchant">{merchant}</span>
                     <span className="classify-preview-trailing">
                       <span className="classify-preview-meta">
-                        {formatDate(tx.transaction_date)} ·{" "}
-                        <span className={tx.direction === "credit" ? "tx-amount credit" : "tx-amount debit"}>
-                          {tx.direction === "credit" ? "+" : "−"}
-                          {formatMoney(tx.amount ?? 0, tx.currency)}
-                        </span>
+                        {formatMoney(tx.amount ?? 0, tx.currency)} · {formatDate(tx.transaction_date)}
                       </span>
                       <button
                         className="icon-action"
                         type="button"
-                        title="Flag a data issue"
-                        aria-label={`Flag a data issue on ${merchant}`}
+                        title="Flag an issue with this transaction"
+                        aria-label="Flag issue"
                         onClick={() => onFlag(tx)}
                       >
                         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
-                          <path fill="currentColor" d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z" />
+                          <path
+                            fill="currentColor"
+                            d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"
+                          />
                         </svg>
                       </button>
                     </span>
@@ -148,77 +157,78 @@ export default function ClassifyPanel({
               })}
             </ul>
             {remaining > 0 && (
-              <p className="metric-hint">and {remaining} more…</p>
+              <p className="metric-hint" style={{ marginTop: 6 }}>
+                + {remaining} more selected
+              </p>
             )}
           </section>
 
-          {count === 1 && (
-            <section className="classify-ai-section" style={{ marginBottom: 16 }}>
-              {aiLoading && (
-                <div style={{ padding: "12px 16px", borderRadius: 8, border: "1px dashed var(--line)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.8125rem" }}>
-                  Consulting Gemini for category suggestion…
+          {aiLoading && (
+            <div style={{ padding: "10px 14px", background: "var(--accent-soft)", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontSize: "1rem" }}>✨</span>
+              <span style={{ fontSize: "0.85rem", color: "var(--accent)", fontWeight: 500 }}>
+                Checking smart suggestion…
+              </span>
+            </div>
+          )}
+
+          {aiSuggestion && (
+            <section
+              style={{
+                padding: "12px 14px",
+                background: "var(--accent-soft)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--accent)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: "1rem" }}>✨</span>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Suggested Category
+                  </span>
                 </div>
-              )}
-              {aiError && (
-                <div style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--surface)", fontSize: "0.8125rem", color: "var(--ink-muted)" }}>
-                  <span>AI Suggestion unavailable ({aiError})</span>
-                </div>
-              )}
-              {aiSuggestion && (
-                <div
-                  style={{
-                    padding: "14px 16px",
-                    borderRadius: 8,
-                    border: "1px solid var(--accent, #0c6e5c)",
-                    background: "var(--accent-soft, #e8f5f1)",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "var(--accent, #0c6e5c)" }}>
-                        ✨ AI Suggestion ({aiSuggestion.model || "Gemini"})
-                      </span>
-                      <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
-                        {Math.round(aiSuggestion.confidence * 100)}% confidence
-                      </span>
-                      {aiSuggestion.cached && (
-                        <span style={{ fontSize: "0.6875rem", background: "var(--surface)", padding: "1px 6px", borderRadius: 4, color: "var(--ink-muted)", border: "1px solid var(--line)" }}>
-                          cached
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      className="btn primary"
-                      style={{ padding: "4px 12px", fontSize: "0.8125rem", height: "auto" }}
-                      onClick={() => {
-                        setCategoryId(aiSuggestion.category_id);
-                        setSubcategoryId(aiSuggestion.subcategory_id || "");
-                      }}
-                    >
-                      Accept Suggestion
-                    </button>
-                  </div>
-                  <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "var(--ink)" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 500 }}>
+                  {Math.round(aiSuggestion.confidence * 100)}% confidence
+                </span>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>
                     {aiSuggestion.category_name}
-                    {aiSuggestion.subcategory_name ? ` › ${aiSuggestion.subcategory_name}` : ""}
+                    {aiSuggestion.subcategory_name && ` › ${aiSuggestion.subcategory_name}`}
                   </div>
-                  {aiSuggestion.signals && aiSuggestion.signals.length > 0 && (
-                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: "0.8125rem", color: "var(--ink-muted)", lineHeight: 1.4 }}>
-                      {aiSuggestion.signals.map((sig, i) => (
-                        <li key={i}>{sig}</li>
-                      ))}
-                    </ul>
+                  {aiSuggestion.signals.length > 0 && (
+                    <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", marginTop: 2 }}>
+                      Signals: {aiSuggestion.signals.join(" · ")}
+                    </div>
                   )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  className="btn primary"
+                  style={{ padding: "6px 12px", fontSize: "0.82rem", whiteSpace: "nowrap" }}
+                  onClick={() => {
+                    setCategoryId(aiSuggestion.category_id);
+                    if (aiSuggestion.subcategory_id) {
+                      setSubcategoryId(aiSuggestion.subcategory_id);
+                    }
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
             </section>
           )}
 
-          <section>
+          {aiError && (
+            <p className="metric-hint" style={{ color: "var(--warn)", margin: 0, fontSize: "0.8rem" }}>
+              Note: {aiError}
+            </p>
+          )}
+
+          <section className="classify-categories">
             <h3 className="classify-section-title">Category</h3>
             <div className="classify-chip-grid" role="listbox" aria-label="Categories">
               {categories.map((cat) => {
@@ -243,8 +253,8 @@ export default function ClassifyPanel({
           </section>
 
           {selectedCategory && selectedCategory.subcategories.length > 0 && (
-            <section>
-              <h3 className="classify-section-title">Subcategory</h3>
+            <section className="classify-subcategories">
+              <h3 className="classify-section-title">{selectedCategory.name} subcategories</h3>
               <div className="classify-chip-grid" role="listbox" aria-label="Subcategories">
                 <button
                   type="button"
@@ -321,22 +331,42 @@ export default function ClassifyPanel({
           </section>
 
           {error && <p className="error">{error}</p>}
-
-          <div className="classify-panel-footer">
-            <button
-              className="btn primary"
-              type="button"
-              disabled={saving || !categoryId}
-              onClick={() => onSave(categoryId, subcategoryId || null)}
-            >
-              {saving
-                ? "Saving…"
-                : count === 1
-                  ? "Save & verify"
-                  : `Save & verify ${count}`}
-            </button>
-          </div>
         </div>
+
+        <footer
+          className="modal-footer classify-panel-footer"
+          style={{
+            flexShrink: 0,
+            background: "var(--surface)",
+            borderTop: "1px solid var(--line)",
+            padding: "12px 18px max(16px, env(safe-area-inset-bottom, 16px))",
+            display: "flex",
+            gap: 10,
+          }}
+        >
+          <button
+            className="btn quiet"
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{ padding: "12px 18px" }}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            type="button"
+            disabled={saving || !categoryId}
+            onClick={() => onSave(categoryId, subcategoryId || null)}
+            style={{ flex: 1, padding: "12px 18px", fontSize: "0.95rem", fontWeight: 600 }}
+          >
+            {saving
+              ? "Saving…"
+              : count === 1
+                ? "Save & verify"
+                : `Save & verify ${count}`}
+          </button>
+        </footer>
       </div>
     </div>,
     document.body,

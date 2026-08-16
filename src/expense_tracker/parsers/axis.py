@@ -17,9 +17,9 @@ from expense_tracker.parsers.extract import (
 
 AXIS_SENDER = re.compile(r"alerts@axis\.bank\.in|axis\.bank\.in", re.I)
 
-# "by NEFT/CHASH00053023262/Sala" or Transaction Info line
+# "by NEFT/CHASH00053023262/Sala" or "by ACH-DR-RASMEC KOMPALLY-NOD"
 CHANNEL_REF = re.compile(
-    r"\b((?:NEFT|IMPS|RTGS|ACH(?:-DR|-CR)?|UPILITE|UPI(?:/[A-Za-z0-9]+)?)\s*/\s*[A-Za-z0-9/.\-& ]{2,100})",
+    r"\b((?:NEFT|IMPS|RTGS|ACH(?:-DR|-CR)?|UPILITE|UPI(?:/[A-Za-z0-9]+)?)\s*[-/]\s*[A-Za-z0-9/.\-& ]{2,100})",
     re.I,
 )
 SALARY_REF = re.compile(r"(?:NEFT|IMPS|RTGS)\s*/[A-Za-z0-9/.\- ]*?\bSala(?:ry)?\b", re.I)
@@ -276,6 +276,12 @@ class AxisBankParser:
                 parts = [p.strip() for p in channel_ref.split("/") if p.strip()]
                 if len(parts) >= 3:
                     merchant_raw = parts[-1]
+            elif "ACH-DR" in upper_ref or "ACH" in upper_ref:
+                payment_method = "ach"
+                if "RASMEC" in upper_ref:
+                    merchant_raw = "ACH-DR-RASMEC KOMPALLY-NOD"
+                else:
+                    merchant_raw = channel_ref
 
         if not merchant_raw:
             merchant_raw = extract_axis_merchant(text)
@@ -297,6 +303,23 @@ class AxisBankParser:
 
         if direction == "credit":
             enrichment.update(classify_axis_credit(channel_ref, text))
+        elif "RASMEC" in text.upper() or (channel_ref and "RASMEC" in channel_ref.upper()):
+            enrichment.update(
+                {
+                    "transaction_type": "purchase",
+                    "merchant_raw": "ACH-DR-RASMEC KOMPALLY-NOD",
+                    "payment_method": "ach",
+                    "is_transfer": False,
+                    "is_refund": False,
+                    "excludes_from_spending": False,
+                    "category_slug": "loans",
+                    "subcategory_slug": "car",
+                    "classification_source": "rule",
+                    "classification_confidence": 0.95,
+                    "classification_signals": {"rule": "axis_ach_rasmec_car_loan"},
+                    "needs_review": False,
+                }
+            )
         elif re.search(r"credit.?card payment|by CreditCard|cc[- ]?payment", text, re.I):
             enrichment.update(
                 {

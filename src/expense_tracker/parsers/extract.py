@@ -62,7 +62,10 @@ MERCHANT_JUNK = re.compile(
     re.I,
 )
 
-CARD_PATTERN = re.compile(r"\b(?:card|xx|ending|x{2,})[^\d]*(\d{4})\b", re.I)
+CARD_PATTERN = re.compile(
+    r"\b(?:card\s*(?:no\.?|number|ending)?|ending\s*(?:in|with)?|xx|\*{2,}|x{2,})[\s*x#:().-]*(\d{4})\b",
+    re.I,
+)
 UPI_ID_PATTERN = re.compile(r"\b([a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,})\b")
 ACCOUNT_PATTERN = re.compile(r"\b(?:a/c|account|acct)[^\d]*([Xx*\d]{4,}\d{2,4})\b", re.I)
 

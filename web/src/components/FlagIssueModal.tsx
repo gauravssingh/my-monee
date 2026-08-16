@@ -19,11 +19,11 @@ type Props = {
 };
 
 const ISSUE_TYPES: Array<{ value: DataIssueType; label: string }> = [
+  { value: "not_a_transaction", label: "Not a transaction" },
   { value: "wrong_amount", label: "Wrong amount" },
   { value: "wrong_date", label: "Wrong date" },
   { value: "wrong_merchant", label: "Wrong merchant" },
   { value: "wrong_direction", label: "Wrong debit/credit" },
-  { value: "not_a_transaction", label: "Not a transaction" },
   { value: "duplicate", label: "Duplicate" },
   { value: "other", label: "Other" },
 ];
@@ -57,7 +57,7 @@ function previewLabel(tx: Transaction): string {
 
 export default function FlagIssueModal({ open, transactions, saving, error, onClose, onSubmit }: Props) {
   const titleId = useId();
-  const [issueType, setIssueType] = useState<DataIssueType>("wrong_amount");
+  const [issueType, setIssueType] = useState<DataIssueType>("not_a_transaction");
   const [suggestedValue, setSuggestedValue] = useState("");
   const [note, setNote] = useState("");
 
@@ -66,7 +66,7 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
 
   useEffect(() => {
     if (!open) return;
-    setIssueType("wrong_amount");
+    setIssueType("not_a_transaction");
     setSuggestedValue("");
     setNote("");
   }, [open, transactions]);
@@ -87,12 +87,15 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", flexDirection: "column", maxHeight: "86dvh", width: "min(500px, 100%)" }}
       >
-        <header className="modal-header">
+        <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
+
+        <header className="modal-header" style={{ flexShrink: 0, padding: "16px 20px 12px" }}>
           <div>
-            <h2 id={titleId}>{count === 1 ? "Flag a data issue" : `Flag ${count} transactions`}</h2>
-            <p className="lead">
-              Reports a problem with this data without changing it. Flags are grouped for bulk review under Data Issues.
+            <h2 id={titleId} style={{ fontSize: "1.05rem", margin: 0 }}>{count === 1 ? "Flag data issue" : `Flag ${count} transactions`}</h2>
+            <p className="lead" style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "var(--ink-muted)", lineHeight: 1.35 }}>
+              Groups transactions for review under Data Issues without modifying raw data.
             </p>
           </div>
           <div className="modal-actions">
@@ -102,7 +105,7 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
           </div>
         </header>
 
-        <div className="modal-body flag-issue-body">
+        <div className="modal-body flag-issue-body" style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", padding: "14px 20px", gap: "14px" }}>
           <section className="classify-preview">
             <h3 className="classify-section-title">{count === 1 ? "Transaction" : "Selected"}</h3>
             <ul className="classify-preview-list">
@@ -166,7 +169,7 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
             <textarea
               id="flag-note"
               className="input"
-              rows={3}
+              rows={2}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Anything else worth knowing about this one"
@@ -176,7 +179,7 @@ export default function FlagIssueModal({ open, transactions, saving, error, onCl
           {error && <p className="error">{error}</p>}
 
         </div>
-        <footer className="modal-footer">
+        <footer className="modal-footer" style={{ flexShrink: 0, padding: "12px 20px max(14px, env(safe-area-inset-bottom, 14px))", borderTop: "1px solid var(--line)" }}>
           <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>Cancel</button>
           <button 
             type="button" 

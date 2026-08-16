@@ -70,11 +70,14 @@ export default function EmailViewerModal({
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
+        style={{ display: "flex", flexDirection: "column", height: "min(880px, 90vh)" }}
       >
-        <header className="modal-header">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <h2 id={titleId}>
+        <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
+
+        <header className="modal-header" style={{ position: "sticky", top: 0, zIndex: 10, background: "var(--surface)", padding: "14px 18px 12px" }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h2 id={titleId} style={{ fontSize: "1.1rem", fontWeight: 700, margin: 0, wordBreak: "break-word" }}>
                 {message?.subject || (loading ? "Loading email…" : "Email")}
               </h2>
               {transactionId && (
@@ -86,30 +89,25 @@ export default function EmailViewerModal({
                   style={{ margin: 0 }}
                 >
                   <span className="email-tx-id-label">ID</span>
-                  <code>{transactionId}</code>
+                  <code>{transactionId.slice(0, 8)}…</code>
                   <span className="email-tx-id-action">{copied ? "Copied" : "Copy"}</span>
                 </button>
               )}
             </div>
-            <p className="lead" style={{ margin: "4px 0 0" }}>
+            <p className="lead" style={{ margin: "3px 0 0", fontSize: "0.82rem", color: "var(--ink-muted)" }}>
               {message && metaBits.length > 0 ? metaBits.join(" · ") : "Email details"}
             </p>
           </div>
-          <div className="modal-actions">
-            {message?.gmail_url && (
-              <a className="btn quiet" href={message.gmail_url} target="_blank" rel="noreferrer">
-                Open in Gmail ↗
-              </a>
-            )}
+          <div className="modal-actions" style={{ marginLeft: 8, flexShrink: 0 }}>
             <button ref={closeRef} type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
 
-        <div className="modal-body email-modal-body">
-          {loading && <p className="email-modal-status">Fetching from Gmail…</p>}
-          {error && <p className="error">{error}</p>}
+        <div className="modal-body email-modal-body" style={{ flex: 1, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {loading && <p className="email-modal-status" style={{ padding: 20 }}>Fetching from Gmail…</p>}
+          {error && <p className="error" style={{ margin: 16 }}>{error}</p>}
           {!loading && !error && message && (
             htmlDoc ? (
               <iframe
@@ -117,12 +115,52 @@ export default function EmailViewerModal({
                 title="Email contents"
                 sandbox=""
                 srcDoc={htmlDoc}
+                style={{ flex: 1, width: "100%", height: "100%", border: "none" }}
               />
             ) : (
-              <pre className="email-text">{message.body_text || message.snippet || "No body"}</pre>
+              <pre className="email-text" style={{ flex: 1, margin: 0, padding: 16, overflowY: "auto" }}>
+                {message.body_text || message.snippet || "No body"}
+              </pre>
             )
           )}
         </div>
+
+        <footer
+          className="modal-footer"
+          style={{
+            position: "sticky",
+            bottom: 0,
+            zIndex: 10,
+            background: "var(--surface)",
+            borderTop: "1px solid var(--line)",
+            padding: "10px 16px calc(10px + var(--sab))",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          {message?.gmail_url ? (
+            <a
+              className="btn quiet"
+              href={message.gmail_url}
+              target="_blank"
+              rel="noreferrer"
+              style={{ fontSize: "0.85rem", padding: "8px 14px" }}
+            >
+              Open in Gmail ↗
+            </a>
+          ) : <div />}
+
+          <button
+            type="button"
+            className="btn primary"
+            onClick={onClose}
+            style={{ padding: "8px 20px", fontSize: "0.88rem", fontWeight: 600 }}
+          >
+            Done
+          </button>
+        </footer>
       </div>
     </div>,
     document.body,

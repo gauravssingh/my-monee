@@ -1,11 +1,11 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm import Session
 
 from expense_tracker.api.deps import db_session
-from expense_tracker.db.models import Merchant, MerchantAlias, Transaction, utcnow
+from expense_tracker.db.models import Category, Merchant, MerchantAlias, Transaction, utcnow
 
 router = APIRouter(prefix="/api/merchants", tags=["merchants"])
 
@@ -16,7 +16,6 @@ class MergeRequest(BaseModel):
 @router.get("")
 def list_merchants(session: Session = Depends(db_session)) -> dict[str, Any]:
     from datetime import datetime, timedelta, timezone
-    from sqlalchemy import case, func
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
 
@@ -25,21 +24,26 @@ def list_merchants(session: Session = Depends(db_session)) -> dict[str, Any]:
     for a in session.scalars(select(MerchantAlias)).all():
         aliases_by_merchant.setdefault(a.merchant_id, []).append(a.alias_raw)
 
+    valid_tx = (
+        (Transaction.direction == "debit")
+        & (Transaction.excludes_from_spending.is_(False))
+        & (Transaction.is_duplicate.is_(False))
+        & (Transaction.is_transfer.is_(False))
+        & (Transaction.transaction_type.notin_(["not_a_transaction", "declined", "transfer"]))
+    )
+
     stmt = (
         select(
             Merchant.id,
             Merchant.display_name,
             Merchant.canonical_name,
             Merchant.normalized_key,
+            Merchant.category_hint,
+            Category.name.label("default_category_name"),
             func.coalesce(
                 func.sum(
                     case(
-                        (
-                            (Transaction.direction == "debit")
-                            & (Transaction.excludes_from_spending.is_(False))
-                            & (Transaction.is_duplicate.is_(False)),
-                            Transaction.amount,
-                        ),
+                        (valid_tx, Transaction.amount),
                         else_=0,
                     )
                 ),
@@ -48,31 +52,34 @@ def list_merchants(session: Session = Depends(db_session)) -> dict[str, Any]:
             func.coalesce(
                 func.sum(
                     case(
-                        (
-                            (Transaction.direction == "debit")
-                            & (Transaction.excludes_from_spending.is_(False))
-                            & (Transaction.is_duplicate.is_(False))
-                            & (Transaction.transaction_date >= cutoff),
-                            Transaction.amount,
-                        ),
+                        (valid_tx & (Transaction.transaction_date >= cutoff), Transaction.amount),
                         else_=0,
                     )
                 ),
                 0,
             ).label("spent_last_30d"),
-            func.count(Transaction.id).label("tx_count"),
+            func.count(
+                case(
+                    (valid_tx, Transaction.id),
+                    else_=None,
+                )
+            ).label("tx_count"),
         )
+        .outerjoin(Category, Category.id == Merchant.default_category_id)
         .outerjoin(Transaction, Transaction.merchant_entity_id == Merchant.id)
-        .group_by(Merchant.id)
+        .group_by(Merchant.id, Category.name)
+        .having(
+            func.sum(
+                case(
+                    (valid_tx, Transaction.amount),
+                    else_=0,
+                )
+            ) > 0
+        )
         .order_by(
             func.sum(
                 case(
-                    (
-                        (Transaction.direction == "debit")
-                        & (Transaction.excludes_from_spending.is_(False))
-                        & (Transaction.is_duplicate.is_(False)),
-                        Transaction.amount,
-                    ),
+                    (valid_tx, Transaction.amount),
                     else_=0,
                 )
             ).desc(),
@@ -89,6 +96,7 @@ def list_merchants(session: Session = Depends(db_session)) -> dict[str, Any]:
             "display_name": r.display_name,
             "canonical_name": r.canonical_name,
             "normalized_key": r.normalized_key,
+            "default_category": r.default_category_name or r.category_hint or None,
             "aliases": aliases_by_merchant.get(r.id, []),
             "total_spent": float(r.total_spent or 0.0),
             "spent_last_30d": float(r.spent_last_30d or 0.0),

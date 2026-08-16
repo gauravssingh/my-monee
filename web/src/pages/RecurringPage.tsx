@@ -8,6 +8,7 @@ export default function RecurringPage() {
   const [detected, setDetected] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mobileTab, setMobileTab] = useState<"all" | "subscriptions" | "bills" | "detected">("all");
 
   useEffect(() => {
     setLoading(true);
@@ -27,6 +28,10 @@ export default function RecurringPage() {
   const totalMonthlySub = subscriptions.reduce((acc, sub) => acc + (sub.annual_cost / 12), 0);
   const totalBillsExpected = bills.reduce((acc, bill) => acc + bill.expected_amount, 0);
 
+  const showSubs = mobileTab === "all" || mobileTab === "subscriptions";
+  const showBills = mobileTab === "all" || mobileTab === "bills";
+  const showDetected = mobileTab === "all" || mobileTab === "detected";
+
   return (
     <>
       <header className="page-header">
@@ -36,7 +41,7 @@ export default function RecurringPage() {
         </div>
       </header>
       
-      <section className="metrics" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+      <section className="metrics" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <article className="metric">
           <div className="metric-label">Avg Monthly Subscriptions</div>
           <div className="metric-value">
@@ -53,77 +58,117 @@ export default function RecurringPage() {
         </article>
       </section>
 
+      {/* Mobile Tab Filter */}
+      <div className="mobile-recurring-tabs" style={{ display: "none", marginBottom: 16 }}>
+        <div className="segmented" style={{ width: "100%" }}>
+          <button
+            type="button"
+            className={`segmented-btn${mobileTab === "all" ? " active" : ""}`}
+            onClick={() => setMobileTab("all")}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`segmented-btn${mobileTab === "subscriptions" ? " active" : ""}`}
+            onClick={() => setMobileTab("subscriptions")}
+          >
+            Subscriptions ({subscriptions.length})
+          </button>
+          <button
+            type="button"
+            className={`segmented-btn${mobileTab === "bills" ? " active" : ""}`}
+            onClick={() => setMobileTab("bills")}
+          >
+            Bills ({bills.length})
+          </button>
+          {detected.length > 0 && (
+            <button
+              type="button"
+              className={`segmented-btn${mobileTab === "detected" ? " active" : ""}`}
+              onClick={() => setMobileTab("detected")}
+            >
+              Detected ({detected.length})
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="grid-2">
-        <section className="section">
-          <h2>Fixed Subscriptions</h2>
-          <p className="lead">Services with exact recurring amounts.</p>
-          {subscriptions.length === 0 ? (
-            <div className="empty">No subscriptions detected.</div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Service</th>
-                    <th>Freq</th>
-                    <th className="num">Amount</th>
-                    <th>Next Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subscriptions.map(s => (
-                    <tr key={s.id}>
-                      <td style={{ fontWeight: 600 }}>{s.name}</td>
-                      <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{s.billing_frequency}</td>
-                      <td className="num tx-amount debit">−{formatMoney(s.amount)}</td>
-                      <td className="tx-date">{s.next_billing_date ? formatDate(s.next_billing_date) : "—"}</td>
+        {showSubs && (
+          <section className="section">
+            <h2>Fixed Subscriptions</h2>
+            <p className="lead">Services with exact recurring amounts.</p>
+            {subscriptions.length === 0 ? (
+              <div className="empty">No subscriptions detected.</div>
+            ) : (
+              <div className="table-wrap">
+                <table style={{ minWidth: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Freq</th>
+                      <th className="num">Amount</th>
+                      <th>Next Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody>
+                    {subscriptions.map(s => (
+                      <tr key={s.id}>
+                        <td style={{ fontWeight: 600 }}>{s.name}</td>
+                        <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{s.billing_frequency}</td>
+                        <td className="num tx-amount debit">−{formatMoney(s.amount)}</td>
+                        <td className="tx-date">{s.next_billing_date ? formatDate(s.next_billing_date) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
 
-        <section className="section">
-          <h2>Variable Bills</h2>
-          <p className="lead">Recurring payments with varying monthly amounts.</p>
-          {bills.length === 0 ? (
-            <div className="empty">No variable bills detected.</div>
-          ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Biller</th>
-                    <th>Freq</th>
-                    <th className="num">Avg Amount</th>
-                    <th>Due Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bills.map(b => (
-                    <tr key={b.id}>
-                      <td style={{ fontWeight: 600 }}>{b.name}</td>
-                      <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{b.frequency}</td>
-                      <td className="num tx-amount debit">−{formatMoney(b.expected_amount)}</td>
-                      <td className="tx-date" style={{ color: b.due_date ? "var(--warn)" : "var(--ink-muted)" }}>
-                        {b.due_date ? formatDate(b.due_date) : "—"}
-                      </td>
+        {showBills && (
+          <section className="section">
+            <h2>Variable Bills</h2>
+            <p className="lead">Recurring payments with varying monthly amounts.</p>
+            {bills.length === 0 ? (
+              <div className="empty">No variable bills detected.</div>
+            ) : (
+              <div className="table-wrap">
+                <table style={{ minWidth: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th>Biller</th>
+                      <th>Freq</th>
+                      <th className="num">Avg Amount</th>
+                      <th>Due Date</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                  </thead>
+                  <tbody>
+                    {bills.map(b => (
+                      <tr key={b.id}>
+                        <td style={{ fontWeight: 600 }}>{b.name}</td>
+                        <td style={{ textTransform: "capitalize", fontSize: "0.85rem", color: "var(--ink-muted)" }}>{b.frequency}</td>
+                        <td className="num tx-amount debit">−{formatMoney(b.expected_amount)}</td>
+                        <td className="tx-date" style={{ color: b.due_date ? "var(--warn)" : "var(--ink-muted)" }}>
+                          {b.due_date ? formatDate(b.due_date) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
 
-        {detected.length > 0 && (
+        {showDetected && detected.length > 0 && (
           <section className="section" style={{ gridColumn: "1 / -1", marginTop: 12 }}>
             <h2>Detected Recurring Candidates</h2>
             <p className="lead">Transactions identified as candidate recurring commitments.</p>
             <div className="table-wrap">
-              <table>
+              <table style={{ minWidth: "100%" }}>
                 <thead>
                   <tr>
                     <th>Merchant / Name</th>

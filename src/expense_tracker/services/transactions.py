@@ -113,6 +113,8 @@ def list_transactions(
     sort_by: str | None = None,
     sort_dir: str | None = None,
     merchant_id: str | None = None,
+    account: str | None = None,
+    status: str | None = None,
     category_id: str | None = None,
     category_ids: list[str] | None = None,
     subcategory_id: str | None = None,
@@ -132,14 +134,25 @@ def list_transactions(
     )
     if needs_review is not None:
         stmt = stmt.where(Transaction.needs_review.is_(needs_review))
+    if status:
+        if status.lower() in ("review", "needs_review", "needs review"):
+            stmt = stmt.where(Transaction.needs_review.is_(True))
+        elif status.lower() in ("ok", "verified"):
+            stmt = stmt.where(Transaction.needs_review.is_(False))
     if direction in {"debit", "credit"}:
         stmt = stmt.where(Transaction.direction == direction)
+    if account:
+        if account.lower() in ("unlinked", "unknown", "none"):
+            stmt = stmt.where(Transaction.account.is_(None) | (Transaction.account == ""))
+        else:
+            stmt = stmt.where(Transaction.account.ilike(f"%{account}%"))
     if q:
         like = f"%{q}%"
         stmt = stmt.where(
             (Transaction.merchant_raw.ilike(like))
             | (Transaction.merchant_normalized.ilike(like))
             | (Transaction.description.ilike(like))
+            | (Transaction.account.ilike(like))
         )
     if date_from:
         start = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
@@ -148,7 +161,12 @@ def list_transactions(
         end = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=timezone.utc)
         stmt = stmt.where(Transaction.transaction_date < end)
     if merchant_id:
-        stmt = stmt.where(Transaction.merchant_entity_id == merchant_id)
+        stmt = (
+            stmt.where(Transaction.merchant_entity_id == merchant_id)
+            .where(Transaction.is_transfer.is_(False))
+            .where(Transaction.excludes_from_spending.is_(False))
+            .where(Transaction.transaction_type.notin_(["not_a_transaction", "declined", "transfer"]))
+        )
 
     cats = list(category_ids or [])
     if category_id:
@@ -211,6 +229,7 @@ def _apply_category_side_effects(
         tx.is_transfer = True
         tx.is_refund = False
         tx.excludes_from_spending = True
+        tx.merchant_entity_id = None
         if tx.transaction_type not in {"income", "refund"}:
             tx.transaction_type = "transfer"
     elif slug == "income":

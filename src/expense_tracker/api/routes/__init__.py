@@ -1,3 +1,32 @@
-from expense_tracker.api.routes import categories, gmail, health, overview, system, transactions, data_issues, accounts, merchants, recurring
+from expense_tracker.api.routes import (
+    accounts,
+    ai,
+    auth,
+    categories,
+    data_issues,
+    gmail,
+    health,
+    merchants,
+    overview,
+    recurring,
+    statements,
+    system,
+    transactions,
+)
 
-__all__ = ["categories", "gmail", "health", "overview", "system", "transactions", "data_issues", "accounts", "merchants", "recurring"]
+__all__ = [
+    "accounts",
+    "ai",
+    "auth",
+    "categories",
+    "data_issues",
+    "gmail",
+    "health",
+    "merchants",
+    "overview",
+    "recurring",
+    "statements",
+    "system",
+    "transactions",
+]
+

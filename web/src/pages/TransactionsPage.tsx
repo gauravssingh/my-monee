@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   api,
+  type Account,
   type CategoryTree,
   type DataIssueType,
   type GmailMessageView,
@@ -11,7 +14,8 @@ import EmailViewerModal from "../components/EmailViewerModal";
 import FlagIssueModal from "../components/FlagIssueModal";
 import MarkRecurringModal from "../components/MarkRecurringModal";
 import SortHeader from "../components/SortHeader";
-import { formatDate, formatMoney, formatSource } from "../format";
+import TransactionDetailModal from "../components/TransactionDetailModal";
+import { formatDate, formatMoney } from "../format";
 
 type Props = {
   needsReview?: boolean;
@@ -31,8 +35,9 @@ function dateValue(date: Date): string {
 }
 
 function calendarMonth(value: string): Date {
-  const date = value ? new Date(`${value}T00:00:00`) : new Date();
-  return new Date(date.getFullYear(), date.getMonth(), 1);
+  if (!value) return new Date();
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
 function DateFilter({
@@ -54,16 +59,11 @@ function DateFilter({
 
   useEffect(() => {
     if (!open) return;
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      if (!pickerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
-    document.addEventListener("mousedown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.removeEventListener("mousedown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [open]);
@@ -78,82 +78,127 @@ function DateFilter({
         day: "numeric",
         year: "numeric",
       })
-    : "Select date";
+    : "All";
 
   return (
     <div className="date-filter" ref={pickerRef}>
-      <span>{label}</span>
-      <button
-        className="date-filter-trigger"
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => {
-          setMonth(calendarMonth(value));
-          setOpen((isOpen) => !isOpen);
-        }}
-      >
-        {labelValue}
-        <span aria-hidden="true">⌄</span>
-      </button>
-      {value && (
+      <div className="date-filter-input-wrap">
         <button
-          className="date-filter-clear"
+          className="date-filter-trigger"
           type="button"
-          aria-label={`Clear ${label.toLowerCase()} date`}
-          title={`Clear ${label.toLowerCase()} date`}
-          onClick={() => onChange("")}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => {
+            setMonth(calendarMonth(value));
+            setOpen((isOpen) => !isOpen);
+          }}
+          style={{
+            background: value ? "var(--surface)" : "var(--surface)",
+            fontWeight: value ? 600 : 400,
+          }}
         >
-          ×
+          <span style={{ color: "var(--ink-muted)", fontWeight: 500, marginRight: 2 }}>{label}:</span>
+          <span style={{ color: value ? "var(--ink)" : "var(--ink-muted)" }}>{labelValue}</span>
+          <span className="date-filter-chevron" aria-hidden="true" style={{ opacity: value ? 0 : 0.6 }}>▾</span>
         </button>
-      )}
-      {open && (
-        <div className="date-calendar" role="dialog" aria-label={`Choose ${label.toLowerCase()} date`}>
-          <div className="date-calendar-header">
-            <button
-              type="button"
-              aria-label="Previous month"
-              onClick={() => setMonth(new Date(year, monthIndex - 1, 1))}
-            >
-              ‹
-            </button>
-            <strong>{month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
-            <button
-              type="button"
-              aria-label="Next month"
-              onClick={() => setMonth(new Date(year, monthIndex + 1, 1))}
-            >
-              ›
-            </button>
-          </div>
-          <div className="date-calendar-grid">
-            {WEEKDAYS.map((day) => (
-              <span className="date-calendar-weekday" key={day}>{day}</span>
-            ))}
-            {Array.from({ length: firstWeekday }, (_, index) => (
-              <span aria-hidden="true" key={`empty-${index}`} />
-            ))}
-            {Array.from({ length: daysInMonth }, (_, index) => {
-              const day = index + 1;
-              const nextValue = dateValue(new Date(year, monthIndex, day));
-              const disabled = (min != null && nextValue < min) || (max != null && nextValue > max);
-              return (
+        {value && (
+          <button
+            className="date-filter-clear"
+            type="button"
+            aria-label={`Clear ${label.toLowerCase()} date`}
+            title={`Clear ${label.toLowerCase()} date`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange("");
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {open && createPortal(
+        <div
+          className="date-calendar-overlay"
+          role="presentation"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="date-calendar date-calendar-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Choose ${label.toLowerCase()} date`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="date-calendar-header">
+              <button
+                type="button"
+                aria-label="Previous month"
+                onClick={() => setMonth(new Date(year, monthIndex - 1, 1))}
+              >
+                ‹
+              </button>
+              <strong>{month.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</strong>
+              <button
+                type="button"
+                aria-label="Next month"
+                onClick={() => setMonth(new Date(year, monthIndex + 1, 1))}
+              >
+                ›
+              </button>
+            </div>
+            <div className="date-calendar-grid">
+              {WEEKDAYS.map((day) => (
+                <span className="date-calendar-weekday" key={day}>{day}</span>
+              ))}
+              {Array.from({ length: firstWeekday }, (_, index) => (
+                <span aria-hidden="true" key={`empty-${index}`} />
+              ))}
+              {Array.from({ length: daysInMonth }, (_, index) => {
+                const day = index + 1;
+                const nextValue = dateValue(new Date(year, monthIndex, day));
+                const disabled = (min != null && nextValue < min) || (max != null && nextValue > max);
+                return (
+                  <button
+                    type="button"
+                    key={nextValue}
+                    disabled={disabled}
+                    className={nextValue === value ? "selected" : ""}
+                    onClick={() => {
+                      onChange(nextValue);
+                      setOpen(false);
+                    }}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="date-calendar-footer">
+              {value && (
                 <button
                   type="button"
-                  key={nextValue}
-                  disabled={disabled}
-                  className={nextValue === value ? "selected" : ""}
+                  className="btn quiet"
+                  style={{ fontSize: "0.82rem", padding: "6px 12px" }}
                   onClick={() => {
-                    onChange(nextValue);
+                    onChange("");
                     setOpen(false);
                   }}
                 >
-                  {day}
+                  Clear Date
                 </button>
-              );
-            })}
+              )}
+              <button
+                type="button"
+                className="btn primary"
+                style={{ fontSize: "0.82rem", padding: "6px 16px", marginLeft: "auto" }}
+                onClick={() => setOpen(false)}
+              >
+                Done
+              </button>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -163,21 +208,18 @@ function merchantLabel(tx: Transaction): string | null {
   return tx.merchant_normalized || tx.merchant_raw || null;
 }
 
-function truncate(text: string | null | undefined, max: number): string | null {
-  if (!text) return null;
-  return text.length > max ? `${text.slice(0, max)}…` : text;
-}
-
-import { useSearchParams } from "react-router-dom";
-
 export default function TransactionsPage({ needsReview = false }: Props) {
   const [searchParams] = useSearchParams();
   const [items, setItems] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [totalDebit, setTotalDebit] = useState(0);
   const [totalCredit, setTotalCredit] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(needsReview ? 100 : 50);
+
   const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [debouncedQ, setDebouncedQ] = useState(() => searchParams.get("q") || "");
+
+  // Multi-category selection state
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Set<string>>(() => {
     const param =
       searchParams.get("category_ids") ||
@@ -187,6 +229,9 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     if (!param) return new Set();
     return new Set(param.split(",").map((s) => s.trim()).filter(Boolean));
   });
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+
+  const [selectedAccount, setSelectedAccount] = useState<string>(() => searchParams.get("account") || "");
   const [offset, setOffset] = useState(0);
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
   const [dateFrom, setDateFrom] = useState(() => searchParams.get("date_from") || "");
@@ -194,29 +239,58 @@ export default function TransactionsPage({ needsReview = false }: Props) {
   const [sortBy, setSortBy] = useState<SortBy>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [error, setError] = useState<string | null>(null);
+  const [mobileFiltersExpanded, setMobileFiltersExpanded] = useState(false);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (directionFilter !== "all") count++;
+    if (selectedCategoryIds.size > 0) count++;
+    if (selectedAccount) count++;
+    if (dateFrom || dateTo) count++;
+    return count;
+  }, [directionFilter, selectedCategoryIds, selectedAccount, dateFrom, dateTo]);
+
   const [categories, setCategories] = useState<CategoryTree[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Detail Modal State
+  const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // Classify Panel State
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelTargets, setPanelTargets] = useState<Transaction[]>([]);
   const [saving, setSaving] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
+
+  // Email Viewer Modal State
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerLoading, setViewerLoading] = useState(false);
   const [viewerError, setViewerError] = useState<string | null>(null);
   const [viewerMessage, setViewerMessage] = useState<GmailMessageView | null>(null);
   const [viewerTransactionId, setViewerTransactionId] = useState<string | null>(null);
+
+  // Flag Issue Modal State
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagTargets, setFlagTargets] = useState<Transaction[]>([]);
   const [flagSaving, setFlagSaving] = useState(false);
   const [flagError, setFlagError] = useState<string | null>(null);
+
+  // Recurring Modal State
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [recurringTarget, setRecurringTarget] = useState<Transaction | null>(null);
+
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Keyboard shortcut '/' to focus search
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "/" && document.activeElement !== searchInputRef.current && !(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement)) {
+      if (
+        e.key === "/" &&
+        document.activeElement !== searchInputRef.current &&
+        !(document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement)
+      ) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
@@ -225,14 +299,11 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Keep query params in sync on navigation
+  // Sync state with URL params
   useEffect(() => {
     const urlQ = searchParams.get("q") || "";
-    const urlCategory =
-      searchParams.get("category_ids") ||
-      searchParams.get("category_id") ||
-      searchParams.get("category") ||
-      "";
+    const urlCategory = searchParams.get("category_ids") || searchParams.get("category_id") || searchParams.get("category") || "";
+    const urlAccount = searchParams.get("account") || "";
     const urlFrom = searchParams.get("date_from") || "";
     const urlTo = searchParams.get("date_to") || "";
     setQ(urlQ);
@@ -242,6 +313,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     } else {
       setSelectedCategoryIds(new Set());
     }
+    setSelectedAccount(urlAccount);
     setDateFrom(urlFrom);
     setDateTo(urlTo);
     setOffset(0);
@@ -250,12 +322,12 @@ export default function TransactionsPage({ needsReview = false }: Props) {
   useEffect(() => {
     const t = setTimeout(() => {
       setDebouncedQ(q);
-      setOffset(0); // Reset pagination on search
+      setOffset(0);
     }, 250);
     return () => clearTimeout(t);
   }, [q]);
 
-  // Load categories on mount for filtering & classification
+  // Load categories & accounts on mount
   useEffect(() => {
     let cancelled = false;
     api
@@ -266,58 +338,74 @@ export default function TransactionsPage({ needsReview = false }: Props) {
       .catch((err: Error) => {
         if (!cancelled) setError(err.message);
       });
+
+    api
+      .accounts()
+      .then((data) => {
+        if (!cancelled) setAccounts(data.accounts || []);
+      })
+      .catch(() => {
+        // Accounts are non-blocking
+      });
+
     return () => {
       cancelled = true;
     };
   }, []);
 
-  function toggleCategory(catId: string) {
-    setSelectedCategoryIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(catId)) {
-        next.delete(catId);
-      } else {
-        next.add(catId);
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setError(null);
+      try {
+        let catIds: string[] | undefined = undefined;
+        const directionParam = directionFilter !== "all" ? directionFilter : undefined;
+        const statusParam = needsReview ? "review" : "ok";
+
+        if (selectedCategoryIds.size > 0) {
+          catIds = Array.from(selectedCategoryIds);
+        }
+
+        const data = await api.transactions(
+          {
+            needs_review: needsReview ? true : undefined,
+            direction: directionParam,
+            status: statusParam,
+            account: selectedAccount || undefined,
+            q: debouncedQ.trim() || undefined,
+            category_ids: catIds,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined,
+            limit: pageSize,
+            offset,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+          },
+          signal
+        );
+        setItems(data.items);
+        setTotal(data.total);
+        setTotalDebit(data.total_debit ?? 0);
+        setTotalCredit(data.total_credit ?? 0);
+        setSelectedIds(new Set());
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Failed to load");
       }
-      return next;
-    });
-    setOffset(0);
-  }
-
-  function clearCategories() {
-    setSelectedCategoryIds(new Set());
-    setOffset(0);
-  }
-
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setError(null);
-    try {
-      const catIds = Array.from(selectedCategoryIds);
-      const data = await api.transactions(
-        {
-          needs_review: needsReview ? true : undefined,
-          direction: directionFilter !== "all" ? directionFilter : undefined,
-          q: debouncedQ.trim() || undefined,
-          category_ids: !needsReview && catIds.length > 0 ? catIds : undefined,
-          date_from: dateFrom || undefined,
-          date_to: dateTo || undefined,
-          limit: needsReview ? 100 : 50,
-          offset,
-          sort_by: sortBy,
-          sort_dir: sortDir,
-        },
-        signal
-      );
-      setItems(data.items);
-      setTotal(data.total);
-      setTotalDebit(data.total_debit ?? 0);
-      setTotalCredit(data.total_credit ?? 0);
-      setSelectedIds(new Set());
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Failed to load");
-    }
-  }, [needsReview, debouncedQ, selectedCategoryIds, directionFilter, dateFrom, dateTo, offset, sortBy, sortDir]);
+    },
+    [
+      needsReview,
+      directionFilter,
+      selectedCategoryIds,
+      selectedAccount,
+      debouncedQ,
+      dateFrom,
+      dateTo,
+      pageSize,
+      offset,
+      sortBy,
+      sortDir,
+    ]
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -325,10 +413,10 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     return () => controller.abort();
   }, [load]);
 
-  // Reset offset when filter or sort changes
+  // Reset pagination when any filter changes
   useEffect(() => {
     setOffset(0);
-  }, [directionFilter, dateFrom, dateTo, sortBy, sortDir]);
+  }, [directionFilter, selectedCategoryIds, selectedAccount, dateFrom, dateTo, pageSize, sortBy, sortDir]);
 
   function toggleSort(column: SortBy) {
     if (sortBy === column) {
@@ -345,7 +433,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
 
   const selectedTransactions = useMemo(
     () => items.filter((tx) => selectedIds.has(tx.id)),
-    [items, selectedIds],
+    [items, selectedIds]
   );
 
   function toggleOne(id: string) {
@@ -397,7 +485,33 @@ export default function TransactionsPage({ needsReview = false }: Props) {
           subcategory_id: subcategoryId,
         });
       }
-      applyRemoved(ids);
+      if (needsReview) {
+        applyRemoved(ids);
+      } else {
+        const chosenCat = categories.find((c) => c.id === categoryId);
+        const chosenSub = chosenCat?.subcategories.find((s) => s.id === subcategoryId);
+        setItems((prev) =>
+          prev.map((t) =>
+            ids.includes(t.id)
+              ? {
+                  ...t,
+                  category_id: categoryId,
+                  subcategory_id: subcategoryId,
+                  category: chosenCat?.name || t.category,
+                  subcategory: chosenSub?.name || null,
+                  needs_review: false,
+                  user_verified: true,
+                }
+              : t
+          )
+        );
+        setPanelOpen(false);
+        setPanelTargets([]);
+      }
+      if (detailTx && ids.includes(detailTx.id)) {
+        setDetailOpen(false);
+        setDetailTx(null);
+      }
     } catch (err) {
       setPanelError(err instanceof Error ? err.message : "Failed to classify");
     } finally {
@@ -504,10 +618,13 @@ export default function TransactionsPage({ needsReview = false }: Props) {
       } else {
         await api.flagIssuesBulk({ transaction_ids: ids, ...body });
       }
-      // Flagged transactions are hidden from these tables until the flag is resolved.
       applyRemoved(ids);
       setFlagOpen(false);
       setFlagTargets([]);
+      if (detailTx && ids.includes(detailTx.id)) {
+        setDetailOpen(false);
+        setDetailTx(null);
+      }
     } catch (err) {
       setFlagError(err instanceof Error ? err.message : "Failed to flag issue");
     } finally {
@@ -525,125 +642,387 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     setRecurringTarget(null);
   }
 
-  return (
-    <section className="panel section">
-      <h2>{needsReview ? "Needs review" : "Transactions"}</h2>
-      <p className="lead">
-        {needsReview
-          ? "Select one or more rows, then classify them together."
-          : "Searchable ledger of normalized transactions."}
-      </p>
+  function handleRowClick(tx: Transaction) {
+    // In needs review mode, clicking row toggles checkbox
+    if (needsReview) {
+      toggleOne(tx.id);
+      return;
+    }
+    // Otherwise, open detail modal
+    setDetailTx(tx);
+    setDetailOpen(true);
+  }
 
-      <div className="toolbar">
-        <input
-          ref={searchInputRef}
-          className="input"
-          placeholder="Search merchant or description (Press '/' to focus)"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <DateFilter label="From" value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
-        <DateFilter label="To" value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
-        <div className="segmented" role="group" aria-label="Direction filter">
-          {(
-            [
-              ["all", "Both"],
-              ["debit", "Debit only"],
-              ["credit", "Credit only"],
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              className={`segmented-btn${directionFilter === value ? " active" : ""}`}
-              aria-pressed={directionFilter === value}
-              onClick={() => setDirectionFilter(value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <button
-          className="icon-action"
-          type="button"
-          title="Refresh transactions"
-          aria-label="Refresh transactions"
-          onClick={() => void load()}
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-            <path
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-              d="M20 11a8 8 0 0 0-14.9-4M4 5v4h4m-4 4a8 8 0 0 0 14.9 4M20 19v-4h-4"
-            />
-          </svg>
-        </button>
+  const distinctAccounts = useMemo(() => {
+    const list: string[] = [];
+    const seen = new Set<string>();
+    accounts.forEach((a) => {
+      const name = a.account_number_masked ? `${a.name} (${a.account_number_masked})` : a.name;
+      if (!seen.has(name)) {
+        seen.add(name);
+        list.push(name);
+      }
+    });
+    return list;
+  }, [accounts]);
+
+  const currentPage = Math.floor(offset / pageSize) + 1;
+  const totalPages = Math.ceil(total / pageSize) || 1;
+
+  return (
+    <section className="panel section" style={{ maxWidth: 1160, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "16px" }}>
+        <h1 className="page-title" style={{ margin: 0, fontSize: "1.75rem", letterSpacing: "-0.02em" }}>
+          {needsReview ? "Needs Review" : "Classified Transactions"}
+        </h1>
+        <p className="lead" style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontSize: "0.86rem" }}>
+          {needsReview
+            ? "Review and batch-classify unclassified transactions to improve model memory."
+            : "Searchable, durable ledger of classified and verified financial movements."}
+        </p>
       </div>
 
-      {!needsReview && categories.length > 0 && (
-        <div className="category-filter-list" role="group" aria-label="Filter by Category">
-          <button
-            type="button"
-            className={`category-filter-tag ${selectedCategoryIds.size === 0 ? "active" : ""}`}
-            onClick={clearCategories}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`category-filter-tag ${selectedCategoryIds.has("uncategorized") ? "active" : ""}`}
-            onClick={() => toggleCategory("uncategorized")}
-          >
-            Uncategorized
-          </button>
-          {categories.map((c) => {
-            const isSelected = selectedCategoryIds.has(c.id);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                className={`category-filter-tag ${isSelected ? "active" : ""}`}
-                onClick={() => toggleCategory(c.id)}
-              >
-                {c.name}
-              </button>
-            );
-          })}
-          {selectedCategoryIds.size > 0 && (
-            <button
-              type="button"
-              className="btn quiet"
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* STICKY FILTER BAR                                             */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      <div className="sticky-filters">
+        {/* Top Search & Action Bar */}
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", width: "100%" }}>
+          {/* Search Box */}
+          <div style={{ flex: "1 1 240px", minWidth: "160px" }}>
+            <input
+              ref={searchInputRef}
+              className="input"
               style={{
-                fontSize: "0.78rem",
-                padding: "4px 8px",
-                color: "var(--ink-muted)",
-                cursor: "pointer",
-                background: "transparent",
-                border: "none",
-                textDecoration: "underline",
+                width: "100%",
+                height: 36,
+                minHeight: 36,
+                fontSize: "0.85rem",
+                padding: "0 12px",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                boxSizing: "border-box",
               }}
-              onClick={clearCategories}
+              placeholder="Search merchant, description, account... (Press '/' to focus)"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+
+          {/* Mobile Filter Toggle Button */}
+          <button
+            type="button"
+            className="btn quiet filters-mobile-toggle"
+            style={{
+              height: 36,
+              minHeight: 36,
+              fontSize: "0.84rem",
+              padding: "0 10px",
+              border: "1px solid var(--line)",
+              borderRadius: "var(--radius-sm)",
+              alignItems: "center",
+              gap: 5,
+              background: mobileFiltersExpanded || activeFilterCount > 0 ? "var(--surface)" : "transparent",
+              fontWeight: activeFilterCount > 0 ? 600 : 400,
+              flexShrink: 0,
+              boxSizing: "border-box",
+            }}
+            onClick={() => setMobileFiltersExpanded((prev) => !prev)}
+            aria-expanded={mobileFiltersExpanded}
+          >
+            <span>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
+            <span style={{ fontSize: "0.68rem", opacity: 0.7 }}>{mobileFiltersExpanded ? "▲" : "▼"}</span>
+          </button>
+
+          {/* Refresh Button */}
+          <button
+            className="icon-action"
+            type="button"
+            title="Refresh transactions"
+            aria-label="Refresh transactions"
+            onClick={() => void load()}
+            style={{
+              width: 36,
+              height: 36,
+              minWidth: 36,
+              minHeight: 36,
+              padding: 0,
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--line)",
+              background: "var(--surface)",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              boxSizing: "border-box",
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                d="M20 11a8 8 0 0 0-14.9-4M4 5v4h4m-4 4a8 8 0 0 0 14.9 4M20 19v-4h-4"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Detailed Controls (Inline on Desktop, Expandable on Mobile) */}
+        <div className={`filters-desktop-wrap${mobileFiltersExpanded ? " expanded-mobile" : ""}`} style={{ marginTop: "8px" }}>
+          {/* Date Pickers */}
+          <div className="date-filter-group" style={{ display: "flex", gap: "6px" }}>
+            <DateFilter label="From" value={dateFrom} max={dateTo || undefined} onChange={setDateFrom} />
+            <DateFilter label="To" value={dateTo} min={dateFrom || undefined} onChange={setDateTo} />
+          </div>
+
+          {/* Direction Segmented Control */}
+          <div className="segmented" role="group" aria-label="Direction filter">
+            {(
+              [
+                ["all", "Both"],
+                ["debit", "Debit only"],
+                ["credit", "Credit only"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`segmented-btn${directionFilter === value ? " active" : ""}`}
+                aria-pressed={directionFilter === value}
+                onClick={() => setDirectionFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Multi-Category Selector Popover & Account Dropdown (Only for Classified view) */}
+          {!needsReview && (
+            <>
+              {/* Multi-Category Selector Popover */}
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className="input"
+                  style={{
+                    height: 36,
+                    minHeight: 36,
+                    fontSize: "0.84rem",
+                    padding: "0 10px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    cursor: "pointer",
+                    minWidth: 140,
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--line)",
+                    background: "var(--surface)",
+                    fontWeight: selectedCategoryIds.size > 0 ? 600 : 400,
+                    boxSizing: "border-box",
+                  }}
+                  onClick={() => setCategoryDropdownOpen((prev) => !prev)}
+                  aria-haspopup="dialog"
+                  aria-expanded={categoryDropdownOpen}
+                >
+                  <span style={{ color: "var(--ink-muted)", fontWeight: 500 }}>Category:</span>
+                  <span style={{ color: selectedCategoryIds.size > 0 ? "var(--ink)" : "var(--ink-muted)" }}>
+                    {selectedCategoryIds.size === 0 ? "All" : `(${selectedCategoryIds.size})`}
+                  </span>
+                  <span style={{ fontSize: "0.75rem", opacity: 0.6, marginLeft: "auto" }}>▾</span>
+                </button>
+
+                {categoryDropdownOpen && (
+                  <>
+                    <div
+                      style={{ position: "fixed", inset: 0, zIndex: 30 }}
+                      onClick={() => setCategoryDropdownOpen(false)}
+                    />
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 31,
+                        background: "var(--surface)",
+                        border: "1px solid var(--line)",
+                        borderRadius: "var(--radius-sm)",
+                        boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+                        padding: "8px",
+                        minWidth: "220px",
+                        maxHeight: "320px",
+                        overflowY: "auto",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          paddingBottom: "6px",
+                          marginBottom: "6px",
+                          borderBottom: "1px solid var(--line)",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn quiet"
+                          style={{ fontSize: "0.75rem", padding: "2px 6px" }}
+                          onClick={() => {
+                            setSelectedCategoryIds(new Set());
+                            setOffset(0);
+                          }}
+                        >
+                          Clear All
+                        </button>
+                        <button
+                          type="button"
+                          className="btn quiet"
+                          style={{ fontSize: "0.75rem", padding: "2px 6px" }}
+                          onClick={() => {
+                            setSelectedCategoryIds(new Set(categories.map((c) => c.id).concat("uncategorized")));
+                            setOffset(0);
+                          }}
+                        >
+                          Select All
+                        </button>
+                      </div>
+
+                      <label
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "5px 6px",
+                          fontSize: "0.84rem",
+                          cursor: "pointer",
+                          borderRadius: "var(--radius-sm)",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCategoryIds.has("uncategorized")}
+                          onChange={() => {
+                            setSelectedCategoryIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has("uncategorized")) next.delete("uncategorized");
+                              else next.add("uncategorized");
+                              return next;
+                            });
+                            setOffset(0);
+                          }}
+                        />
+                        <span>Uncategorized</span>
+                      </label>
+
+                      {categories.map((c) => {
+                        const isChecked = selectedCategoryIds.has(c.id);
+                        return (
+                          <label
+                            key={c.id}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "8px",
+                              padding: "5px 6px",
+                              fontSize: "0.84rem",
+                              cursor: "pointer",
+                              borderRadius: "var(--radius-sm)",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                setSelectedCategoryIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(c.id)) next.delete(c.id);
+                                  else next.add(c.id);
+                                  return next;
+                                });
+                                setOffset(0);
+                              }}
+                            />
+                            <span>{c.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Account Dropdown */}
+              <select
+                className="input"
+                style={{
+                  height: 36,
+                  minHeight: 36,
+                  fontSize: "0.84rem",
+                  padding: "0 10px",
+                  width: "auto",
+                  minWidth: 140,
+                  borderRadius: "var(--radius-sm)",
+                  border: "1px solid var(--line)",
+                  background: "var(--surface)",
+                  cursor: "pointer",
+                  boxSizing: "border-box",
+                }}
+                value={selectedAccount}
+                onChange={(e) => setSelectedAccount(e.target.value)}
+                aria-label="Filter by Account"
+              >
+                <option value="">Account: All</option>
+                {distinctAccounts.map((acc) => (
+                  <option key={acc} value={acc}>
+                    {acc}
+                  </option>
+                ))}
+                <option value="unlinked">Unlinked / Unknown</option>
+              </select>
+            </>
+          )}
+
+          {/* Page Size Selector (Only in Needs Review mode) */}
+          {needsReview && (
+            <select
+              className="input"
+              style={{
+                height: 36,
+                minHeight: 36,
+                fontSize: "0.84rem",
+                padding: "0 8px",
+                width: "auto",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                cursor: "pointer",
+                boxSizing: "border-box",
+              }}
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              title="Rows per page"
+              aria-label="Rows per page"
             >
-              Reset ({selectedCategoryIds.size})
-            </button>
+              <option value={25}>25 / page</option>
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
+            </select>
           )}
         </div>
-      )}
+      </div>
 
+      {/* Review Bulk Action Bar (Needs Review mode) */}
       {needsReview && selectedCount > 0 && (
         <div className="review-action-bar" role="region" aria-label="Bulk actions">
           <span>
             <strong>{selectedCount}</strong> selected
           </span>
           <div className="review-action-buttons">
-            <button
-              className="btn primary"
-              type="button"
-              onClick={() => openClassify(selectedTransactions)}
-            >
+            <button className="btn primary" type="button" onClick={() => openClassify(selectedTransactions)}>
               Classify selected
             </button>
             <button className="btn" type="button" onClick={() => openFlag(selectedTransactions)}>
@@ -658,286 +1037,645 @@ export default function TransactionsPage({ needsReview = false }: Props) {
 
       {error && <p className="error">{error}</p>}
 
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* TRANSACTION TABLE / LIST                                      */}
+      {/* ───────────────────────────────────────────────────────────── */}
       {items.length === 0 ? (
-        <div className="empty">
+        <div className="empty" style={{ padding: "36px 0" }}>
           {needsReview
-            ? "Nothing left to review. Nice."
-            : "No transactions yet. Connect Gmail in Settings to start syncing."}
+            ? "Nothing left to review. All transactions are classified."
+            : "No transactions found matching your filter criteria."}
         </div>
       ) : (
         <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {needsReview && (
-                  <th className="col-check">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected;
-                      }}
-                      onChange={toggleAll}
-                      aria-label="Select all visible"
-                    />
-                  </th>
-                )}
-                <SortHeader label="Date" active={sortBy === "date"} dir={sortDir} onClick={() => toggleSort("date")} />
-                <SortHeader label="Merchant" active={sortBy === "merchant"} dir={sortDir} onClick={() => toggleSort("merchant")} />
-                <SortHeader
-                  label="Amount"
-                  className="num"
-                  active={sortBy === "amount"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("amount")}
-                />
-                <SortHeader
-                  label="Category"
-                  active={sortBy === "category"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("category")}
-                />
-                <SortHeader label="Source" active={sortBy === "source"} dir={sortDir} onClick={() => toggleSort("source")} />
-                {needsReview ? (
-                  <th>Action</th>
-                ) : (
-                  <SortHeader
-                    label="Status"
-                    active={sortBy === "status"}
-                    dir={sortDir}
-                    onClick={() => toggleSort("status")}
-                  />
-                )}
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((tx) => {
-                const selected = selectedIds.has(tx.id);
-                return (
-                  <tr
-                    key={tx.id}
-                    className={[
-                      tx.direction === "credit" ? "tx-row credit" : "tx-row debit",
-                      needsReview ? "selectable" : "",
-                      needsReview && selected ? "tx-selected" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={needsReview ? () => toggleOne(tx.id) : undefined}
-                  >
-                    {needsReview && (
-                      <td className="col-check" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleOne(tx.id)}
-                          aria-label={`Select ${merchantLabel(tx) ?? "transaction"}`}
-                        />
+          {/* Desktop Table View (>= 768px) */}
+          <div className="tx-table-desktop">
+            <table>
+              <thead>
+                <tr>
+                  {needsReview && (
+                    <th className="col-check">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = someSelected;
+                        }}
+                        onChange={toggleAll}
+                        aria-label="Select all visible"
+                      />
+                    </th>
+                  )}
+                  <SortHeader label="Date" active={sortBy === "date"} dir={sortDir} onClick={() => toggleSort("date")} />
+                  <SortHeader label="Merchant / Description" active={sortBy === "merchant"} dir={sortDir} onClick={() => toggleSort("merchant")} />
+                  <SortHeader label="Category" active={sortBy === "category"} dir={sortDir} onClick={() => toggleSort("category")} />
+                  <th>Account</th>
+                  <SortHeader label="Amount" className="num" active={sortBy === "amount"} dir={sortDir} onClick={() => toggleSort("amount")} />
+                  {needsReview && <th style={{ width: 80 }}>Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((tx) => {
+                  const selected = selectedIds.has(tx.id);
+                  const isCredit = tx.direction === "credit";
+                  const merchant = merchantLabel(tx) ?? "Unidentified merchant";
+                  const isLargeAmount = (tx.amount ?? 0) >= 30000;
+
+                  return (
+                    <tr
+                      key={tx.id}
+                      className={[
+                        isCredit ? "tx-row credit" : "tx-row debit",
+                        "clickable",
+                        needsReview && selected ? "tx-selected" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handleRowClick(tx)}
+                      title="Click to view details & audit trail"
+                    >
+                      {needsReview && (
+                        <td className="col-check" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleOne(tx.id)}
+                            aria-label={`Select ${merchant}`}
+                          />
+                        </td>
+                      )}
+
+                      {/* Date Column */}
+                      <td className="tx-date" style={{ whiteSpace: "nowrap", fontSize: "0.85rem", color: "var(--ink)" }}>
+                        {formatDate(tx.transaction_date)}
                       </td>
-                    )}
-                    <td className="tx-date">{formatDate(tx.transaction_date)}</td>
-                    <td>
-                      <div>{merchantLabel(tx) ?? truncate(tx.description, 80) ?? "Uncategorized transaction"}</div>
-                      {merchantLabel(tx) && tx.description && (
-                        <div className="metric-hint" style={{ marginTop: 2 }}>
-                          {truncate(tx.description, 80)}
+
+                      {/* Merchant & Description (Two-line structure with ellipsis) */}
+                      <td style={{ maxWidth: 280, paddingRight: 16 }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: "0.92rem",
+                            color: "var(--ink)",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={merchant}
+                        >
+                          {merchant}
+                        </div>
+                        {tx.description && (
+                          <div
+                            style={{
+                              fontSize: "0.78rem",
+                              color: "var(--ink-muted)",
+                              marginTop: 1,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={tx.description}
+                          >
+                            {tx.description}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Category & Subcategory + Quick Edit Button */}
+                      <td style={{ paddingRight: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                          <div>
+                            <div style={{ fontWeight: 500, fontSize: "0.88rem", color: "var(--ink)" }}>
+                              {tx.category ?? <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>}
+                            </div>
+                            {tx.subcategory && (
+                              <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 1 }}>
+                                {tx.subcategory}
+                              </div>
+                            )}
+                          </div>
+                          {!needsReview && (
+                            <button
+                              type="button"
+                              className="btn quiet icon-btn"
+                              style={{
+                                width: 26,
+                                height: 26,
+                                padding: 0,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--ink-muted)",
+                                border: "1px solid var(--line)",
+                                borderRadius: "var(--radius-sm)",
+                                flexShrink: 0,
+                              }}
+                              title={`Modify classification for ${merchant}`}
+                              aria-label={`Modify classification for ${merchant}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openClassify([tx]);
+                              }}
+                            >
+                              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false">
+                                <path
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                                />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Account / Payment Method */}
+                      <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem", whiteSpace: "nowrap" }}>
+                        {tx.account || "—"}
+                      </td>
+
+                      {/* Amount (Heavier weight for large amounts, strictly right-aligned) */}
+                      <td
+                        className="tx-amount num"
+                        style={{
+                          whiteSpace: "nowrap",
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: isLargeAmount ? 700 : 600,
+                          fontSize: isLargeAmount ? "0.96rem" : "0.9rem",
+                        }}
+                      >
+                        {isCredit ? "+" : "−"}
+                        {formatMoney(tx.amount ?? 0, tx.currency)}
+                      </td>
+
+                      {/* Action Column (Only in Needs Review mode) */}
+                      {needsReview && (
+                        <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: "nowrap", textAlign: "right" }}>
+                          <div style={{ display: "inline-flex", gap: 5, alignItems: "center", justifyContent: "flex-end" }}>
+                            {/* 1. View Source Email */}
+                            {tx.source_email_id && (
+                              <button
+                                className="btn quiet icon-btn"
+                                type="button"
+                                title="View source email"
+                                aria-label="View source email"
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  padding: 0,
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  borderRadius: "var(--radius-sm)",
+                                  border: "1px solid var(--line)",
+                                }}
+                                onClick={() => void openEmail(tx)}
+                              >
+                                <svg className="gmail-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                                  <path
+                                    fill="currentColor"
+                                    d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+
+                            {/* 2. Classify (with tag icon) */}
+                            <button
+                              className="btn primary"
+                              type="button"
+                              title={`Classify ${merchant}`}
+                              aria-label={`Classify ${merchant}`}
+                              style={{
+                                height: 28,
+                                minHeight: 28,
+                                fontSize: "0.78rem",
+                                padding: "0 8px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                              }}
+                              onClick={() => openClassify([tx])}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="12"
+                                height="12"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                                <line x1="7" y1="7" x2="7.01" y2="7" />
+                              </svg>
+                              <span>Classify</span>
+                            </button>
+
+                            {/* 3. Flag Data Issue */}
+                            <button
+                              className="btn quiet icon-btn"
+                              type="button"
+                              title={`Flag data issue for ${merchant}`}
+                              aria-label={`Flag data issue for ${merchant}`}
+                              style={{
+                                width: 28,
+                                height: 28,
+                                padding: 0,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: "var(--radius-sm)",
+                                border: "1px solid var(--line)",
+                                color: "var(--ink-muted)",
+                              }}
+                              onClick={() => openFlag([tx])}
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="13"
+                                height="13"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                                <line x1="4" y1="22" x2="4" y2="15" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card Layout (< 768px) */}
+          <div className="tx-cards-mobile" role="feed" aria-label="Transactions list">
+            {items.map((tx) => {
+              const selected = selectedIds.has(tx.id);
+              const isCredit = tx.direction === "credit";
+              const merchant = merchantLabel(tx) ?? "Unidentified merchant";
+
+              return (
+                <article
+                  key={tx.id}
+                  className={`tx-card ${isCredit ? "credit" : "debit"} ${needsReview ? "selectable" : ""} ${needsReview && selected ? "tx-selected" : ""}`}
+                  onClick={() => handleRowClick(tx)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="tx-card-header">
+                    <div className="tx-card-title-group">
+                      {needsReview && (
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleOne(tx.id)}
+                            aria-label={`Select ${merchant}`}
+                            style={{ width: 18, height: 18 }}
+                          />
                         </div>
                       )}
-                    </td>
-                    <td className="tx-amount num">
-                      {tx.direction === "credit" ? "+" : "−"}
-                      {formatMoney(tx.amount ?? 0, tx.currency)}
-                    </td>
-                    <td>
-                      {tx.category ?? "Uncategorized"}
-                      {tx.subcategory ? (
-                        <div className="metric-hint" style={{ marginTop: 2 }}>
-                          {tx.subcategory}
+                      <div>
+                        <div className="tx-card-merchant" style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+                          {merchant}
                         </div>
-                      ) : null}
-                    </td>
-                    <td>{formatSource(tx.classification_source)}</td>
-                    <td onClick={needsReview ? (event) => event.stopPropagation() : undefined}>
-                      {needsReview ? (
+                        <div className="tx-card-date" style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 2 }}>
+                          {formatDate(tx.transaction_date)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`tx-card-amount ${isCredit ? "credit" : "debit"}`} style={{ fontWeight: 700 }}>
+                      {isCredit ? "+" : "−"}
+                      {formatMoney(tx.amount ?? 0, tx.currency)}
+                    </div>
+                  </div>
+
+                  <div className="tx-card-body" style={{ marginTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <div className="tx-card-meta" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                      <span
+                        className="tx-card-tag"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          background: "var(--bg)",
+                          border: "1px solid var(--line)",
+                          borderRadius: "var(--radius-sm)",
+                          padding: "2px 6px 2px 8px",
+                          fontWeight: 500,
+                          fontSize: "0.78rem",
+                          color: "var(--ink)",
+                        }}
+                      >
+                        <span>{tx.category ?? <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>}</span>
+                        {tx.subcategory && (
+                          <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>· {tx.subcategory}</span>
+                        )}
+                        {!needsReview && (
+                          <button
+                            type="button"
+                            className="btn quiet icon-btn"
+                            style={{
+                              width: 22,
+                              height: 22,
+                              padding: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              border: "none",
+                              background: "transparent",
+                              color: "var(--ink-muted)",
+                              cursor: "pointer",
+                            }}
+                            title={`Modify classification for ${merchant}`}
+                            aria-label={`Modify classification for ${merchant}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openClassify([tx]);
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">
+                              <path
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </span>
+
+                      {tx.account && <span className="tx-card-tag" style={{ fontSize: "0.74rem" }}>{tx.account}</span>}
+                    </div>
+
+                    {needsReview && (
+                      <div style={{ display: "flex", gap: 5, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
+                        {/* 1. View Source Email */}
+                        {tx.source_email_id && (
+                          <button
+                            className="btn quiet icon-btn"
+                            type="button"
+                            title="View source email"
+                            aria-label="View source email"
+                            style={{
+                              width: 30,
+                              height: 30,
+                              padding: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              border: "1px solid var(--line)",
+                              borderRadius: "var(--radius-sm)",
+                            }}
+                            onClick={() => void openEmail(tx)}
+                          >
+                            <svg className="gmail-icon" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                              <path
+                                fill="currentColor"
+                                d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"
+                              />
+                            </svg>
+                          </button>
+                        )}
+
+                        {/* 2. Classify (with tag icon) */}
                         <button
-                          className="icon-action"
+                          className="btn primary"
                           type="button"
-                          title="Classify"
-                          aria-label="Classify transaction"
+                          title={`Classify ${merchant}`}
+                          aria-label={`Classify ${merchant}`}
+                          style={{
+                            height: 30,
+                            minHeight: 30,
+                            fontSize: "0.78rem",
+                            padding: "0 9px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 5,
+                          }}
                           onClick={() => openClassify([tx])}
                         >
-                          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                            <path fill="currentColor" d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16zM16 17H5V7h11l3.55 5L16 17zm-9.5-3.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" />
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="12"
+                            height="12"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                            <line x1="7" y1="7" x2="7.01" y2="7" />
                           </svg>
+                          <span>Classify</span>
                         </button>
-                      ) : (
-                        <span className={`badge ${tx.needs_review ? "review" : "ok"}`}>
-                          {tx.needs_review ? "Review" : "OK"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="row-actions" onClick={(e) => e.stopPropagation()}>
-                      {tx.source_email_id ? (
+
+                        {/* 3. Flag Data Issue */}
                         <button
-                          className="gmail-link"
+                          className="btn quiet icon-btn"
                           type="button"
-                          title="View source email"
-                          aria-label="View source email"
-                          onClick={() => void openEmail(tx)}
+                          title={`Flag data issue for ${merchant}`}
+                          aria-label={`Flag data issue for ${merchant}`}
+                          style={{
+                            width: 30,
+                            height: 30,
+                            padding: 0,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "1px solid var(--line)",
+                            borderRadius: "var(--radius-sm)",
+                            color: "var(--ink-muted)",
+                          }}
+                          onClick={() => openFlag([tx])}
                         >
                           <svg
-                            className="gmail-icon"
                             viewBox="0 0 24 24"
-                            width="18"
-                            height="18"
+                            width="13"
+                            height="13"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                             aria-hidden="true"
-                            focusable="false"
                           >
-                            <path
-                              fill="currentColor"
-                              d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"
-                            />
+                            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                            <line x1="4" y1="22" x2="4" y2="15" />
                           </svg>
                         </button>
-                      ) : (
-                        <span className="metric-hint">—</span>
-                      )}
-                      <button
-                        className="icon-action"
-                        type="button"
-                        title="Mark as recurring"
-                        aria-label="Mark as recurring"
-                        onClick={() => openRecurring(tx)}
-                      >
-                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                          <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-                        </svg>
-                      </button>
-                      <button
-                        className="icon-action"
-                        type="button"
-                        title="Flag a data issue"
-                        aria-label="Flag a data issue"
-                        onClick={() => openFlag([tx])}
-                      >
-                        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
-                          <path
-                            fill="currentColor"
-                            d="M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z"
-                          />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: "2px solid var(--line)", background: "var(--surface)", fontWeight: 600 }}>
-                {needsReview && <td />}
-                <td>
-                  <strong>Total ({total} items)</strong>
-                </td>
-                <td />
-                <td className="num" style={{ whiteSpace: "nowrap" }}>
-                  {directionFilter === "debit" ? (
-                    <span style={{ color: "var(--ink)", fontWeight: 700 }}>{formatMoney(totalDebit)}</span>
-                  ) : directionFilter === "credit" ? (
-                    <span style={{ color: "var(--ok)", fontWeight: 700 }}>{formatMoney(totalCredit)}</span>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                      <span style={{ color: "var(--ink)", fontWeight: 700 }}>{formatMoney(totalDebit)}</span>
-                      {totalCredit > 0 && (
-                        <span style={{ color: "var(--ok)", fontSize: "0.75rem", fontWeight: 500 }}>
-                          +{formatMoney(totalCredit)}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td />
-                <td />
-                <td />
-                <td />
-              </tr>
-            </tfoot>
-          </table>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* ───────────────────────────────────────────────────────────── */}
+          {/* FOOTER & PAGINATION                                           */}
+          {/* ───────────────────────────────────────────────────────────── */}
           <div
+            className="tx-pagination-footer"
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              flexWrap: "wrap",
               gap: 12,
               marginTop: 14,
-              padding: "10px 16px",
+              padding: "10px 14px",
               background: "var(--surface)",
               border: "1px solid var(--line)",
-              borderRadius: 6,
-              fontSize: "0.875rem",
+              borderRadius: "var(--radius-sm)",
+              fontSize: "0.85rem",
             }}
           >
-            <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-              <span>
-                Showing <strong>{items.length}</strong> of <strong>{total}</strong>
+            {/* Left summary */}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, overflow: "hidden" }}>
+              <span style={{ whiteSpace: "nowrap" }}>
+                Showing <strong>{offset + 1}–{Math.min(offset + items.length, total)}</strong> of{" "}
+                <strong>{total}</strong>
               </span>
-              <span style={{ color: "var(--line)" }}>|</span>
-              <span>
-                <span style={{ color: "var(--ink-muted)" }}>Total Spent: </span>
-                <strong>{formatMoney(totalDebit)}</strong>
+              <span style={{ color: "var(--line)" }}>·</span>
+              <span style={{ whiteSpace: "nowrap" }}>
+                <span style={{ color: "var(--ink-muted)" }}>Outflow </span>
+                <strong style={{ color: "var(--ink)" }}>{formatMoney(totalDebit)}</strong>
               </span>
               {totalCredit > 0 && (
-                <span>
-                  <span style={{ color: "var(--ink-muted)" }}>Total Inflow: </span>
-                  <strong style={{ color: "var(--ok)" }}>{formatMoney(totalCredit)}</strong>
-                </span>
+                <>
+                  <span style={{ color: "var(--line)" }}>·</span>
+                  <span style={{ whiteSpace: "nowrap" }}>
+                    <span style={{ color: "var(--ink-muted)" }}>Inflow </span>
+                    <strong style={{ color: "var(--credit)" }}>+{formatMoney(totalCredit)}</strong>
+                  </span>
+                </>
               )}
             </div>
-            {total > (needsReview ? 100 : 50) && (
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <button
-                  className="btn"
-                  disabled={offset === 0}
-                  onClick={() => setOffset((o) => Math.max(0, o - (needsReview ? 100 : 50)))}
+
+            {/* Right pagination & page size controls */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+              {!needsReview && (
+                <select
+                  className="input"
+                  style={{
+                    height: 30,
+                    minHeight: 30,
+                    fontSize: "0.8rem",
+                    padding: "0 6px",
+                    width: "auto",
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--line)",
+                    background: "var(--surface)",
+                    cursor: "pointer",
+                    boxSizing: "border-box",
+                  }}
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setOffset(0);
+                  }}
+                  title="Rows per page"
+                  aria-label="Rows per page"
                 >
-                  Previous
-                </button>
-                <span className="metric-hint">
-                  Page {Math.floor(offset / (needsReview ? 100 : 50)) + 1} of{" "}
-                  {Math.ceil(total / (needsReview ? 100 : 50))}
-                </span>
-                <button
-                  className="btn"
-                  disabled={offset + (needsReview ? 100 : 50) >= total}
-                  onClick={() => setOffset((o) => o + (needsReview ? 100 : 50))}
-                >
-                  Next
-                </button>
-              </div>
-            )}
+                  <option value={25}>25 / page</option>
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                </select>
+              )}
+
+              {total > pageSize && (
+                <>
+                  <button
+                    className="btn"
+                    disabled={offset === 0}
+                    onClick={() => setOffset((o) => Math.max(0, o - pageSize))}
+                    style={{ fontSize: "0.8rem", height: 30, padding: "0 10px", display: "inline-flex", alignItems: "center" }}
+                  >
+                    ‹ Prev
+                  </button>
+                  <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)", whiteSpace: "nowrap", padding: "0 2px" }}>
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    className="btn"
+                    disabled={offset + pageSize >= total}
+                    onClick={() => setOffset((o) => o + pageSize)}
+                    style={{ fontSize: "0.8rem", height: 30, padding: "0 10px", display: "inline-flex", alignItems: "center" }}
+                  >
+                    Next ›
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {needsReview && (
-        <ClassifyPanel
-          open={panelOpen}
-          transactions={panelTargets}
-          categories={categories}
-          saving={saving}
-          error={panelError}
-          onClose={closePanel}
-          onSave={(categoryId, subcategoryId) => void saveClassification(categoryId, subcategoryId)}
-          onExclude={() => void excludeSelected()}
-          onReimburse={() => void reimburseSelected()}
-          onFlag={(tx) => {
-            closePanel();
-            openFlag([tx]);
-          }}
-        />
-      )}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* MODALS                                                        */}
+      {/* ───────────────────────────────────────────────────────────── */}
 
+      {/* Transaction Detail Audit Modal */}
+      <TransactionDetailModal
+        open={detailOpen}
+        transaction={detailTx}
+        onClose={() => {
+          setDetailOpen(false);
+          setDetailTx(null);
+        }}
+        onClassify={(tx) => {
+          openClassify([tx]);
+        }}
+        onViewEmail={(tx) => {
+          void openEmail(tx);
+        }}
+        onMarkRecurring={(tx) => {
+          openRecurring(tx);
+        }}
+        onFlagIssue={(tx) => {
+          openFlag([tx]);
+        }}
+      />
+
+      {/* Classify Panel */}
+      <ClassifyPanel
+        open={panelOpen}
+        transactions={panelTargets}
+        categories={categories}
+        saving={saving}
+        error={panelError}
+        onClose={closePanel}
+        onSave={(categoryId, subcategoryId) => void saveClassification(categoryId, subcategoryId)}
+        onExclude={() => void excludeSelected()}
+        onReimburse={() => void reimburseSelected()}
+        onFlag={(tx) => {
+          closePanel();
+          openFlag([tx]);
+        }}
+      />
+
+      {/* Email Viewer Modal */}
       <EmailViewerModal
         open={viewerOpen}
         loading={viewerLoading}
@@ -947,6 +1685,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
         onClose={closeViewer}
       />
 
+      {/* Flag Issue Modal */}
       <FlagIssueModal
         open={flagOpen}
         transactions={flagTargets}
@@ -956,13 +1695,14 @@ export default function TransactionsPage({ needsReview = false }: Props) {
         onSubmit={(body) => void submitFlag(body)}
       />
 
+      {/* Mark Recurring Modal */}
       <MarkRecurringModal
         open={recurringOpen}
         transaction={recurringTarget}
         onClose={closeRecurring}
         onSuccess={() => {
           closeRecurring();
-          // Optional: refresh transactions
+          void load();
         }}
       />
     </section>

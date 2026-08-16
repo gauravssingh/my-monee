@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import { api, type Transaction, type GmailMessageView } from "../api";
 import { formatMoney, formatDateTime } from "../format";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
@@ -75,10 +76,12 @@ export default function MerchantDetailsModal({ merchantId, merchantName, onClose
         role="dialog"
         aria-labelledby={titleId}
         aria-modal="true"
-        style={{ width: "90%", maxWidth: 800, maxHeight: "90vh", overflowY: "auto" }}
+        style={{ width: "90%", maxWidth: 800, height: "min(820px, 90dvh)", maxHeight: "90dvh", display: "flex", flexDirection: "column" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-header">
+        <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
+
+        <header className="modal-header" style={{ flexShrink: 0 }}>
           <div>
             <h2 id={titleId}>{merchantName}</h2>
             <p className="lead">Transactions and receipts for this merchant.</p>
@@ -90,52 +93,88 @@ export default function MerchantDetailsModal({ merchantId, merchantName, onClose
           </div>
         </header>
         
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 16, flex: "1 1 0%", minHeight: 0, overflowY: "auto" }}>
           {error && <div className="error">{error}</div>}
           
           {loading ? (
             <div className="empty">Loading transactions...</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <div style={{ maxHeight: selectedTx ? "200px" : "60vh", overflowY: "auto", borderBottom: selectedTx ? "1px solid var(--line)" : "none" }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left" }}>Date</th>
-                      <th style={{ textAlign: "right" }}>Amount</th>
-                      <th style={{ textAlign: "left" }}>Category</th>
-                      <th style={{ textAlign: "left" }}>Description</th>
-                      <th style={{ textAlign: "left" }}>Source</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map(t => (
-                      <tr 
-                        key={t.id} 
-                        className={`selectable ${selectedTx?.id === t.id ? "tx-selected" : ""}`}
-                        onClick={() => setSelectedTx(t)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <td>{formatDateTime(t.transaction_date || "")}</td>
-                        <td style={{ textAlign: "right", fontWeight: 500 }}>{formatMoney(t.amount || 0, t.currency || "INR")}</td>
-                        <td>{t.category || "Uncategorized"}</td>
-                        <td style={{ color: "var(--ink-muted)" }}>{t.description || t.merchant_raw}</td>
-                        <td>{t.source}</td>
-                      </tr>
-                    ))}
-                    {transactions.length === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ maxHeight: selectedTx ? "220px" : "none", overflowY: selectedTx ? "auto" : "visible", borderBottom: selectedTx ? "1px solid var(--line)" : "none", paddingBottom: selectedTx ? 12 : 0 }}>
+                {/* Desktop Table View */}
+                <div className="tx-table-desktop">
+                  <table className="table">
+                    <thead>
                       <tr>
-                        <td colSpan={5} className="empty">No transactions found.</td>
+                        <th style={{ textAlign: "left" }}>Date</th>
+                        <th style={{ textAlign: "right" }}>Amount</th>
+                        <th style={{ textAlign: "left" }}>Category</th>
+                        <th style={{ textAlign: "left" }}>Description</th>
+                        <th style={{ textAlign: "left" }}>Source</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {transactions.map(t => (
+                        <tr 
+                          key={t.id} 
+                          className={`selectable ${selectedTx?.id === t.id ? "tx-selected" : ""}`}
+                          onClick={() => setSelectedTx(t)}
+                          style={{ cursor: "pointer" }}
+                        >
+                          <td>{formatDateTime(t.transaction_date || "")}</td>
+                          <td style={{ textAlign: "right", fontWeight: 500 }}>{formatMoney(t.amount || 0, t.currency || "INR")}</td>
+                          <td>{t.category || "Uncategorized"}</td>
+                          <td style={{ color: "var(--ink-muted)" }}>{t.description || t.merchant_raw}</td>
+                          <td>{t.source}</td>
+                        </tr>
+                      ))}
+                      {transactions.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="empty">No transactions found.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="tx-cards-mobile">
+                  {transactions.map(t => (
+                    <article
+                      key={t.id}
+                      className={`tx-card selectable ${selectedTx?.id === t.id ? "tx-selected" : ""}`}
+                      onClick={() => setSelectedTx(t)}
+                    >
+                      <div className="tx-card-header">
+                        <div>
+                          <div className="tx-card-merchant">{t.category || "Uncategorized"}</div>
+                          <div className="tx-card-date" style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2 }}>
+                            {formatDateTime(t.transaction_date || "")}
+                          </div>
+                        </div>
+                        <div className="tx-card-amount debit">{formatMoney(t.amount || 0, t.currency || "INR")}</div>
+                      </div>
+                      {t.description && (
+                        <div style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>{t.description}</div>
+                      )}
+                      <div className="tx-card-footer" style={{ borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+                        <span className="tx-card-tag">{t.source || "Ledger"}</span>
+                        {t.source_email_id && (
+                          <span style={{ fontSize: "0.76rem", color: "var(--accent)", fontWeight: 600 }}>Tap for receipt →</span>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                  {transactions.length === 0 && (
+                    <div className="empty" style={{ padding: 16 }}>No transactions found.</div>
+                  )}
+                </div>
               </div>
               
               {selectedTx && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 400 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 320, background: "var(--bg)", padding: 12, borderRadius: "var(--radius)", border: "1px solid var(--line)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{emailMessage?.subject || "Receipt"}</h3>
+                    <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>{emailMessage?.subject || "Receipt"}</h3>
                     <button 
                       className="btn quiet icon-btn" 
                       title="Close Preview" 
@@ -151,7 +190,7 @@ export default function MerchantDetailsModal({ merchantId, merchantName, onClose
                   ) : htmlDoc ? (
                     <iframe 
                       srcDoc={htmlDoc} 
-                      style={{ width: "100%", height: "400px", border: "1px solid var(--line)", borderRadius: 8, background: "white" }} 
+                      style={{ width: "100%", height: "300px", border: "1px solid var(--line)", borderRadius: 6, background: "white" }} 
                       title="Receipt preview" 
                     />
                   ) : (
@@ -162,6 +201,21 @@ export default function MerchantDetailsModal({ merchantId, merchantName, onClose
             </div>
           )}
         </div>
+
+        <footer className="modal-footer" style={{ flexShrink: 0, padding: "10px 18px max(14px, env(safe-area-inset-bottom, 14px))", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Link
+            to={`/transactions?q=${encodeURIComponent(merchantName)}`}
+            className="btn quiet"
+            style={{ fontSize: "0.84rem", display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none" }}
+            onClick={onClose}
+          >
+            <span>View All Transactions in Ledger</span>
+            <span>→</span>
+          </Link>
+          <button type="button" className="btn primary" onClick={onClose} style={{ padding: "8px 22px" }}>
+            Done
+          </button>
+        </footer>
       </div>
     </div>,
     document.body

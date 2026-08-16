@@ -139,7 +139,10 @@ class Settings(BaseSettings):
         return self.resolved_data_dir() / "gmail_credentials.json"
 
     def oauth_redirect_uri(self) -> str:
-        return f"http://{self.app.host}:{self.app.port}/oauth/callback"
+        # Google's OAuth client only accepts loopback redirect URIs, so this
+        # must stay 127.0.0.1 even if app.host is bound wider (e.g. 0.0.0.0).
+        host = self.app.host if self.app.host not in ("0.0.0.0", "::") else "127.0.0.1"
+        return f"http://{host}:{self.app.port}/oauth/callback"
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

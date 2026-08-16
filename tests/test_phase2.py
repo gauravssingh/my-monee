@@ -117,3 +117,22 @@ def test_sync_requires_connection(tmp_path: Path) -> None:
     with patch("expense_tracker.ingestion.gmail.oauth.keyring.get_password", return_value=None):
         response = client.post("/api/gmail/sync")
     assert response.status_code == 400
+
+
+def test_merchants_exclude_transfers(tmp_path: Path) -> None:
+    app = create_app(_test_settings(tmp_path))
+    client = TestClient(app)
+
+    # Ingest demo data
+    client.post("/api/ingestion/demo")
+
+    # Fetch merchants
+    merchants_resp = client.get("/api/merchants")
+    assert merchants_resp.status_code == 200
+    items = merchants_resp.json()["items"]
+
+    # Verify no negative or transfer amounts are counted as spend
+    for m in items:
+        assert m["total_spent"] >= 0
+        assert m["spent_last_30d"] >= 0
+

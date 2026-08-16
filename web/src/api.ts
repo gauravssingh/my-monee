@@ -21,6 +21,68 @@ export type AccountsResponse = {
   accounts: Account[];
 };
 
+export interface StatementProcessingEvent {
+  id: string;
+  stage: string;
+  status: string;
+  message: string | null;
+  metadata: Record<string, any>;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface CreditCardStatement {
+  id: string;
+  account_id: string | null;
+  account_name: string | null;
+  account_type?: string | null;
+  account_number_masked?: string | null;
+  source_email_id: string | null;
+  source_attachment_id: string | null;
+  gmail_url?: string | null;
+  issuer: string;
+  statement_type?: "CREDIT_CARD" | "BANK_ACCOUNT" | string;
+  card_last4: string | null;
+  statement_period_start: string | null;
+  statement_period_end: string | null;
+  statement_date: string | null;
+  payment_due_date?: string | null;
+  total_amount_due?: number | null;
+  email_received_at?: string | null;
+  original_filename: string;
+  original_sha256: string | null;
+  unlocked_sha256: string | null;
+  has_original_file: boolean;
+  has_unlocked_file: boolean;
+  is_encrypted: boolean;
+  password_strategy_id: string | null;
+  status: string;
+  discovered_at: string | null;
+  downloaded_at: string | null;
+  unlocked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  error_code: string | null;
+  error_message: string | null;
+  event_count?: number;
+  events?: StatementProcessingEvent[];
+}
+
+export interface PasswordProfile {
+  configured: boolean;
+  id?: string;
+  account_id: string;
+  account_name?: string;
+  issuer: string;
+  strategy: string;
+  configuration: Record<string, any>;
+  has_custom_password?: boolean;
+  available_strategies: string[];
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+
 
 
 export type Merchant = {
@@ -28,6 +90,7 @@ export type Merchant = {
   display_name: string;
   canonical_name: string | null;
   normalized_key: string;
+  default_category?: string | null;
   aliases: string[];
   total_spent?: number;
   spent_last_30d?: number;
@@ -73,11 +136,15 @@ export type Overview = {
   currency: string;
   summary: {
     spent: number;
+    consumer_spent?: number;
+    commitments_spent?: number;
     income: number;
     net_cash_flow: number;
     transaction_count: number;
     debit_count: number;
     credit_count: number;
+    total_recorded_count?: number;
+    excluded_count?: number;
   };
   month_comparison: {
     spent_change_pct: number | null;
@@ -97,6 +164,7 @@ export type Overview = {
   daily_spending: Array<{
     date: string;
     spent: number;
+    count?: number;
   }>;
   top_merchants: Array<{
     merchant: string;
@@ -133,6 +201,21 @@ export type IncomeTrend = {
   }>;
 };
 
+export type FinancialTrendPoint = {
+  year: number;
+  month: number;
+  label: string;
+  spent: number;
+  income: number;
+  net_cash_flow: number;
+};
+
+export type FinancialTrends = {
+  months: number;
+  currency: string;
+  points: FinancialTrendPoint[];
+};
+
 export type CategorySpend = {
   category_id: string;
   category: string;
@@ -162,6 +245,9 @@ export type Transaction = {
   classification_source: string;
   user_verified: boolean;
   needs_review: boolean;
+  account?: string | null;
+  card?: string | null;
+  payment_method?: string | null;
   is_transfer?: boolean;
   is_refund?: boolean;
   excludes_from_spending?: boolean;
@@ -294,22 +380,33 @@ export type IngestionResult = {
   error_summary: string | null;
 };
 
+export type AuthStatus = {
+  configured: boolean;
+  authenticated: boolean;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("mymonee_auth_token") : null;
+  const authHeaders: Record<string, string> = {};
+  if (token) {
+    authHeaders["Authorization"] = `Bearer ${token}`;
+  }
   const response = await fetch(path, {
-    headers: { Accept: "application/json", ...(init?.headers ?? {}) },
+    credentials: "include",
+    headers: { Accept: "application/json", ...authHeaders, ...(init?.headers ?? {}) },
     ...init,
   });
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`;
     try {
       const body = (await response.json()) as { detail?: string };
-      if (typeof body.detail === "string") detail = body.detail;
+      if (body.detail) detail = body.detail;
     } catch {
-      // ignore
+      // Keep status text
     }
     throw new Error(detail);
   }
-  return response.json() as Promise<T>;
+  return (await response.json()) as T;
 }
 
 export const api = {
@@ -328,6 +425,11 @@ export const api = {
   },
   incomeTrend: (months = 6) =>
     request<IncomeTrend>(`/api/overview/income-trend?months=${months}`),
+  financialTrends: (months = 6, year?: number, month?: number) => {
+    let url = `/api/overview/trends?months=${months}`;
+    if (year != null && month != null) url += `&year=${year}&month=${month}`;
+    return request<FinancialTrends>(url);
+  },
   transactions: (
     params?: {
       needs_review?: boolean;
@@ -336,6 +438,8 @@ export const api = {
       date_from?: string;
       date_to?: string;
       merchant_id?: string;
+      account?: string;
+      status?: string;
       category_id?: string;
       category_ids?: string[];
       subcategory_id?: string;
@@ -350,6 +454,8 @@ export const api = {
     if (params?.needs_review != null) qs.set("needs_review", String(params.needs_review));
     if (params?.direction) qs.set("direction", params.direction);
     if (params?.q) qs.set("q", params.q);
+    if (params?.account) qs.set("account", params.account);
+    if (params?.status) qs.set("status", params.status);
     if (params?.date_from) qs.set("date_from", params.date_from);
     if (params?.date_to) qs.set("date_to", params.date_to);
     if (params?.merchant_id) qs.set("merchant_id", params.merchant_id);
@@ -556,4 +662,82 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),
+  authStatus: () => request<AuthStatus>("/api/auth/status"),
+  authSetup: (pin: string) =>
+    request<{ success: boolean; token: string }>("/api/auth/setup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    }),
+  authLogin: (pin: string) =>
+    request<{ success: boolean; token: string }>("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    }),
+  authLogout: () =>
+    request<{ success: boolean }>("/api/auth/logout", { method: "POST" }),
+  authChangePin: (old_pin: string, new_pin: string) =>
+    request<{ success: boolean; token: string }>("/api/auth/change-pin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ old_pin, new_pin }),
+    }),
+
+  // Statements & Password Profiles (Statement Vault)
+  statements: (params?: { account_id?: string; issuer?: string; status?: string; limit?: number; offset?: number }) => {
+    const query = new URLSearchParams();
+    if (params?.account_id) query.set("account_id", params.account_id);
+    if (params?.issuer) query.set("issuer", params.issuer);
+    if (params?.status) query.set("status", params.status);
+    if (params?.limit) query.set("limit", String(params.limit));
+    if (params?.offset) query.set("offset", String(params.offset));
+    const qs = query.toString();
+    return request<{ statements: CreditCardStatement[]; total: number; limit: number; offset: number }>(
+      `/api/statements${qs ? `?${qs}` : ""}`
+    );
+  },
+  statement: (id: string) => request<CreditCardStatement>(`/api/statements/${id}`),
+  discoverStatements: (max_messages: number = 50) =>
+    request<{ discovered_count: number; statements: CreditCardStatement[] }>(
+      `/api/statements/discover?max_messages=${max_messages}`,
+      { method: "POST" }
+    ),
+  uploadStatement: (formData: FormData): Promise<CreditCardStatement> =>
+    request<CreditCardStatement>("/api/statements/upload", {
+      method: "POST",
+      body: formData,
+    }),
+  unlockStatement: (
+    id: string,
+    payload: { password: string; save_to_profile?: boolean; strategy?: string }
+  ) =>
+    request<CreditCardStatement>(`/api/statements/${id}/unlock`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  accountPasswordProfile: (accountId: string) =>
+    request<PasswordProfile>(`/api/accounts/${accountId}/password-profile`),
+  updateAccountPasswordProfile: (
+    accountId: string,
+    data: { issuer: string; strategy: string; configuration: Record<string, any> }
+  ) =>
+    request<{ success: boolean; id: string; issuer: string; strategy: string; configuration: Record<string, any> }>(
+      `/api/accounts/${accountId}/password-profile`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }
+    ),
+  accountStatements: (accountId: string) =>
+    request<{ account_id: string; account_name: string; statements: CreditCardStatement[] }>(
+      `/api/accounts/${accountId}/statements`
+    ),
+  statementOriginalUrl: (id: string, download: boolean = false) =>
+    `/api/statements/${id}/file/original${download ? "?download=true" : ""}`,
+  statementUnlockedUrl: (id: string, download: boolean = false) =>
+    `/api/statements/${id}/file/unlocked${download ? "?download=true" : ""}`,
 };
+

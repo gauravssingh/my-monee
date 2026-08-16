@@ -49,6 +49,8 @@ exclude_subject_patterns:
   - "verification code"
   - "login alert(?!.*transaction)"
   - "bigbasket order no"
+  - "unlock.*loan"
+  - "zype loan"
 
 exclude_sender_patterns:
   - "noreply@.*(promo|marketing|offers)"

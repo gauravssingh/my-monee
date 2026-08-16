@@ -65,6 +65,28 @@ def header_map(payload: dict[str, Any]) -> dict[str, str]:
     return result
 
 
+def extract_attachments(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract list of attachments metadata and inline data if available."""
+    attachments: list[dict[str, Any]] = []
+    for part in _walk_parts(payload):
+        filename = part.get("filename")
+        body = part.get("body") or {}
+        attachment_id = body.get("attachmentId")
+        data = body.get("data")
+        mime_type = (part.get("mimeType") or "").lower()
+
+        if filename or attachment_id or (mime_type == "application/pdf"):
+            decoded_data = _b64url_decode(data) if data else None
+            attachments.append({
+                "filename": filename or "attachment.pdf",
+                "mimeType": mime_type,
+                "attachmentId": attachment_id,
+                "size": body.get("size", len(decoded_data) if decoded_data else 0),
+                "data": decoded_data,
+            })
+    return attachments
+
+
 def parse_internal_date(ms: str | int | None):
     if ms is None:
         return None
@@ -88,3 +110,4 @@ def parse_header_date(value: str | None):
         return dt
     except Exception:
         return None
+

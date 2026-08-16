@@ -398,6 +398,12 @@ class Account(Base):
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
 
+    statements: Mapped[list[CreditCardStatement]] = relationship(back_populates="account")
+    password_profile: Mapped[PasswordProfile | None] = relationship(
+        back_populates="account", uselist=False
+    )
+
+
 
 class FinancialEvent(Base):
     __tablename__ = "financial_events"
@@ -576,6 +582,114 @@ class AIOperation(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class CreditCardStatement(Base):
+    __tablename__ = "credit_card_statements"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+
+    source_email_id: Mapped[str | None] = mapped_column(String(128))
+    source_attachment_id: Mapped[str | None] = mapped_column(String(255))
+
+    issuer: Mapped[str] = mapped_column(String(100), nullable=False)
+    statement_type: Mapped[str] = mapped_column(String(32), default="CREDIT_CARD")
+    card_last4: Mapped[str | None] = mapped_column(String(4))
+
+    statement_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    statement_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    statement_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    payment_due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    total_amount_due: Mapped[float | None] = mapped_column(Numeric(12, 2))
+    email_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    original_file_path: Mapped[str | None] = mapped_column(Text)
+    unlocked_file_path: Mapped[str | None] = mapped_column(Text)
+
+    original_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
+    unlocked_sha256: Mapped[str | None] = mapped_column(String(64))
+
+    is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False)
+    password_strategy_id: Mapped[str | None] = mapped_column(String(64))
+
+    status: Mapped[str] = mapped_column(String(32), default="DISCOVERED")
+
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    downloaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+    account: Mapped[Account | None] = relationship(
+        foreign_keys=[account_id], back_populates="statements"
+    )
+    events: Mapped[list[StatementProcessingEvent]] = relationship(
+        back_populates="statement",
+        cascade="all, delete-orphan",
+        order_by="StatementProcessingEvent.started_at",
+    )
+
+    __table_args__ = (
+        Index("ix_stmt_account", "account_id"),
+        Index("ix_stmt_issuer_card", "issuer", "card_last4"),
+        Index("ix_stmt_source", "source_email_id", "source_attachment_id"),
+        Index("ix_stmt_status", "status"),
+    )
+
+
+class PasswordProfile(Base):
+    __tablename__ = "password_profiles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    account_id: Mapped[str] = mapped_column(ForeignKey("accounts.id"), nullable=False, unique=True)
+    issuer: Mapped[str] = mapped_column(String(100), nullable=False)
+    strategy: Mapped[str] = mapped_column(String(64), default="NAME4_DDMM")
+    configuration: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    account: Mapped[Account] = relationship(
+        foreign_keys=[account_id], back_populates="password_profile"
+    )
+
+
+class StatementProcessingEvent(Base):
+    __tablename__ = "statement_processing_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    statement_id: Mapped[str] = mapped_column(
+        ForeignKey("credit_card_statements.id", ondelete="CASCADE"), nullable=False
+    )
+    stage: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    message: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    statement: Mapped[CreditCardStatement] = relationship(back_populates="events")
+
+    __table_args__ = (
+        Index("ix_stmt_event_stmt_id", "statement_id"),
+        Index("ix_stmt_event_stage", "stage"),
+    )
+
+
 @event.listens_for(Transaction, "before_update")
 def _touch_transaction_updated_at(mapper, connection, target: Transaction) -> None:  # noqa: ARG001
     target.updated_at = utcnow()
+
+
+@event.listens_for(CreditCardStatement, "before_update")
+def _touch_statement_updated_at(mapper, connection, target: CreditCardStatement) -> None:  # noqa: ARG001
+    target.updated_at = utcnow()
+

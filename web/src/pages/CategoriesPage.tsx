@@ -188,7 +188,7 @@ export default function CategoriesPage() {
   }, [categories, selectedType, filterQuery]);
 
   return (
-    <section className="panel section" style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "calc(100vh - 180px)" }}>
+    <section className="panel section settings-categories" style={{ display: "flex", flexDirection: "column", width: "100%", maxWidth: "100%", minWidth: 0, boxSizing: "border-box" }}>
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: "0 0 4px" }}>Categories &amp; Hierarchy</h2>
         <p className="lead" style={{ margin: 0, fontSize: "0.875rem" }}>
@@ -197,11 +197,11 @@ export default function CategoriesPage() {
       </div>
 
       {/* Add Category and Search Toolbars */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-        <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, width: "100%", minWidth: 0 }}>
+        <div style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
           <input
             className="input"
-            style={{ flex: 1 }}
+            style={{ flex: 1, minWidth: 0 }}
             placeholder="Add new master category…"
             value={newCategory}
             onChange={(e) => setNewCategory(e.target.value)}
@@ -212,28 +212,35 @@ export default function CategoriesPage() {
             type="button"
             disabled={busy !== null || !newCategory.trim()}
             onClick={() => void addCategory()}
-            style={{ whiteSpace: "nowrap" }}
+            style={{ whiteSpace: "nowrap", flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4 }}
           >
-            {busy === "cat" ? "Adding…" : "Add Category"}
+            {busy === "cat" ? (
+              "Adding…"
+            ) : (
+              <>
+                <span style={{ fontSize: "1.05rem", fontWeight: 700, lineHeight: 1 }}>+</span>
+                <span>Category</span>
+              </>
+            )}
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", minWidth: 0 }}>
           <input
             className="input"
-            style={{ flex: 1, fontSize: "0.875rem", padding: "6px 10px" }}
+            style={{ width: "100%", minWidth: 0, fontSize: "0.875rem", padding: "6px 10px", boxSizing: "border-box" }}
             placeholder="Filter categories or subcategories…"
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
           />
-          <div className="segmented" style={{ flexShrink: 0 }}>
+          <div className="segmented" style={{ width: "100%", maxWidth: "100%", overflowX: "auto", display: "flex", WebkitOverflowScrolling: "touch", boxSizing: "border-box" }}>
             {EXPENSE_TYPES.map((t) => (
               <button
                 key={t.value}
                 type="button"
                 className={`segmented-btn${selectedType === t.value ? " active" : ""}`}
                 onClick={() => setSelectedType(t.value)}
-                style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                style={{ fontSize: "0.75rem", padding: "6px 8px", flexShrink: 0, whiteSpace: "nowrap" }}
               >
                 {t.label}
               </button>
@@ -245,13 +252,15 @@ export default function CategoriesPage() {
       {/* Categories List */}
       <div
         style={{
-          flex: 1,
-          overflowY: "auto",
           display: "flex",
           flexDirection: "column",
           gap: 12,
-          paddingRight: 4,
+          padding: 0,
           minHeight: 0,
+          width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          boxSizing: "border-box",
         }}
       >
         {filteredCategories.length === 0 && (
@@ -271,11 +280,15 @@ export default function CategoriesPage() {
               display: "flex",
               flexDirection: "column",
               gap: 8,
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
+              boxSizing: "border-box",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <strong style={{ fontSize: "0.9375rem", color: "var(--ink)" }}>{cat.name}</strong>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, width: "100%", minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, minWidth: 0 }}>
+                <strong style={{ fontSize: "0.9375rem", color: "var(--ink)", wordBreak: "break-word" }}>{cat.name}</strong>
                 <select
                   style={{
                     padding: "2px 6px",
@@ -296,7 +309,7 @@ export default function CategoriesPage() {
                   <option value="investment">Investment</option>
                   <option value="transfer">Transfer</option>
                 </select>
-                <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)", whiteSpace: "nowrap" }}>
                   {cat.transaction_count} txs {cat.is_system ? "· system" : ""}
                 </span>
               </div>
@@ -309,7 +322,7 @@ export default function CategoriesPage() {
             </div>
 
             {/* Subcategories */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", width: "100%", minWidth: 0 }}>
               {cat.subcategories.map((sub) => (
                 <SubCategoryChip
                   key={sub.id}
@@ -326,10 +339,10 @@ export default function CategoriesPage() {
             </div>
 
             {/* Inline Add Subcategory */}
-            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            <div style={{ display: "flex", gap: 6, marginTop: 4, width: "100%", minWidth: 0 }}>
               <input
                 className="input"
-                style={{ flex: 1, fontSize: "0.8125rem", padding: "4px 8px" }}
+                style={{ flex: 1, minWidth: 0, fontSize: "0.8125rem", padding: "4px 8px" }}
                 placeholder={`Add subcategory to ${cat.name}…`}
                 value={subdrafts[cat.id] || ""}
                 onChange={(e) => setSubdrafts((prev) => ({ ...prev, [cat.id]: e.target.value }))}
@@ -338,7 +351,7 @@ export default function CategoriesPage() {
               <button
                 className="btn"
                 type="button"
-                style={{ padding: "4px 10px", fontSize: "0.8125rem", height: "auto" }}
+                style={{ padding: "4px 10px", fontSize: "0.8125rem", height: "auto", flexShrink: 0 }}
                 disabled={busy !== null || !(subdrafts[cat.id] || "").trim()}
                 onClick={() => void addSubcategory(cat.id)}
               >

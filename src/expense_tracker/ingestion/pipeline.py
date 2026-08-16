@@ -207,10 +207,13 @@ def _apply_parsed_fields(
     tx.transaction_type = parsed.transaction_type
     tx.merchant_raw = parsed.merchant_raw
     tx.merchant_normalized = normalize_merchant(parsed.merchant_raw)
-    if session is not None:
+    is_transfer_tx = bool(extra.get("is_transfer", parsed.transaction_type == "transfer" or extra.get("category_slug") == "transfers"))
+    if session is not None and not is_transfer_tx and parsed.transaction_type != "transfer":
         tx.merchant_entity_id = _resolve_merchant_entity_id(
             session, tx.merchant_raw, tx.merchant_normalized
         )
+    else:
+        tx.merchant_entity_id = None
     tx.payment_method = parsed.payment_method
     tx.account = parsed.account
     tx.card = parsed.card

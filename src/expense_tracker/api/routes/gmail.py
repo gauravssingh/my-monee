@@ -12,11 +12,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from expense_tracker.api.deps import db_session, settings_dep
 from expense_tracker.config import Settings
-from expense_tracker.db.models import Email
+from expense_tracker.db.models import CreditCardStatement, Email
 
 from expense_tracker.ingestion.gmail.client import GmailApiSource
 from expense_tracker.ingestion.gmail.links import gmail_web_url
@@ -289,13 +290,14 @@ def fetch_gmail_message(
 ) -> dict[str, Any]:
     """Realtime fetch of a known ingested email body (not persisted)."""
 
-    if not is_connected(settings):
-        raise HTTPException(status_code=400, detail="Gmail is not connected")
-
     # Only allow messages we already discovered/ingested locally.
     local = session.get(Email, message_id)
     if local is None:
-        raise HTTPException(status_code=404, detail="Email not found in local index")
+        local_stmt = session.scalars(
+            select(CreditCardStatement).where(CreditCardStatement.source_email_id == message_id)
+        ).first()
+        if local_stmt is None:
+            raise HTTPException(status_code=404, detail="Email not found in local index")
 
     try:
         message = GmailApiSource(settings).get_message(message_id)

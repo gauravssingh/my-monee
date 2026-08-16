@@ -67,7 +67,13 @@ class RedactingFilter(logging.Filter):
         if any(key in lower for key in _SENSITIVE_KEYS):
             sanitized = _mask_sensitive_text(message)
             for key in _SENSITIVE_KEYS:
-                pattern = re.compile(rf"({key}\s*[:=]?\s+)([^\s,;]+)", re.IGNORECASE)
+                # Separator may be `[:=]` with no surrounding space (as in
+                # "client_secret=GOCSPX-abc123" or URL query strings) or bare
+                # whitespace (as in prose like "password abc123") — either
+                # must trigger redaction of the value that follows.
+                pattern = re.compile(
+                    rf"({key}\s*(?:[:=]\s*|\s+))([^\s,;]+)", re.IGNORECASE
+                )
                 sanitized = pattern.sub(r"\1[REDACTED]", sanitized)
             record.msg = sanitized
             record.args = ()
