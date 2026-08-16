@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { GmailMessageView } from "../api";
 import { formatDate } from "../format";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
+import { openInGmail } from "../utils/gmail";
 
 type Props = {
   open: boolean;
@@ -140,16 +141,16 @@ export default function EmailViewerModal({
             gap: 10,
           }}
         >
-          {message?.gmail_url ? (
-            <a
+          {message?.id ? (
+            <button
+              type="button"
               className="btn quiet"
-              href={message.gmail_url}
-              target="_blank"
-              rel="noreferrer"
-              style={{ fontSize: "0.85rem", padding: "8px 14px" }}
+              onClick={() => openInGmail(message.id)}
+              style={{ fontSize: "0.85rem", padding: "8px 14px", display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              Open in Gmail ↗
-            </a>
+              <span>Open in Gmail</span>
+              <span style={{ fontSize: "0.78rem" }}>↗</span>
+            </button>
           ) : <div />}
 
           <button

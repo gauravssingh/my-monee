@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { type Transaction } from "../api";
 import { formatDate, formatMoney, formatSource } from "../format";
+import { openInGmail } from "../utils/gmail";
 
 type Props = {
   open: boolean;
@@ -193,6 +194,18 @@ export default function TransactionDetailModal({
                   <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"/>
                 </svg>
                 View Email
+              </button>
+            )}
+            {transaction.source_email_id && (
+              <button
+                type="button"
+                className="btn quiet"
+                onClick={() => openInGmail(transaction.source_email_id!)}
+                style={{ fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5 }}
+                title="Launch native Gmail app on iOS/mobile or open web thread"
+              >
+                <span>Gmail App</span>
+                <span style={{ fontSize: "0.74rem" }}>↗</span>
               </button>
             )}
             {onMarkRecurring && (

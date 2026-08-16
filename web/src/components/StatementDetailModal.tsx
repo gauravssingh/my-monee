@@ -5,6 +5,7 @@ import { useToast } from "../hooks/useToast";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { GmailLogo } from "./GmailLogo";
 import { DownloadIcon } from "./DownloadIcon";
+import { openInGmail } from "../utils/gmail";
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -130,7 +131,6 @@ export function StatementDetailModal({
   const currentStmt = activeStatement;
   const isLocked = currentStmt.status === "PASSWORD_REQUIRED" || currentStmt.status === "PASSWORD_FAILED";
   const isBank = currentStmt.statement_type === "BANK_ACCOUNT";
-  const gmailUrl = currentStmt.gmail_url || (currentStmt.source_email_id ? `https://mail.google.com/mail/u/0/#all/${currentStmt.source_email_id}` : null);
 
   const transactions = currentStmt.transactions || [];
   const matchedCount = transactions.filter((t) => t.match_status === "MATCHED" || t.match_status === "LIABILITY_PAYMENT").length;
@@ -495,15 +495,15 @@ export function StatementDetailModal({
               <div style={{ fontSize: "0.7rem", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: 600 }}>Source Email</div>
               <div style={{ fontSize: "0.84rem", fontWeight: 500, marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
                 {currentStmt.source_email_id ? (
-                  <>
+                  <button
+                    type="button"
+                    onClick={() => openInGmail(currentStmt.source_email_id!)}
+                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent, #6366f1)", fontSize: "0.82rem", fontWeight: 500 }}
+                    title="Launch native Gmail app on iOS/mobile or open web thread"
+                  >
                     <GmailLogo size={13} />
-                    <span>Gmail</span>
-                    {gmailUrl && (
-                      <a href={gmailUrl} target="_blank" rel="noreferrer" style={{ fontSize: "0.75rem", color: "var(--accent, #6366f1)", textDecoration: "none", fontWeight: 500 }}>
-                        Open email →
-                      </a>
-                    )}
-                  </>
+                    <span>Gmail App →</span>
+                  </button>
                 ) : (
                   "Manual Upload"
                 )}
