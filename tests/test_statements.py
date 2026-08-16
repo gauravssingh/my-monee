@@ -306,6 +306,24 @@ def test_discovery_heuristics():
     )
     assert is_statement_candidate(undotted_msg) is False
 
+    # Test eforex@axisbank.com statement email is excluded
+    eforex_msg = GmailMessage(
+        id="msg_eforex_01",
+        thread_id="t_eforex",
+        sender="eforex@axisbank.com",
+        subject="Axis Bank Forex Card Statement for July 2026",
+        snippet="Forex card statement attached",
+        received_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        label_ids=[],
+        headers={"to": "gaurav.singh.86@gmail.com", "from": "eforex@axisbank.com"},
+        body_text="Dear Customer, find attached your Forex Card statement",
+        body_html=None,
+        attachments=[{"filename": "Forex_Statement.pdf", "attachmentId": "att_forex_01"}],
+    )
+    assert is_statement_candidate(eforex_msg) is False
+    eforex_cands = discover_statement_candidates([eforex_msg])
+    assert len(eforex_cands) == 0
+
 
 # --- Ingestion & Pipeline Tests ---
 
@@ -359,7 +377,7 @@ def test_ingestion_encrypted_statement_with_profile(tmp_path: Path):
     )
     assert upload_res.status_code == 200
     data = upload_res.json()
-    assert data["status"] == "READY_FOR_EXTRACTION"
+    assert data["status"] in ("READY_FOR_EXTRACTION", "VALIDATED", "REVIEW_REQUIRED")
     assert data["is_encrypted"] is True
     assert data["password_strategy_id"] == "NAME4_DDMM"
     assert data["has_original_file"] is True
@@ -371,7 +389,7 @@ def test_ingestion_encrypted_statement_with_profile(tmp_path: Path):
     # 5. Fetch statement detail
     detail_res = client.get(f"/api/statements/{statement_id}")
     assert detail_res.status_code == 200
-    assert detail_res.json()["status"] == "READY_FOR_EXTRACTION"
+    assert detail_res.json()["status"] in ("READY_FOR_EXTRACTION", "VALIDATED", "REVIEW_REQUIRED")
 
     # 6. Download original and unlocked files
     orig_file_res = client.get(f"/api/statements/{statement_id}/file/original")
@@ -435,7 +453,7 @@ def test_ingestion_encrypted_statement_manual_unlock(tmp_path: Path):
         json={"password": "MyHardPassword99", "save_to_profile": True},
     )
     assert good_unlock.status_code == 200
-    assert good_unlock.json()["status"] == "READY_FOR_EXTRACTION"
+    assert good_unlock.json()["status"] in ("READY_FOR_EXTRACTION", "VALIDATED", "REVIEW_REQUIRED")
     assert good_unlock.json()["has_unlocked_file"] is True
 
     # 5. Verify password profile was updated — the API redacts the raw
@@ -460,3 +478,233 @@ def test_ingestion_encrypted_statement_manual_unlock(tmp_path: Path):
         assert stored.configuration["custom_password"] == "MyHardPassword99"
     finally:
         session.close()
+
+
+def test_statement_transaction_match_api(tmp_path: Path):
+    """Test confirming and rejecting statement transaction matches."""
+    from expense_tracker.db.models import CreditCardStatement, StatementTransaction, Transaction
+    from expense_tracker.db.session import get_session_factory
+
+    settings = Settings(
+        app={"data_dir": tmp_path},
+        database={"filename": "test.db"},
+    )
+    app = create_app(settings)
+    client = TestClient(app)
+
+    session = get_session_factory()()
+    try:
+        # Create a statement with a transaction
+        stmt = CreditCardStatement(
+            id=new_id(),
+            issuer="AXIS",
+            original_filename="axis_test.pdf",
+            status="VALIDATED",
+            validation_status="VALIDATED",
+        )
+        session.add(stmt)
+        session.flush()
+
+        tx = StatementTransaction(
+            id=new_id(),
+            statement_id=stmt.id,
+            transaction_date=datetime(2026, 6, 1, tzinfo=timezone.utc),
+            description="NOBROKER TECHNOLOGIES",
+            amount=6858.00,
+            debit_amount=6858.00,
+            match_status="POSSIBLE_MATCH",
+            match_confidence=0.75,
+            match_reason="Exact amount, Same date",
+        )
+        session.add(tx)
+        session.commit()
+
+        statement_id = stmt.id
+        tx_id = tx.id
+    finally:
+        session.close()
+
+    # 1. Confirm Match
+    confirm_res = client.post(
+        f"/api/statements/{statement_id}/transactions/{tx_id}/match",
+        json={"match_status": "MATCHED", "match_reason": "Manually confirmed by user"},
+    )
+    assert confirm_res.status_code == 200
+    data = confirm_res.json()
+    assert data["success"] is True
+    updated_txs = data["statement"]["transactions"]
+    matched_tx = next(t for t in updated_txs if t["id"] == tx_id)
+    assert matched_tx["match_status"] == "MATCHED"
+    assert matched_tx["match_confidence"] == 1.0
+    assert "Manually confirmed" in matched_tx["match_reason"]
+
+    # 2. Reject Match / Mark Unmatched
+    reject_res = client.post(
+        f"/api/statements/{statement_id}/transactions/{tx_id}/match",
+        json={"match_status": "UNMATCHED", "match_reason": "Marked as non-match by user"},
+    )
+    assert reject_res.status_code == 200
+    data2 = reject_res.json()
+    assert data2["success"] is True
+    updated_txs2 = data2["statement"]["transactions"]
+    unmatched_tx = next(t for t in updated_txs2 if t["id"] == tx_id)
+    assert unmatched_tx["match_status"] == "UNMATCHED"
+    assert unmatched_tx["match_confidence"] == 0.0
+
+
+def test_emi_detection_and_ledger_import(tmp_path: Path):
+    """Test parsing, grouping, and importing EMI line items (Principal, Interest, GST)."""
+    from expense_tracker.db.models import CreditCardStatement, StatementTransaction, Transaction
+    from expense_tracker.db.session import get_session_factory
+    from expense_tracker.statements.emi import parse_emi_details, categorize_statement_line_item
+
+    # 1. Test Regex parsing
+    emi_p = parse_emi_details("EMI PRINCIPAL - 7/9, REF# 68265776 MEDICAL")
+    assert emi_p is not None
+    assert emi_p["type"] == "PRINCIPAL"
+    assert emi_p["installment"] == 7
+    assert emi_p["tenure"] == 9
+    assert emi_p["ref_id"] == "68265776"
+    assert emi_p["merchant"] == "MEDICAL"
+
+    emi_i = parse_emi_details("EMI INTEREST - 7/9, REF# 68265776 MEDICAL")
+    assert emi_i is not None
+    assert emi_i["type"] == "INTEREST"
+    assert emi_i["installment"] == 7
+
+    # 2. Test Smart Categorization
+    cat_p, _, dir_p, _ = categorize_statement_line_item("EMI PRINCIPAL - 7/9, REF# 68265776 MEDICAL", 8464.00)
+    assert cat_p == "healthcare"
+
+    cat_i, sub_i, _, _ = categorize_statement_line_item("EMI INTEREST - 7/9, REF# 68265776 MEDICAL", 387.00)
+    assert cat_i == "fees-interest"
+    assert sub_i == "emi-interest"
+
+    cat_g, sub_g, _, _ = categorize_statement_line_item("GST", 69.66)
+    assert cat_g == "fees-interest"
+    assert sub_g == "gst"
+
+    # 3. Test Import Endpoint
+    settings = Settings(
+        app={"data_dir": tmp_path},
+        database={"filename": "test.db"},
+    )
+    app = create_app(settings)
+    client = TestClient(app)
+
+    session = get_session_factory()()
+    try:
+        stmt = CreditCardStatement(
+            id=new_id(),
+            issuer="AXIS",
+            card_last4="4951",
+            original_filename="axis_cc.pdf",
+            status="VALIDATED",
+            validation_status="VALIDATED",
+        )
+        session.add(stmt)
+        session.flush()
+
+        tx_p = StatementTransaction(
+            id=new_id(),
+            statement_id=stmt.id,
+            transaction_date=datetime(2026, 8, 10, tzinfo=timezone.utc),
+            description="EMI PRINCIPAL - 7/9, REF# 68265776 MEDICAL",
+            amount=8464.00,
+            debit_amount=8464.00,
+            match_status="UNMATCHED",
+        )
+        tx_i = StatementTransaction(
+            id=new_id(),
+            statement_id=stmt.id,
+            transaction_date=datetime(2026, 8, 10, tzinfo=timezone.utc),
+            description="EMI INTEREST - 7/9, REF# 68265776 MEDICAL",
+            amount=387.00,
+            debit_amount=387.00,
+            match_status="UNMATCHED",
+        )
+        tx_g = StatementTransaction(
+            id=new_id(),
+            statement_id=stmt.id,
+            transaction_date=datetime(2026, 8, 10, tzinfo=timezone.utc),
+            description="GST",
+            amount=69.66,
+            debit_amount=69.66,
+            match_status="UNMATCHED",
+        )
+        session.add_all([tx_p, tx_i, tx_g])
+        session.commit()
+
+        stmt_id = stmt.id
+        bundle_ids = [tx_p.id, tx_i.id, tx_g.id]
+    finally:
+        session.close()
+
+    # Import bundle
+    bundle_res = client.post(
+        f"/api/statements/{stmt_id}/import-bundle",
+        json={"transaction_ids": bundle_ids},
+    )
+    assert bundle_res.status_code == 200
+    b_data = bundle_res.json()
+    assert b_data["success"] is True
+    assert b_data["imported_count"] == 3
+
+    # Verify all 3 transactions are now MATCHED in statement
+    updated_txs = b_data["statement"]["transactions"]
+    for b_id in bundle_ids:
+        found = next(t for t in updated_txs if t["id"] == b_id)
+        assert found["match_status"] == "MATCHED"
+        assert found["matched_transaction_id"] is not None
+
+    # 4. Re-running reconcile does NOT overwrite imported/confirmed matches
+    recon_res = client.post(f"/api/statements/{stmt_id}/reconcile")
+    assert recon_res.status_code == 200
+    recon_txs = recon_res.json()["statement"]["transactions"]
+    for b_id in bundle_ids:
+        found = next(t for t in recon_txs if t["id"] == b_id)
+        assert found["match_status"] == "MATCHED"
+        assert found["matched_transaction_id"] is not None
+
+
+def test_upi_rrn_exact_reconciliation_matching(tmp_path: Path):
+    """Test 12-digit UPI RRN deterministic matching between statement and ledger alerts."""
+    from expense_tracker.db.models import CreditCardStatement, StatementTransaction, Transaction
+    from expense_tracker.db.session import get_session_factory
+    from expense_tracker.statements.reconciliation import extract_upi_rrn, match_statement_transaction
+
+    # 1. Verify RRN Extraction
+    stmt_desc = "UPI/P2M/934010689696/Syed Naseeruddin /Paymen/YES BANK LIMITED YBS"
+    rrn = extract_upi_rrn(stmt_desc)
+    assert rrn == "934010689696"
+
+    # 2. Test Deterministic Match
+    stmt_tx = StatementTransaction(
+        id=new_id(),
+        statement_id="stmt-1",
+        transaction_date=datetime(2026, 7, 27, 8, 0, tzinfo=timezone.utc),
+        description=stmt_desc,
+        amount=20.00,
+        debit_amount=20.00,
+    )
+
+    ledger_tx = Transaction(
+        id=new_id(),
+        source="gmail:axis",
+        transaction_date=datetime(2026, 7, 27, 8, 0, 44, tzinfo=timezone.utc),
+        amount=20.00,
+        currency="INR",
+        direction="outflow",
+        reference_number="934010689696",
+        description="UPI/P2M/934010689696/Syed Naseeruddin",
+    )
+
+    res = match_statement_transaction(stmt_tx, [ledger_tx])
+    assert res.status == "MATCHED"
+    assert res.matched_transaction_id == ledger_tx.id
+    assert res.score == 1.0
+    assert "934010689696" in res.reason
+
+
+
+

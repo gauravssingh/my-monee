@@ -61,10 +61,39 @@ def get_session_factory() -> sessionmaker[Session]:
     return _SessionLocal
 
 
+def _migrate_columns(engine: Engine) -> None:
+    """Safe additive migrations for SQLite columns."""
+    with engine.begin() as conn:
+        cursor = conn.exec_driver_sql("PRAGMA table_info(credit_card_statements)")
+        cols = {row[1] for row in cursor.fetchall()}
+        if cols:
+            if "validation_status" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE credit_card_statements ADD COLUMN validation_status VARCHAR(32) DEFAULT 'PENDING'"
+                )
+            if "validation_details_json" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE credit_card_statements ADD COLUMN validation_details_json JSON"
+                )
+            if "parser_name" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE credit_card_statements ADD COLUMN parser_name VARCHAR(64)"
+                )
+            if "parser_version" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE credit_card_statements ADD COLUMN parser_version VARCHAR(32)"
+                )
+            if "page_count" not in cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE credit_card_statements ADD COLUMN page_count INTEGER"
+                )
+
+
 def init_db(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     engine = init_engine(settings)
     Base.metadata.create_all(bind=engine)
+    _migrate_columns(engine)
     with Session(engine) as session:
         seed_defaults(session)
         session.commit()

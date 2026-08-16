@@ -15,7 +15,11 @@ from expense_tracker.db.models import (
     Account,
     CreditCardStatement,
     PasswordProfile,
+    StatementAccount,
     StatementProcessingEvent,
+    StatementSection,
+    StatementSummary,
+    StatementTransaction,
     new_id,
     utcnow,
 )
@@ -24,10 +28,13 @@ from expense_tracker.statements.discovery import (
     DiscoveredStatementCandidate,
     discover_statement_candidates,
 )
+from expense_tracker.statements.parsers.registry import get_statement_parser_registry
 from expense_tracker.statements.password_engine import (
     AccountProfile,
     generate_candidate_passwords,
 )
+from expense_tracker.statements.reconciliation import reconcile_statement_in_db
+from expense_tracker.statements.validator import StatementValidator
 from expense_tracker.statements.vault import (
     compute_sha256,
     save_original_statement,
@@ -260,6 +267,7 @@ def process_statement_bytes(
             message="Unlocked PDF validated and ready for transaction extraction",
         )
         session.commit()
+        extract_and_validate_statement(session, statement)
         return statement
 
     # 4. If encrypted, attempt unlocking via password profile strategies
@@ -342,6 +350,8 @@ def process_statement_bytes(
             "SUCCESS",
             message="Unlocked PDF re-opened and validated successfully",
         )
+        session.commit()
+        extract_and_validate_statement(session, statement)
     else:
         statement.status = "PASSWORD_FAILED"
         statement.error_code = "PASSWORD_FAILED"
@@ -557,7 +567,209 @@ def unlock_statement_manually(
         )
 
     session.commit()
+    extract_and_validate_statement(session, statement)
     return True, statement, None
+
+
+def extract_and_validate_statement(
+    session: Session, statement: CreditCardStatement
+) -> CreditCardStatement:
+    """Run deterministic extraction, validation arithmetic, and alert reconciliation on unlocked statement PDF."""
+    if not statement.unlocked_file_path or not Path(statement.unlocked_file_path).exists():
+        statement.status = "EXTRACTION_FAILED"
+        statement.error_code = "FILE_NOT_FOUND"
+        statement.error_message = "Unlocked statement PDF file missing from disk"
+        session.commit()
+        return statement
+
+    statement.status = "EXTRACTING"
+    _record_event(
+        session,
+        statement.id,
+        "EXTRACTION",
+        "PENDING",
+        message="Starting deterministic statement extraction",
+    )
+    session.commit()
+
+    try:
+        registry = get_statement_parser_registry()
+        parsed_res = registry.detect_and_parse(
+            statement.unlocked_file_path, expected_issuer=statement.issuer
+        )
+
+        statement.parser_name = parsed_res.parser_name
+        statement.parser_version = parsed_res.parser_version
+        statement.statement_type = parsed_res.statement_type
+
+        # Clear any prior parsed statement children if re-extracting
+        for acc in list(statement.statement_accounts):
+            session.delete(acc)
+        if statement.summary:
+            session.delete(statement.summary)
+        for sec in list(statement.sections):
+            session.delete(sec)
+        for tx in list(statement.transactions):
+            session.delete(tx)
+        session.flush()
+
+        # 1. Persist Statement Accounts
+        created_accounts: list[StatementAccount] = []
+        for p_acc in parsed_res.accounts:
+            matched_local = find_matching_account(
+                session, p_acc.institution, p_acc.account_identifier, p_acc.account_type
+            )
+            s_acc = StatementAccount(
+                id=new_id(),
+                statement_id=statement.id,
+                linked_account_id=matched_local.id if matched_local else statement.account_id,
+                account_type=p_acc.account_type,
+                institution=p_acc.institution,
+                account_identifier=p_acc.account_identifier,
+                masked_identifier=p_acc.masked_identifier,
+                card_network=p_acc.card_network,
+                account_name=p_acc.account_name,
+                currency=p_acc.currency,
+                opening_balance=p_acc.opening_balance,
+                closing_balance=p_acc.closing_balance,
+                credit_limit=p_acc.credit_limit,
+                available_limit=p_acc.available_limit,
+                cash_withdrawal_limit=p_acc.cash_withdrawal_limit,
+                attribution_confidence=p_acc.attribution_confidence,
+            )
+            session.add(s_acc)
+            created_accounts.append(s_acc)
+        session.flush()
+
+        # 2. Persist Statement Summary
+        if parsed_res.summary:
+            p_sum = parsed_res.summary
+            s_sum = StatementSummary(
+                id=new_id(),
+                statement_id=statement.id,
+                previous_balance=p_sum.previous_balance,
+                payments=p_sum.payments,
+                refunds=p_sum.refunds,
+                purchases=p_sum.purchases,
+                cash_withdrawals=p_sum.cash_withdrawals,
+                fees=p_sum.fees,
+                interest=p_sum.interest,
+                other_charges=p_sum.other_charges,
+                total_due=p_sum.total_due,
+                minimum_due=p_sum.minimum_due,
+                statement_date=p_sum.statement_date or statement.statement_date,
+                due_date=p_sum.due_date or statement.payment_due_date,
+                currency=p_sum.currency,
+                extra_json=p_sum.extra_data,
+            )
+            session.add(s_sum)
+            if p_sum.total_due is not None:
+                statement.total_amount_due = p_sum.total_due
+            if p_sum.minimum_due is not None:
+                statement.payment_due_date = p_sum.due_date
+            if p_sum.statement_date:
+                statement.statement_date = p_sum.statement_date
+            if p_sum.period_start:
+                statement.statement_period_start = p_sum.period_start
+            if p_sum.period_end:
+                statement.statement_period_end = p_sum.period_end
+
+        # 3. Persist Statement Sections
+        for p_sec in parsed_res.sections:
+            s_sec = StatementSection(
+                id=new_id(),
+                statement_id=statement.id,
+                section_type=p_sec.section_type,
+                page_start=p_sec.page_start,
+                page_end=p_sec.page_end,
+                source_text=p_sec.source_text,
+            )
+            session.add(s_sec)
+
+        # 4. Persist Statement Transactions
+        for p_tx in parsed_res.transactions:
+            acc_id = None
+            if p_tx.statement_account_index is not None and p_tx.statement_account_index < len(created_accounts):
+                acc_id = created_accounts[p_tx.statement_account_index].id
+
+            s_tx = StatementTransaction(
+                id=new_id(),
+                statement_id=statement.id,
+                statement_account_id=acc_id,
+                transaction_date=p_tx.transaction_date,
+                transaction_time=p_tx.transaction_time,
+                value_date=p_tx.value_date,
+                description=p_tx.description,
+                reference_number=p_tx.reference_number,
+                transaction_type=p_tx.transaction_type,
+                amount=p_tx.amount,
+                debit_amount=p_tx.debit_amount,
+                credit_amount=p_tx.credit_amount,
+                currency=p_tx.currency,
+                running_balance=p_tx.running_balance,
+                source_page=p_tx.source_page,
+                source_row=p_tx.source_row,
+                raw_text=p_tx.raw_text,
+                source_metadata=p_tx.source_metadata,
+                attribution_status=p_tx.attribution_status,
+                match_status="UNMATCHED",
+            )
+            session.add(s_tx)
+        session.flush()
+
+        _record_event(
+            session,
+            statement.id,
+            "EXTRACTION",
+            "SUCCESS",
+            message=f"Extracted {len(parsed_res.transactions)} transactions across {len(created_accounts)} account(s)",
+            metadata={"transaction_count": len(parsed_res.transactions), "parser": parsed_res.parser_name},
+        )
+
+        # 5. Run Statement Arithmetic Validation
+        validator = StatementValidator()
+        val_report = validator.validate(parsed_res)
+        statement.validation_status = val_report.status
+        statement.validation_details_json = val_report.details
+
+        _record_event(
+            session,
+            statement.id,
+            "VALIDATION_ARITHMETIC",
+            "SUCCESS" if val_report.status == "VALIDATED" else "WARNING",
+            message="; ".join(val_report.messages + val_report.warnings) or "Validation complete",
+            metadata=val_report.details,
+        )
+
+        # 6. Run Reconciliation against Ledger Alerts
+        reconcile_res = reconcile_statement_in_db(session, statement.id)
+        _record_event(
+            session,
+            statement.id,
+            "RECONCILIATION",
+            "SUCCESS",
+            message=f"Reconciliation: {reconcile_res['matched']} matched, {reconcile_res['possible_matches']} possible, {reconcile_res['liability_payments']} liability payments",
+            metadata=reconcile_res,
+        )
+
+        statement.status = "VALIDATED" if val_report.status == "VALIDATED" else "REVIEW_REQUIRED"
+        session.commit()
+        return statement
+
+    except Exception as exc:
+        logger.error(f"Failed statement extraction for {statement.id}: {exc}", exc_info=True)
+        statement.status = "EXTRACTION_FAILED"
+        statement.error_code = "EXTRACTION_FAILED"
+        statement.error_message = str(exc)
+        _record_event(
+            session,
+            statement.id,
+            "EXTRACTION",
+            "FAILED",
+            message=f"Extraction failed: {exc}",
+        )
+        session.commit()
+        return statement
 
 
 def upsert_password_profile(

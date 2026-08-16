@@ -199,3 +199,40 @@ INR 1193000
     assert tx.card == "4951"
     assert tx.transaction_date.day == 13
     assert tx.transaction_date.month == 6
+
+
+def test_axis_bank_upi_email_parsing() -> None:
+    parser = AxisBankParser()
+    body_text = """
+Amount Debited:
+INR 20.00
+
+Account Number:
+XX1022
+
+Date & Time:
+27-07-26, 08:00:44 IST
+
+Transaction Info:
+UPI/P2M/800745883926/Syed Naseeruddin
+"""
+    email = EmailContext(
+        message_id="axis-upi-debit-1",
+        thread_id="t_upi_1",
+        sender="Axis Bank Alerts <alerts@axis.bank.in>",
+        subject="Debit Transaction Alert",
+        received_at=datetime(2026, 7, 27, 8, 0, 44, tzinfo=timezone.utc),
+        body_text=body_text,
+    )
+    assert parser.can_parse(email) >= 0.9
+    parsed = parser.parse(email)
+    assert len(parsed) == 1
+    tx = parsed[0]
+    assert tx.amount == Decimal("20.00")
+    assert tx.direction == "debit"
+    assert tx.merchant_raw == "Syed Naseeruddin"
+    assert tx.payment_method == "upi"
+    assert tx.reference_number == "UPI/P2M/800745883926/Syed Naseeruddin"
+    assert tx.bank_reference == "UPI/P2M/800745883926/Syed Naseeruddin"
+    assert "800745883926" in tx.description
+    assert tx.extra["upi_rrn"] == "800745883926"

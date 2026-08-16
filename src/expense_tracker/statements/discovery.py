@@ -395,14 +395,15 @@ EXCLUDED_STATEMENT_PATTERNS = [
     r"kfs",
     r"key\s*fact",
     r"most\s*important\s*terms",
-    r"welcome\s*kit",
-    r"card\s*member\s*agreement",
     r"demat",
     r"mutual\s*fund",
     r"fixed\s*deposit",
     r"recurring\s*deposit",
     r"lichousing",
     r"instaforex",
+    r"eforex@axisbank\.com",
+    r"eforex",
+    r"forex\s*card",
 ]
 
 

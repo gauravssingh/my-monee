@@ -625,6 +625,12 @@ class CreditCardStatement(Base):
     error_code: Mapped[str | None] = mapped_column(String(64))
     error_message: Mapped[str | None] = mapped_column(Text)
 
+    validation_status: Mapped[str] = mapped_column(String(32), default="PENDING")
+    validation_details_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+    parser_name: Mapped[str | None] = mapped_column(String(64))
+    parser_version: Mapped[str | None] = mapped_column(String(32))
+    page_count: Mapped[int | None] = mapped_column(Integer)
+
     account: Mapped[Account | None] = relationship(
         foreign_keys=[account_id], back_populates="statements"
     )
@@ -633,12 +639,163 @@ class CreditCardStatement(Base):
         cascade="all, delete-orphan",
         order_by="StatementProcessingEvent.started_at",
     )
+    statement_accounts: Mapped[list[StatementAccount]] = relationship(
+        back_populates="statement",
+        cascade="all, delete-orphan",
+    )
+    summary: Mapped[StatementSummary | None] = relationship(
+        back_populates="statement",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    sections: Mapped[list[StatementSection]] = relationship(
+        back_populates="statement",
+        cascade="all, delete-orphan",
+    )
+    transactions: Mapped[list[StatementTransaction]] = relationship(
+        back_populates="statement",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("ix_stmt_account", "account_id"),
         Index("ix_stmt_issuer_card", "issuer", "card_last4"),
         Index("ix_stmt_source", "source_email_id", "source_attachment_id"),
         Index("ix_stmt_status", "status"),
+        Index("ix_stmt_val_status", "validation_status"),
+    )
+
+
+class StatementAccount(Base):
+    __tablename__ = "statement_accounts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    statement_id: Mapped[str] = mapped_column(
+        ForeignKey("credit_card_statements.id", ondelete="CASCADE"), nullable=False
+    )
+    linked_account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
+
+    account_type: Mapped[str] = mapped_column(String(32), default="CREDIT_CARD")
+    institution: Mapped[str] = mapped_column(String(100), nullable=False)
+    account_identifier: Mapped[str | None] = mapped_column(String(100))
+    masked_identifier: Mapped[str | None] = mapped_column(String(100))
+    card_network: Mapped[str | None] = mapped_column(String(32))
+    account_name: Mapped[str | None] = mapped_column(String(255))
+    currency: Mapped[str] = mapped_column(String(8), default="INR")
+
+    opening_balance: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    closing_balance: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    credit_limit: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    available_limit: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    cash_withdrawal_limit: Mapped[float | None] = mapped_column(Numeric(18, 4))
+
+    attribution_confidence: Mapped[str] = mapped_column(String(32), default="EXACT")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    statement: Mapped[CreditCardStatement] = relationship(back_populates="statement_accounts")
+    transactions: Mapped[list[StatementTransaction]] = relationship(back_populates="statement_account")
+
+    __table_args__ = (
+        Index("ix_stmt_acc_stmt_id", "statement_id"),
+        Index("ix_stmt_acc_masked", "masked_identifier"),
+    )
+
+
+class StatementSummary(Base):
+    __tablename__ = "statement_summaries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    statement_id: Mapped[str] = mapped_column(
+        ForeignKey("credit_card_statements.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+
+    previous_balance: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    payments: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    refunds: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    purchases: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    cash_withdrawals: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    fees: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    interest: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    other_charges: Mapped[float | None] = mapped_column(Numeric(18, 4))
+
+    total_due: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    minimum_due: Mapped[float | None] = mapped_column(Numeric(18, 4))
+
+    statement_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    currency: Mapped[str] = mapped_column(String(8), default="INR")
+    extra_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    statement: Mapped[CreditCardStatement] = relationship(back_populates="summary")
+
+
+class StatementSection(Base):
+    __tablename__ = "statement_sections"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    statement_id: Mapped[str] = mapped_column(
+        ForeignKey("credit_card_statements.id", ondelete="CASCADE"), nullable=False
+    )
+    section_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    page_start: Mapped[int] = mapped_column(Integer, default=1)
+    page_end: Mapped[int] = mapped_column(Integer, default=1)
+    source_text: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    statement: Mapped[CreditCardStatement] = relationship(back_populates="sections")
+
+    __table_args__ = (Index("ix_stmt_section_stmt_id", "statement_id"),)
+
+
+class StatementTransaction(Base):
+    __tablename__ = "statement_transactions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    statement_id: Mapped[str] = mapped_column(
+        ForeignKey("credit_card_statements.id", ondelete="CASCADE"), nullable=False
+    )
+    statement_account_id: Mapped[str | None] = mapped_column(
+        ForeignKey("statement_accounts.id", ondelete="SET NULL"), nullable=True
+    )
+
+    transaction_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    transaction_time: Mapped[str | None] = mapped_column(String(16))
+    value_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    reference_number: Mapped[str | None] = mapped_column(String(128))
+    transaction_type: Mapped[str] = mapped_column(String(32), default="PURCHASE")
+
+    amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    debit_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    credit_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
+    currency: Mapped[str] = mapped_column(String(8), default="INR")
+    running_balance: Mapped[float | None] = mapped_column(Numeric(18, 4))
+
+    source_page: Mapped[int] = mapped_column(Integer, default=1)
+    source_row: Mapped[int | None] = mapped_column(Integer)
+    raw_text: Mapped[str | None] = mapped_column(Text)
+    source_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+    attribution_status: Mapped[str] = mapped_column(String(32), default="UNKNOWN")  # EXACT, UNKNOWN, INFERRED
+    matched_transaction_id: Mapped[str | None] = mapped_column(ForeignKey("transactions.id", ondelete="SET NULL"))
+    match_status: Mapped[str] = mapped_column(String(32), default="UNMATCHED")  # UNMATCHED, MATCHED, POSSIBLE_MATCH, DUPLICATE, LIABILITY_PAYMENT
+    match_confidence: Mapped[float | None] = mapped_column(Float)
+    match_reason: Mapped[str | None] = mapped_column(Text)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    statement: Mapped[CreditCardStatement] = relationship(back_populates="transactions")
+    statement_account: Mapped[StatementAccount | None] = relationship(back_populates="transactions")
+    matched_transaction: Mapped[Transaction | None] = relationship("Transaction", foreign_keys=[matched_transaction_id])
+
+    __table_args__ = (
+        Index("ix_stmt_tx_stmt_id", "statement_id"),
+        Index("ix_stmt_tx_stmt_acc_id", "statement_account_id"),
+        Index("ix_stmt_tx_date", "transaction_date"),
+        Index("ix_stmt_tx_matched_tx", "matched_transaction_id"),
+        Index("ix_stmt_tx_match_status", "match_status"),
     )
 
 

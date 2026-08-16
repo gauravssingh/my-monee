@@ -54,3 +54,5 @@ exclude_subject_patterns:
 
 exclude_sender_patterns:
   - "noreply@.*(promo|marketing|offers)"
+  - "eforex@axisbank\\.com"
+

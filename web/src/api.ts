@@ -31,6 +31,106 @@ export interface StatementProcessingEvent {
   completed_at: string | null;
 }
 
+export interface StatementAccount {
+  id: string;
+  account_type: string;
+  institution: string;
+  account_identifier?: string | null;
+  masked_identifier?: string | null;
+  card_network?: string | null;
+  account_name?: string | null;
+  currency: string;
+  opening_balance?: number | null;
+  closing_balance?: number | null;
+  credit_limit?: number | null;
+  available_limit?: number | null;
+  cash_withdrawal_limit?: number | null;
+  attribution_confidence: string;
+}
+
+export interface StatementSummary {
+  previous_balance?: number | null;
+  payments?: number | null;
+  refunds?: number | null;
+  purchases?: number | null;
+  cash_withdrawals?: number | null;
+  fees?: number | null;
+  interest?: number | null;
+  other_charges?: number | null;
+  total_due?: number | null;
+  minimum_due?: number | null;
+  statement_date?: string | null;
+  due_date?: string | null;
+  currency: string;
+  extra_json?: Record<string, any>;
+}
+
+export interface StatementSection {
+  id: string;
+  section_type: string;
+  page_start: number;
+  page_end: number;
+}
+
+export interface StatementTransaction {
+  id: string;
+  statement_account_id?: string | null;
+  transaction_date: string;
+  transaction_time?: string | null;
+  value_date?: string | null;
+  description: string;
+  reference_number?: string | null;
+  transaction_type: string;
+  amount: number;
+  debit_amount?: number | null;
+  credit_amount?: number | null;
+  currency: string;
+  running_balance?: number | null;
+  source_page: number;
+  source_row?: number | null;
+  raw_text?: string | null;
+  attribution_status: string;
+  match_status: string;
+  match_confidence?: number | null;
+  match_reason?: string | null;
+  matched_transaction_id?: string | null;
+  matched_transaction?: {
+    id: string;
+    transaction_date: string | null;
+    amount: number;
+    currency?: string;
+    direction: string;
+    merchant_raw?: string | null;
+    merchant_normalized?: string | null;
+    category?: string | null;
+    account?: string | null;
+    card?: string | null;
+    source?: string | null;
+  } | null;
+}
+
+export interface ValidationEquation {
+  name: string;
+  formula: string;
+  expected: number;
+  calculated: number;
+  difference: number;
+  is_balanced: boolean;
+}
+
+export interface ValidationDetails {
+  transaction_count?: number;
+  account_count?: number;
+  total_extracted_debits?: number;
+  total_extracted_credits?: number;
+  reported_purchases?: number | null;
+  reported_payments?: number | null;
+  reported_total_due?: number | null;
+  equations?: ValidationEquation[];
+  messages?: string[];
+  warnings?: string[];
+}
+
 export interface CreditCardStatement {
   id: string;
   account_id: string | null;
@@ -57,6 +157,10 @@ export interface CreditCardStatement {
   is_encrypted: boolean;
   password_strategy_id: string | null;
   status: string;
+  validation_status?: string;
+  validation_details?: ValidationDetails;
+  parser_name?: string | null;
+  parser_version?: string | null;
   discovered_at: string | null;
   downloaded_at: string | null;
   unlocked_at: string | null;
@@ -66,6 +170,11 @@ export interface CreditCardStatement {
   error_message: string | null;
   event_count?: number;
   events?: StatementProcessingEvent[];
+  transaction_count?: number;
+  statement_accounts?: StatementAccount[];
+  summary?: StatementSummary | null;
+  sections?: StatementSection[];
+  transactions?: StatementTransaction[];
 }
 
 export interface PasswordProfile {
@@ -739,5 +848,54 @@ export const api = {
     `/api/statements/${id}/file/original${download ? "?download=true" : ""}`,
   statementUnlockedUrl: (id: string, download: boolean = false) =>
     `/api/statements/${id}/file/unlocked${download ? "?download=true" : ""}`,
+  reExtractStatement: (id: string) =>
+    request<CreditCardStatement>(`/api/statements/${id}/re-extract`, { method: "POST" }),
+  batchExtractStatements: (limit: number = 100) =>
+    request<{
+      success: boolean;
+      total_processed: number;
+      validated_count: number;
+      review_count: number;
+      failed_count: number;
+    }>(`/api/statements/batch-extract?limit=${limit}`, { method: "POST" }),
+  reconcileStatement: (id: string) =>
+    request<{ success: boolean; statement_id: string; reconciliation: any; statement: CreditCardStatement }>(
+      `/api/statements/${id}/reconcile`,
+      { method: "POST" }
+    ),
+  updateTransactionMatch: (
+    statementId: string,
+    transactionId: string,
+    payload: { match_status: string; matched_transaction_id?: string | null; match_reason?: string | null }
+  ) =>
+    request<{ success: boolean; transaction_id: string; statement: CreditCardStatement }>(
+      `/api/statements/${statementId}/transactions/${transactionId}/match`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    ),
+  importStatementTransaction: (statementId: string, transactionId: string) =>
+    request<{ success: boolean; transaction_id: string; ledger_transaction_id: string; statement: CreditCardStatement }>(
+      `/api/statements/${statementId}/transactions/${transactionId}/import`,
+      { method: "POST" }
+    ),
+  importStatementBundle: (statementId: string, transactionIds: string[]) =>
+    request<{ success: boolean; imported_count: number; ledger_transaction_ids: string[]; statement: CreditCardStatement }>(
+      `/api/statements/${statementId}/import-bundle`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transaction_ids: transactionIds }),
+      }
+    ),
+  scanGmailForTransaction: (statementId: string, transactionId: string) =>
+    request<{ success: boolean; found: boolean; rrn?: string; message: string; matched_transaction_id?: string; statement: CreditCardStatement }>(
+      `/api/statements/${statementId}/transactions/${transactionId}/scan-gmail`,
+      { method: "POST" }
+    ),
 };
+
+
 

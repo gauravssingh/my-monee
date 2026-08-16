@@ -20,6 +20,7 @@ from expense_tracker.db.models import (
     CreditCardStatement,
     PasswordProfile,
     StatementProcessingEvent,
+    StatementTransaction,
     new_id,
     utcnow,
 )
@@ -67,7 +68,103 @@ def _format_event(e: StatementProcessingEvent) -> dict[str, Any]:
 from expense_tracker.ingestion.gmail.links import gmail_web_url
 
 
-def _format_statement(stmt: CreditCardStatement, include_events: bool = False) -> dict[str, Any]:
+def _format_statement(
+    stmt: CreditCardStatement,
+    include_events: bool = False,
+    include_transactions: bool = True,
+) -> dict[str, Any]:
+    accounts_data = [
+        {
+            "id": a.id,
+            "account_type": a.account_type,
+            "institution": a.institution,
+            "account_identifier": a.account_identifier,
+            "masked_identifier": a.masked_identifier,
+            "card_network": a.card_network,
+            "account_name": a.account_name,
+            "currency": a.currency,
+            "opening_balance": float(a.opening_balance) if a.opening_balance is not None else None,
+            "closing_balance": float(a.closing_balance) if a.closing_balance is not None else None,
+            "credit_limit": float(a.credit_limit) if a.credit_limit is not None else None,
+            "available_limit": float(a.available_limit) if a.available_limit is not None else None,
+            "cash_withdrawal_limit": float(a.cash_withdrawal_limit) if a.cash_withdrawal_limit is not None else None,
+            "attribution_confidence": a.attribution_confidence,
+        }
+        for a in stmt.statement_accounts
+    ]
+
+    summary_data = None
+    if stmt.summary:
+        s = stmt.summary
+        summary_data = {
+            "previous_balance": float(s.previous_balance) if s.previous_balance is not None else None,
+            "payments": float(s.payments) if s.payments is not None else None,
+            "refunds": float(s.refunds) if s.refunds is not None else None,
+            "purchases": float(s.purchases) if s.purchases is not None else None,
+            "cash_withdrawals": float(s.cash_withdrawals) if s.cash_withdrawals is not None else None,
+            "fees": float(s.fees) if s.fees is not None else None,
+            "interest": float(s.interest) if s.interest is not None else None,
+            "other_charges": float(s.other_charges) if s.other_charges is not None else None,
+            "total_due": float(s.total_due) if s.total_due is not None else None,
+            "minimum_due": float(s.minimum_due) if s.minimum_due is not None else None,
+            "statement_date": s.statement_date.isoformat() if s.statement_date else None,
+            "due_date": s.due_date.isoformat() if s.due_date else None,
+            "currency": s.currency,
+            "extra_json": s.extra_json or {},
+        }
+
+    sections_data = [
+        {
+            "id": sec.id,
+            "section_type": sec.section_type,
+            "page_start": sec.page_start,
+            "page_end": sec.page_end,
+        }
+        for sec in stmt.sections
+    ]
+
+    transactions_data = []
+    if include_transactions:
+        transactions_data = [
+            {
+                "id": tx.id,
+                "statement_account_id": tx.statement_account_id,
+                "transaction_date": tx.transaction_date.isoformat() if tx.transaction_date else None,
+                "transaction_time": tx.transaction_time,
+                "value_date": tx.value_date.isoformat() if tx.value_date else None,
+                "description": tx.description,
+                "reference_number": tx.reference_number,
+                "transaction_type": tx.transaction_type,
+                "amount": float(tx.amount),
+                "debit_amount": float(tx.debit_amount) if tx.debit_amount is not None else None,
+                "credit_amount": float(tx.credit_amount) if tx.credit_amount is not None else None,
+                "currency": tx.currency,
+                "running_balance": float(tx.running_balance) if tx.running_balance is not None else None,
+                "source_page": tx.source_page,
+                "source_row": tx.source_row,
+                "raw_text": tx.raw_text,
+                "attribution_status": tx.attribution_status,
+                "match_status": tx.match_status,
+                "match_confidence": tx.match_confidence,
+                "match_reason": tx.match_reason,
+                "matched_transaction_id": tx.matched_transaction_id,
+                "matched_transaction": {
+                    "id": tx.matched_transaction.id,
+                    "transaction_date": tx.matched_transaction.transaction_date.isoformat() if tx.matched_transaction.transaction_date else None,
+                    "amount": float(tx.matched_transaction.amount),
+                    "currency": tx.matched_transaction.currency,
+                    "direction": tx.matched_transaction.direction,
+                    "merchant_raw": tx.matched_transaction.merchant_raw,
+                    "merchant_normalized": tx.matched_transaction.merchant_normalized,
+                    "category": tx.matched_transaction.category.name if tx.matched_transaction.category else None,
+                    "account": tx.matched_transaction.account,
+                    "card": tx.matched_transaction.card,
+                    "source": tx.matched_transaction.source,
+                } if tx.matched_transaction else None,
+            }
+            for tx in sorted(stmt.transactions, key=lambda x: (x.transaction_date, x.source_page, x.source_row or 0))
+        ]
+
     data = {
         "id": stmt.id,
         "account_id": stmt.account_id,
@@ -100,6 +197,10 @@ def _format_statement(stmt: CreditCardStatement, include_events: bool = False) -
         "is_encrypted": stmt.is_encrypted,
         "password_strategy_id": stmt.password_strategy_id,
         "status": stmt.status,
+        "validation_status": stmt.validation_status or "PENDING",
+        "validation_details": stmt.validation_details_json or {},
+        "parser_name": stmt.parser_name,
+        "parser_version": stmt.parser_version,
         "discovered_at": stmt.discovered_at.isoformat() if stmt.discovered_at else None,
         "downloaded_at": stmt.downloaded_at.isoformat() if stmt.downloaded_at else None,
         "unlocked_at": stmt.unlocked_at.isoformat() if stmt.unlocked_at else None,
@@ -108,7 +209,13 @@ def _format_statement(stmt: CreditCardStatement, include_events: bool = False) -
         "error_code": stmt.error_code,
         "error_message": stmt.error_message,
         "event_count": len(stmt.events) if stmt.events else 0,
+        "transaction_count": len(stmt.transactions) if stmt.transactions else 0,
+        "statement_accounts": accounts_data,
+        "summary": summary_data,
+        "sections": sections_data,
     }
+    if include_transactions:
+        data["transactions"] = transactions_data
     if include_events:
         data["events"] = [_format_event(e) for e in stmt.events]
     return data
@@ -413,3 +520,207 @@ def get_account_statements(
         "account_name": account.name,
         "statements": [_format_statement(s) for s in statements],
     }
+
+
+@router.post("/api/statements/{statement_id}/re-extract")
+def re_extract_statement_route(
+    statement_id: str,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    statement = session.get(CreditCardStatement, statement_id)
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    from expense_tracker.statements.service import extract_and_validate_statement
+
+    statement = extract_and_validate_statement(session, statement)
+    return _format_statement(statement, include_events=True, include_transactions=True)
+
+
+@router.post("/api/statements/batch-extract")
+def batch_extract_statements_route(
+    limit: int = Query(default=100, ge=1, le=500),
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    from expense_tracker.statements.service import extract_and_validate_statement
+
+    stmts = session.scalars(
+        select(CreditCardStatement).where(
+            CreditCardStatement.unlocked_file_path.isnot(None),
+            CreditCardStatement.status.in_(["READY_FOR_EXTRACTION", "UNLOCKED", "VALIDATED", "REVIEW_REQUIRED"]),
+        ).limit(limit)
+    ).all()
+
+    processed = 0
+    validated = 0
+    review_required = 0
+    failed = 0
+
+    for s in stmts:
+        try:
+            res = extract_and_validate_statement(session, s)
+            processed += 1
+            if res.validation_status == "VALIDATED":
+                validated += 1
+            elif res.validation_status == "REVIEW_REQUIRED":
+                review_required += 1
+            elif res.status.endswith("_FAILED") or res.validation_status == "VALIDATION_FAILED":
+                failed += 1
+        except Exception as exc:
+            logger.error(f"Failed extracting statement {s.id}: {exc}")
+            failed += 1
+
+    return {
+        "success": True,
+        "total_processed": processed,
+        "validated_count": validated,
+        "review_count": review_required,
+        "failed_count": failed,
+    }
+
+
+@router.post("/api/statements/{statement_id}/reconcile")
+def reconcile_statement_route(
+    statement_id: str,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    statement = session.get(CreditCardStatement, statement_id)
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    from expense_tracker.statements.reconciliation import reconcile_statement_in_db
+
+    res = reconcile_statement_in_db(session, statement_id)
+    return {
+        "success": True,
+        "statement_id": statement_id,
+        "reconciliation": res,
+        "statement": _format_statement(statement, include_events=True, include_transactions=True),
+    }
+
+
+class TransactionMatchPayload(BaseModel):
+    match_status: str  # "MATCHED", "UNMATCHED", etc.
+    matched_transaction_id: str | None = None
+    match_reason: str | None = None
+
+
+@router.post("/api/statements/{statement_id}/transactions/{transaction_id}/match")
+def update_statement_transaction_match(
+    statement_id: str,
+    transaction_id: str,
+    payload: TransactionMatchPayload,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    statement = session.get(CreditCardStatement, statement_id)
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    tx = session.get(StatementTransaction, transaction_id)
+    if not tx or tx.statement_id != statement_id:
+        raise HTTPException(status_code=404, detail="Statement transaction not found")
+
+    if payload.match_status == "MATCHED":
+        tx.match_status = "MATCHED"
+        tx.match_confidence = 1.0
+        tx.match_reason = payload.match_reason or "Manually confirmed by user"
+        if payload.matched_transaction_id:
+            tx.matched_transaction_id = payload.matched_transaction_id
+    elif payload.match_status == "UNMATCHED":
+        tx.match_status = "UNMATCHED"
+        tx.match_confidence = 0.0
+        tx.matched_transaction_id = None
+        tx.match_reason = payload.match_reason or "Rejected match by user"
+    else:
+        tx.match_status = payload.match_status
+
+    session.commit()
+    session.refresh(statement)
+    return {
+        "success": True,
+        "transaction_id": transaction_id,
+        "statement": _format_statement(statement, include_events=True, include_transactions=True),
+    }
+
+
+@router.post("/api/statements/{statement_id}/transactions/{transaction_id}/import")
+def import_statement_transaction_route(
+    statement_id: str,
+    transaction_id: str,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    statement = session.get(CreditCardStatement, statement_id)
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    stmt_tx = session.get(StatementTransaction, transaction_id)
+    if not stmt_tx or stmt_tx.statement_id != statement_id:
+        raise HTTPException(status_code=404, detail="Statement transaction not found")
+
+    from expense_tracker.statements.emi import import_statement_transaction_to_ledger
+
+    ledger_tx = import_statement_transaction_to_ledger(session, statement, stmt_tx)
+    session.refresh(statement)
+    return {
+        "success": True,
+        "transaction_id": transaction_id,
+        "ledger_transaction_id": ledger_tx.id,
+        "statement": _format_statement(statement, include_events=True, include_transactions=True),
+    }
+
+
+class ImportBundlePayload(BaseModel):
+    transaction_ids: list[str]
+
+
+@router.post("/api/statements/{statement_id}/import-bundle")
+def import_statement_bundle_route(
+    statement_id: str,
+    payload: ImportBundlePayload,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    statement = session.get(CreditCardStatement, statement_id)
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    from expense_tracker.statements.emi import import_statement_transaction_to_ledger
+
+    imported_ids = []
+    for tx_id in payload.transaction_ids:
+        stmt_tx = session.get(StatementTransaction, tx_id)
+        if stmt_tx and stmt_tx.statement_id == statement_id:
+            ledger_tx = import_statement_transaction_to_ledger(session, statement, stmt_tx)
+            imported_ids.append(ledger_tx.id)
+
+    session.refresh(statement)
+    return {
+        "success": True,
+        "imported_count": len(imported_ids),
+        "ledger_transaction_ids": imported_ids,
+        "statement": _format_statement(statement, include_events=True, include_transactions=True),
+    }
+
+
+@router.post("/api/statements/{statement_id}/transactions/{transaction_id}/scan-gmail")
+def scan_gmail_transaction_route(
+    statement_id: str,
+    transaction_id: str,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    statement = session.get(CreditCardStatement, statement_id)
+    if not statement:
+        raise HTTPException(status_code=404, detail="Statement not found")
+
+    from expense_tracker.statements.reconciliation import scan_gmail_for_upi_rrn
+
+    res = scan_gmail_for_upi_rrn(session, statement_id, transaction_id)
+    session.refresh(statement)
+    return {
+        **res,
+        "statement": _format_statement(statement, include_events=True, include_transactions=True),
+    }
+
+
+
+
+

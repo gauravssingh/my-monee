@@ -24,23 +24,32 @@ function formatPeriod(startStr: string | null | undefined, endStr: string | null
   return formatDate(startStr || endStr);
 }
 
-function getStatusBadge(status: string) {
+function getStatusBadge(status: string, validationStatus?: string | null) {
+  if (status === "VALIDATED" || validationStatus === "VALIDATED") {
+    return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600 }}>✓ Extracted</span>;
+  }
+  if (status === "REVIEW_REQUIRED" || validationStatus === "REVIEW_REQUIRED") {
+    return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>⚠ Needs Review</span>;
+  }
   switch (status) {
     case "READY_FOR_EXTRACTION":
     case "UNLOCKED":
-      return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600 }}>✓ Ready</span>;
+      return <span className="badge" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--accent, #3b82f6)", fontWeight: 600 }}>⚡ Ready to Extract</span>;
     case "PASSWORD_REQUIRED":
-      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>🔒 Locked</span>;
+      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>🔒 Needs Unlocking</span>;
     case "PASSWORD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>⚠ Review</span>;
+      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>⚠ Password Failed</span>;
     case "INVALID_PDF":
     case "DOWNLOAD_FAILED":
     case "UNLOCK_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>✕ {status.replace("_", " ")}</span>;
+    case "VALIDATION_FAILED":
+    case "EXTRACTION_FAILED":
+      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>✕ Failed</span>;
     default:
       return <span className="badge">{status}</span>;
   }
 }
+
 
 export default function CreditCardStatementsPage() {
   const [statements, setStatements] = useState<CreditCardStatement[]>([]);
@@ -95,6 +104,24 @@ export default function CreditCardStatementsPage() {
     }
   };
 
+  const [batchExtracting, setBatchExtracting] = useState(false);
+
+  const handleBatchExtract = async () => {
+    setBatchExtracting(true);
+    try {
+      const res = await api.batchExtractStatements(150);
+      showToast(
+        `Batch Extracted: ${res.total_processed} processed (${res.validated_count} validated, ${res.review_count} review required)`,
+        "success"
+      );
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message || "Batch statement extraction failed", "error");
+    } finally {
+      setBatchExtracting(false);
+    }
+  };
+
   const handleDiscover = async () => {
     setDiscovering(true);
     try {
@@ -117,9 +144,16 @@ export default function CreditCardStatementsPage() {
       if (selectedType === "BANK_ACCOUNT" && s.statement_type !== "BANK_ACCOUNT") return false;
     }
     if (selectedStatus !== "all") {
-      if (selectedStatus === "READY" && s.status !== "READY_FOR_EXTRACTION" && s.status !== "UNLOCKED") return false;
-      if (selectedStatus === "LOCKED" && s.status !== "PASSWORD_REQUIRED" && s.status !== "PASSWORD_FAILED") return false;
-      if (selectedStatus === "FAILED" && !s.status.includes("FAILED")) return false;
+      if (selectedStatus === "EXTRACTED") {
+        if (s.status !== "VALIDATED" && s.validation_status !== "VALIDATED") return false;
+      } else if (selectedStatus === "READY") {
+        if (s.status !== "READY_FOR_EXTRACTION" && s.status !== "UNLOCKED") return false;
+        if (s.validation_status === "VALIDATED") return false;
+      } else if (selectedStatus === "LOCKED") {
+        if (s.status !== "PASSWORD_REQUIRED" && s.status !== "PASSWORD_FAILED") return false;
+      } else if (selectedStatus === "REVIEW") {
+        if (s.status !== "REVIEW_REQUIRED" && s.validation_status !== "VALIDATION_FAILED" && !s.status.includes("FAILED")) return false;
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -151,8 +185,11 @@ export default function CreditCardStatementsPage() {
     return sortDirection === "asc" ? cmp : -cmp;
   });
 
-  const readyCount = statements.filter((s) => s.status === "READY_FOR_EXTRACTION" || s.status === "UNLOCKED").length;
+  const extractedCount = statements.filter((s) => s.status === "VALIDATED" || s.validation_status === "VALIDATED").length;
+  const readyCount = statements.filter((s) => (s.status === "READY_FOR_EXTRACTION" || s.status === "UNLOCKED") && s.validation_status !== "VALIDATED").length;
   const lockedCount = statements.filter((s) => s.status === "PASSWORD_REQUIRED" || s.status === "PASSWORD_FAILED").length;
+  const reviewCount = statements.filter((s) => s.status === "REVIEW_REQUIRED" || s.validation_status === "VALIDATION_FAILED" || s.status.includes("FAILED")).length;
+
 
   return (
     <>
@@ -180,6 +217,17 @@ export default function CreditCardStatementsPage() {
           >
             {discovering ? "Scanning Gmail..." : "Discover from Gmail"}
           </button>
+          {readyCount > 0 && (
+            <button
+              type="button"
+              className="btn quiet"
+              onClick={handleBatchExtract}
+              disabled={batchExtracting}
+              title="Run deterministic parser and validation on all ready statements"
+            >
+              {batchExtracting ? "Extracting..." : `⚡ Batch Extract (${readyCount})`}
+            </button>
+          )}
           <button
             type="button"
             className="btn primary"
@@ -190,27 +238,96 @@ export default function CreditCardStatementsPage() {
         </div>
       </header>
 
-      {/* Summary Stat Cards */}
+      {/* Summary Stat Cards (Interactive Clickable Filters) */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 14,
           marginBottom: 24,
         }}
       >
-        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: "16px 20px" }}>
-          <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Total Ingested</div>
-          <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: 4 }}>{statements.length}</div>
+        <div
+          onClick={() => setSelectedStatus("all")}
+          style={{
+            background: "var(--surface)",
+            border: selectedStatus === "all" ? "2px solid var(--accent, #6366f1)" : "1px solid var(--line)",
+            borderRadius: "var(--radius-md)",
+            padding: "14px 18px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          title="Click to view all statements"
+        >
+          <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Total Statements</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4 }}>{statements.length}</div>
         </div>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: "16px 20px" }}>
-          <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Ready for Extraction</div>
-          <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: 4, color: "var(--success, #10b981)" }}>{readyCount}</div>
+
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === "EXTRACTED" ? "all" : "EXTRACTED")}
+          style={{
+            background: "var(--surface)",
+            border: selectedStatus === "EXTRACTED" ? "2px solid var(--success, #10b981)" : "1px solid var(--line)",
+            borderRadius: "var(--radius-md)",
+            padding: "14px 18px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          title="Click to filter statements that are successfully extracted & validated"
+        >
+          <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Extracted & Validated</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: "var(--success, #10b981)" }}>{extractedCount}</div>
         </div>
-        <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: "16px 20px" }}>
-          <div style={{ fontSize: "0.75rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Password Locked</div>
-          <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: 4, color: lockedCount > 0 ? "var(--warning, #f59e0b)" : "inherit" }}>{lockedCount}</div>
+
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === "READY" ? "all" : "READY")}
+          style={{
+            background: "var(--surface)",
+            border: selectedStatus === "READY" ? "2px solid var(--accent, #3b82f6)" : "1px solid var(--line)",
+            borderRadius: "var(--radius-md)",
+            padding: "14px 18px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          title="Click to filter statements unlocked and ready to extract"
+        >
+          <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Ready to Extract</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: readyCount > 0 ? "var(--accent, #3b82f6)" : "inherit" }}>{readyCount}</div>
         </div>
+
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === "LOCKED" ? "all" : "LOCKED")}
+          style={{
+            background: "var(--surface)",
+            border: selectedStatus === "LOCKED" ? "2px solid var(--warning, #f59e0b)" : "1px solid var(--line)",
+            borderRadius: "var(--radius-md)",
+            padding: "14px 18px",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          title="Click to filter statements that require password unlocking"
+        >
+          <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Needs Unlocking</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: lockedCount > 0 ? "var(--warning, #f59e0b)" : "inherit" }}>{lockedCount}</div>
+        </div>
+
+        {reviewCount > 0 && (
+          <div
+            onClick={() => setSelectedStatus(selectedStatus === "REVIEW" ? "all" : "REVIEW")}
+            style={{
+              background: "var(--surface)",
+              border: selectedStatus === "REVIEW" ? "2px solid var(--danger, #ef4444)" : "1px solid var(--line)",
+              borderRadius: "var(--radius-md)",
+              padding: "14px 18px",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+            title="Click to filter statements needing review or with extraction errors"
+          >
+            <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Needs Review / Failed</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: "var(--danger, #ef4444)" }}>{reviewCount}</div>
+          </div>
+        )}
       </div>
 
       {/* Filters & Search Controls */}
@@ -263,12 +380,13 @@ export default function CreditCardStatementsPage() {
             className="input"
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            style={{ maxWidth: 180 }}
+            style={{ maxWidth: 200 }}
           >
             <option value="all">All Statuses</option>
-            <option value="READY">✓ Ready</option>
-            <option value="LOCKED">🔒 Password Locked</option>
-            <option value="FAILED">⚠ Failed / Review</option>
+            <option value="EXTRACTED">✓ Extracted & Validated</option>
+            <option value="READY">⚡ Ready to Extract</option>
+            <option value="LOCKED">🔒 Needs Unlocking</option>
+            <option value="REVIEW">⚠ Needs Review / Failed</option>
           </select>
         </div>
       </div>
@@ -287,10 +405,10 @@ export default function CreditCardStatementsPage() {
                     <th
                       style={{ cursor: "pointer", userSelect: "none" }}
                       onClick={() => handleSort("account")}
-                      title="Sort by Account / Card"
+                      title="Sort by Account"
                     >
                       <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <span>Account / Card</span>
+                        <span>Account</span>
                         <span style={{ fontSize: "0.75rem", opacity: sortField === "account" ? 1 : 0.3 }}>
                           {sortField === "account" ? (sortDirection === "asc" ? "▲" : "▼") : "⇅"}
                         </span>
@@ -371,17 +489,17 @@ export default function CreditCardStatementsPage() {
                             : (stmt.card_last4 ? `Card ending ${stmt.card_last4}` : stmt.original_filename)}
                         </div>
                       </td>
-                      <td style={{ fontSize: "0.88rem" }}>
+                      <td style={{ fontSize: "0.9rem", fontWeight: 600 }}>
                         {formatPeriod(stmt.statement_period_start, stmt.statement_period_end)}
                       </td>
-                      <td style={{ fontSize: "0.88rem" }}>
+                      <td style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
                         {formatDate(stmt.statement_date)}
                       </td>
                       <td style={{ fontSize: "0.85rem", color: "var(--ink-muted)" }}>
                         {formatDate(stmt.email_received_at || stmt.discovered_at)}
                       </td>
                       <td>
-                        {getStatusBadge(stmt.status)}
+                        {getStatusBadge(stmt.status, stmt.validation_status)}
                       </td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <a
@@ -390,8 +508,8 @@ export default function CreditCardStatementsPage() {
                           rel="noreferrer"
                           className="btn quiet icon-btn"
                           style={{ width: 28, height: 28, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                          title="Download / View Original PDF"
-                          aria-label="Download / View Original PDF"
+                          title="Download original statement as received (Immutable source)"
+                          aria-label="Download original statement as received"
                         >
                           <DownloadIcon size={14} />
                         </a>
@@ -404,8 +522,8 @@ export default function CreditCardStatementsPage() {
                             rel="noreferrer"
                             className="btn quiet icon-btn"
                             style={{ width: 28, height: 28, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-                            title="Download / View Unlocked PDF"
-                            aria-label="Download / View Unlocked PDF"
+                            title="Download password-unlocked PDF copy (Used for extraction)"
+                            aria-label="Download password-unlocked PDF copy"
                           >
                             <DownloadIcon size={14} />
                           </a>

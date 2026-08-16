@@ -89,6 +89,19 @@ def _clean_channel_ref(raw: str) -> str:
 
 
 def extract_axis_channel_ref(text: str) -> str | None:
+    # 1. Explicit 'Transaction Info:' field in Axis alert emails
+    m_info = re.search(r"Transaction\s*Info\s*[:\-]?\s*[\n\r]*\s*([^\n\r\t]+)", text, re.I)
+    if m_info:
+        val = m_info.group(1).strip()
+        val = re.split(
+            r"(?:Available\s+Limit|Total\s+Credit|Date\s*&|Account\s*Number|\.\s+To\s+check|\.\s+If|\.\s+Feel|\s+&nbsp;)",
+            val,
+            flags=re.I,
+        )[0].strip()
+        if val and not val.lower().startswith(("dear ", "inr ", "axis bank")):
+            return _clean_channel_ref(val)
+
+    # 2. General channel pattern (UPI, NEFT, IMPS, RTGS, ACH)
     match = CHANNEL_REF.search(text)
     if not match:
         return None
@@ -336,6 +349,13 @@ class AxisBankParser:
                 }
             )
 
+        desc = subject[:500] if subject else None
+        if channel_ref and (not desc or "Transaction Alert" in desc or "alert" in desc.lower()):
+            desc = f"Transaction Info: {channel_ref}"
+
+        upi_rrn_match = re.search(r"\b(\d{12})\b", channel_ref or "")
+        upi_rrn = upi_rrn_match.group(1) if upi_rrn_match else None
+
         return [
             ParsedTransaction(
                 amount=amount,
@@ -349,10 +369,11 @@ class AxisBankParser:
                 card=extract_card(text),
                 reference_number=channel_ref,
                 bank_reference=channel_ref,
-                description=(subject[:500] or None),
+                description=desc,
                 extra={
                     "parser": self.name,
                     "channel_ref": channel_ref,
+                    "upi_rrn": upi_rrn,
                     **{
                         k: enrichment[k]
                         for k in enrichment

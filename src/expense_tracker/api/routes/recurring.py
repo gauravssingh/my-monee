@@ -114,6 +114,9 @@ def detect_recurring():
 
 @router.post("/subscriptions")
 def create_subscription(body: SubscriptionCreate, session: Session = Depends(db_session)):
+    m_id = body.merchant_id.strip() if body.merchant_id and body.merchant_id.strip() else None
+    c_id = body.category_id.strip() if body.category_id and body.category_id.strip() else None
+
     rt = RecurringTransaction(
         id=str(uuid.uuid4()),
         name=body.name,
@@ -121,35 +124,42 @@ def create_subscription(body: SubscriptionCreate, session: Session = Depends(db_
         frequency=body.billing_frequency,
         expected_day=body.expected_day,
         date_tolerance_days=body.date_tolerance_days,
-        merchant_id=body.merchant_id,
-        category_id=body.category_id,
-        status="active"
+        merchant_id=m_id,
+        category_id=c_id,
+        status="active",
     )
     session.add(rt)
+    session.flush()
+
     sub = Subscription(
         id=str(uuid.uuid4()),
         recurring_transaction_id=rt.id,
         name=body.name,
         amount=body.amount,
         annual_cost=body.annual_cost,
-        status="active"
+        status="active",
     )
     session.add(sub)
     
     if body.transaction_id:
-        link = TransactionRecurringLink(
-            id=str(uuid.uuid4()),
-            transaction_id=body.transaction_id,
-            recurring_transaction_id=rt.id,
-            match_type="manual"
-        )
-        session.add(link)
+        tx = session.get(Transaction, body.transaction_id)
+        if tx:
+            link = TransactionRecurringLink(
+                id=str(uuid.uuid4()),
+                transaction_id=body.transaction_id,
+                recurring_transaction_id=rt.id,
+                match_type="manual",
+            )
+            session.add(link)
         
     session.commit()
     return {"id": rt.id, "subscription_id": sub.id}
 
 @router.post("/bills")
 def create_bill(body: BillCreate, session: Session = Depends(db_session)):
+    m_id = body.merchant_id.strip() if body.merchant_id and body.merchant_id.strip() else None
+    c_id = body.category_id.strip() if body.category_id and body.category_id.strip() else None
+
     rt = RecurringTransaction(
         id=str(uuid.uuid4()),
         name=body.name,
@@ -157,29 +167,33 @@ def create_bill(body: BillCreate, session: Session = Depends(db_session)):
         frequency=body.frequency,
         expected_day=body.expected_day,
         date_tolerance_days=body.date_tolerance_days,
-        merchant_id=body.merchant_id,
-        category_id=body.category_id,
-        status="active"
+        merchant_id=m_id,
+        category_id=c_id,
+        status="active",
     )
     session.add(rt)
+    session.flush()
+
     bill = Bill(
         id=str(uuid.uuid4()),
         recurring_transaction_id=rt.id,
         name=body.name,
         bill_type=body.bill_type,
         autopay=body.autopay,
-        status="active"
+        status="active",
     )
     session.add(bill)
     
     if body.transaction_id:
-        link = TransactionRecurringLink(
-            id=str(uuid.uuid4()),
-            transaction_id=body.transaction_id,
-            recurring_transaction_id=rt.id,
-            match_type="manual"
-        )
-        session.add(link)
+        tx = session.get(Transaction, body.transaction_id)
+        if tx:
+            link = TransactionRecurringLink(
+                id=str(uuid.uuid4()),
+                transaction_id=body.transaction_id,
+                recurring_transaction_id=rt.id,
+                match_type="manual",
+            )
+            session.add(link)
         
     session.commit()
     return {"id": rt.id, "bill_id": bill.id}

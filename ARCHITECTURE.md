@@ -471,6 +471,106 @@ API: `POST /api/transactions/{id}/flag-issue`, `GET /api/data-issues`, `GET /api
 
 ---
 
+---
+
+## 18. Statement Ingestion & Reconciliation Architecture
+
+### Three Core Architectural Principles
+
+1. **PDF is evidence, not the ledger**
+   ```text
+   PDF → Raw Statement → Validated Statement → Reconciliation → Canonical Ledger
+   ```
+   *Never*: `PDF → Ledger`. A statement is an ingestion source and audit document. It does not blindly overwrite or inject into the financial ledger without validation and reconciliation.
+
+2. **One PDF can contain many accounts**
+   ```text
+   Statement Document
+          ├── Statement Account A (e.g. Visa ****0863)
+          ├── Statement Account B (e.g. RuPay ****1221)
+          ├── Statement Summary (Combined Total Due, Min Due, Dates)
+          ├── Statement Sections (Summary, Transactions, Rewards, Fees)
+          └── Statement Transactions (Line items)
+   ```
+   Scapia multi-card statements prove that a single document can cover multiple cards with a single combined billing cycle.
+
+3. **Never infer what the source does not establish**
+   If a combined statement lists transactions without explicit per-card tags, do not fabricate card attribution via AI or heuristics. Represent accurately:
+   `statement_account_id = NULL`, `attribution_status = UNKNOWN`.
+
+---
+
+### Tiered Extraction Architecture & Parser Framework
+
+Extraction primitives are organized into explicit parser strategies rather than assuming one technique fits all banks:
+
+```text
+PDF
+ │
+ ▼
+PyMuPDF
+ │
+ ├── text extraction       → metadata / header / document type classification
+ │
+ ├── find_tables()         → PRIMARY extraction for structured tabular statements (Axis Bank, HDFC, ICICI)
+ │
+ ├── coordinate_rows       → PRIMARY/FALLBACK for multi-card / floating layouts (Scapia)
+ │
+ └── text_blocks           → FALLBACK for text stream statements
+ │
+ ▼
+Quality Check (Fail-Fast Verification)
+ ├── Zero-row trap: If summary indicates activity but 0 rows extracted → EXTRACTION_FAILED
+ └── Layout mismatch: Auto-fallback to next strategy in parser cascade
+ │
+ ▼
+Bank-Specific Normalization & Provenance Tagging
+ │
+ ▼
+Multi-Point Integrity Verification Engine
+ ├── 1. Debits / Withdrawals Equality:   Σ Extracted Debits == Reported Total Withdrawals
+ ├── 2. Credits / Deposits Equality:     Σ Extracted Credits == Reported Total Deposits
+ ├── 3. Step-by-Step Running Balances:   For all i, B[i] == B[i-1] + C[i] - D[i] (N/N step checks)
+ └── 4. Global Balance Equation:         Opening + Deposits - Withdrawals == Closing
+ │
+ ▼
+VALIDATED STATEMENT (Status: VALIDATED / REVIEW_REQUIRED / VALIDATION_FAILED)
+```
+
+---
+
+### Data Model Hierarchy
+
+- **`statement_documents`**: Physical PDF entity, hashes (`original_sha256`, `unlocked_sha256`), file paths, institution, statement type, period dates, parser info, and processing/validation status.
+- **`statement_accounts`**: Accounts/cards declared in the statement (e.g., credit card last4, savings account number, card network, credit limit).
+- **`statement_summaries`**: Exact statement-level figures as stated by the institution (opening/previous balance, payments, purchases, fees, finance charges, total due, minimum due, due date).
+- **`statement_sections`**: Document layout boundaries (`SUMMARY`, `TRANSACTIONS`, `PAYMENTS`, `FEES`, `EMI`, `REWARDS`).
+- **`statement_transactions`**: Extracted line items with strict provenance (`page_number`, `source_row`, `raw_text`, `reference_number`, `attribution_status`).
+
+---
+
+### Statement Validation & Deterministic Arithmetic
+
+Deterministic extraction using PyMuPDF runs first; AI is strictly an optional fallback for unknown layouts and never bypasses validation.
+
+- **Bank Account Arithmetic**: `Opening Balance + Deposits - Withdrawals == Closing Balance`
+- **Credit Card Arithmetic**: `Previous Balance - Payments/Credits + Purchases/Debits + Fees/Interest == Total Due`
+- **Scapia Multi-Card Arithmetic**: `Previous Balance + Transactions - Payments/Refunds == New Balance / Total Due`
+
+Validation thresholds: `EXACT`, `MINOR_DIFFERENCE` (review queue), `MAJOR_DIFFERENCE` (do not import).
+
+---
+
+### Reconciliation & Duplicate Prevention
+
+Statements reconcile against alert-based ledger transactions using composite scoring (Amount 40%, Date proximity 25%, Merchant similarity 20%, Reference match 15%).
+
+- Statements **enrich and verify** existing transactions rather than duplicating expenses.
+- **Credit Card Bill Payments** are categorized as `TRANSFER / LIABILITY_PAYMENT` (Bank Asset Outflow → Credit Card Liability Reduction), strictly preventing double-counting with individual card purchases.
+
+
+---
+
 ## Accuracy Principle
 
 Prefer:
@@ -480,3 +580,4 @@ unknown → ai → user verified → learned rule → high-confidence auto
 ```
 
 Optimize for **classification accuracy**, not AI usage volume.
+
