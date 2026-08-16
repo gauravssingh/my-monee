@@ -37,8 +37,7 @@ Hi Gaurav
     assert tx.merchant_raw == "Telangana E Challan"
     assert tx.account == "43"
     assert tx.reference_number == "922291017537"
-    assert tx.extra["category_slug"] == "car"
-    assert tx.extra["subcategory_slug"] == "fines"
+    assert tx.extra["needs_review"] is True
 
 
 def test_phonepe_gas_bill_parsing():
@@ -68,8 +67,7 @@ Provider : Bhagyanagar Gas Limited
     assert tx.merchant_raw == "Bhagyanagar Gas Limited"
     assert tx.account == "801022"
     assert tx.reference_number == "181829717197"
-    assert tx.extra["category_slug"] == "utilities"
-    assert tx.extra["subcategory_slug"] == "gas"
+    assert tx.extra["needs_review"] is True
 
 
 def test_phonepe_autopay_reminder_ignored():

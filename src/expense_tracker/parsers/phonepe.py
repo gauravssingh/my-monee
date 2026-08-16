@@ -84,38 +84,13 @@ class PhonePeParser:
                 if raw_val:
                     merchant_raw = raw_val
 
-        if not merchant_raw:
-            merchant_raw = "PhonePe"
-
-        # 5. Extract Category and map to internal taxonomy
-        m_cat = re.search(r"Category\s*:\s*([^\n\r]+?)(?:\s+Provider|\s+Hi|\s*$)", text, re.I)
-        raw_category = m_cat.group(1).strip().lower() if m_cat else ""
-        
-        category_slug = "utilities"
-        subcategory_slug = None
-        if "gas" in raw_category or "gas" in merchant_raw.lower():
-            category_slug = "utilities"
-            subcategory_slug = "gas"
-        elif "fastag" in raw_category or "fastag" in merchant_raw.lower():
-            category_slug = "car"
-            subcategory_slug = "fastag"
-        elif "challan" in raw_category or "challan" in merchant_raw.lower():
-            category_slug = "car"
-            subcategory_slug = "fines"
-        elif "dth" in raw_category or "mobile" in raw_category or "recharge" in subject.lower():
-            category_slug = "utilities"
-            subcategory_slug = "mobile"
-        elif "electricity" in raw_category:
-            category_slug = "utilities"
-            subcategory_slug = "electricity"
-
-        # 6. Extract Bank Account last digits
+        # 5. Extract Bank Account last digits
         account: str | None = None
         m_acc = re.search(r"Bank Account\s*:\s*X*(\d{2,6})", text, re.I)
         if m_acc:
             account = m_acc.group(1)
 
-        # 7. Extract Reference Numbers
+        # 6. Extract Reference Numbers
         bank_ref: str | None = None
         m_bank_ref = re.search(r"Bank Ref\. No\.\s*:\s*([A-Za-z0-9]+)", text, re.I)
         if m_bank_ref:
@@ -128,6 +103,7 @@ class PhonePeParser:
 
         reference_number = bank_ref or txn_id
 
+        # 7. Leave category taxonomy to normal review / learned merchant rules
         return [
             ParsedTransaction(
                 amount=amount,
@@ -147,12 +123,7 @@ class PhonePeParser:
                     "parser": self.name,
                     "provider": merchant_raw,
                     "phonepe_txn_id": txn_id,
-                    "category_slug": category_slug,
-                    "subcategory_slug": subcategory_slug,
-                    "classification_source": "rule",
-                    "classification_confidence": 0.95,
-                    "classification_signals": {"rule": "phonepe_receipt", "category": raw_category or "bill"},
-                    "needs_review": False,
+                    "needs_review": True,
                     "is_transfer": False,
                     "is_refund": False,
                     "excludes_from_spending": False,
