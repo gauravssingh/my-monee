@@ -62,6 +62,9 @@ exclude_sender_patterns:
   - ".*@bookmyshow\\.email"
   - "no-reply@razorpay\\.com"
   - ".*@razorpay\\.com"
+  - "order-update@amazon\\.in"
+  - "return@amazon\\.in"
+
 
 
 
