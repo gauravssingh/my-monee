@@ -71,6 +71,18 @@ exclude_sender_patterns:
   - "sales@shopershop\\.in"
   - ".*@vesta\\.threadloom\\.news"
   - ".*@cleartax\\.in"
+  - ".*@magicbricks\\.com"
+  - ".*@mail-in\\.bosch-home\\.com"
+  - "CUSTOMER\\.SERVICE@hdfcbank\\.bank\\.in"
+  - ".*@amazonpay\\.in"
+  - "payments-update@amazon\\.in"
+  - ".*@jio\\.com"
+  - ".*@nobrokerhood\\.com"
+  - ".*@mygateliving\\.in"
+  - ".*@ixigo\\.com"
+  - ".*@customer\\.goindigo\\.in"
+  - ".*@irctc\\.co\\.in"
+
 
 
 
