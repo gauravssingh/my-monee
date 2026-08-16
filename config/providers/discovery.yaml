@@ -60,6 +60,9 @@ exclude_sender_patterns:
   - ".*@bigbasket\\.com"
   - "tickets@bookmyshow\\.email"
   - ".*@bookmyshow\\.email"
+  - "no-reply@razorpay\\.com"
+  - ".*@razorpay\\.com"
+
 
 
 
