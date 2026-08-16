@@ -198,6 +198,8 @@ class AxisBankParser:
         subject = email.subject or ""
         if not AXIS_SENDER.search(sender):
             return 0.0
+        if re.search(r"statements@|cc\.statements@", sender, re.I) or "statement" in subject.lower():
+            return 0.0  # Handled exclusively by Statement Vault, never as raw email txs
         text = combined_text(email.subject, email.body_text, email.body_html)
         if is_axis_declined_alert(subject, text):
             return 0.98

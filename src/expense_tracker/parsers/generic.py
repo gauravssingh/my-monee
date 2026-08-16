@@ -17,11 +17,17 @@ from expense_tracker.parsers.extract import (
 )
 
 
+import re
+
 class GenericHeuristicParser:
     name = "generic_heuristic"
     priority = 10
 
     def can_parse(self, email: EmailContext) -> float:
+        sender = email.sender or ""
+        subject = email.subject or ""
+        if re.search(r"statements@|cc\.statements@", sender, re.I) or "statement" in subject.lower():
+            return 0.0  # Handled exclusively by Statement Vault, never as raw email txs
         text = combined_text(email.subject, email.body_text, email.body_html)
         amounts = parse_all_amounts(text)
         if not amounts:
