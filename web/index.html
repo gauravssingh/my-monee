@@ -16,6 +16,17 @@
       href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem("mymonee_theme");
+          var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var theme = saved === "dark" || (saved === "system" && systemDark) || (!saved && systemDark) ? "dark" : "light";
+          document.documentElement.setAttribute("data-theme", theme);
+          document.documentElement.style.colorScheme = theme;
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

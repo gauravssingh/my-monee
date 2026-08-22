@@ -43,6 +43,68 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+:root[data-theme="dark"] {
+  /* Dark Mode Surfaces */
+  --bg: #0d1117;
+  --surface: #161b22;
+  --panel: #1e242d;
+  --panel-solid: #1e242d;
+  --line: #2e3642;
+
+  /* Typography */
+  --ink: #f0f3f6;
+  --ink-muted: #8b949e;
+
+  /* Brand / interaction */
+  --accent: #a78bfa;
+  --accent-hover: #c4b5fd;
+  --accent-soft: rgba(167, 139, 250, 0.16);
+
+  /* Financial semantics */
+  --debit: #f87171;
+  --debit-soft: rgba(248, 113, 113, 0.16);
+
+  --credit: #34d399;
+  --credit-soft: rgba(52, 211, 153, 0.16);
+
+  --warn: #fbbf24;
+  --warn-soft: rgba(251, 191, 36, 0.16);
+
+  --danger: #f87171;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Dark Mode Surfaces */
+    --bg: #0d1117;
+    --surface: #161b22;
+    --panel: #1e242d;
+    --panel-solid: #1e242d;
+    --line: #2e3642;
+
+    /* Typography */
+    --ink: #f0f3f6;
+    --ink-muted: #8b949e;
+
+    /* Brand / interaction */
+    --accent: #a78bfa;
+    --accent-hover: #c4b5fd;
+    --accent-soft: rgba(167, 139, 250, 0.16);
+
+    /* Financial semantics */
+    --debit: #f87171;
+    --debit-soft: rgba(248, 113, 113, 0.16);
+
+    --credit: #34d399;
+    --credit-soft: rgba(52, 211, 153, 0.16);
+
+    --warn: #fbbf24;
+    --warn-soft: rgba(251, 191, 36, 0.16);
+
+    --danger: #f87171;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

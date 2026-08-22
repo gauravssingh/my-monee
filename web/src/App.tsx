@@ -9,6 +9,7 @@ import RecurringPage from "./pages/RecurringPage";
 import AccountsPage from "./pages/AccountsPage";
 import CreditCardStatementsPage from "./pages/CreditCardStatementsPage";
 import LockScreen from "./components/LockScreen";
+import ThemeToggle from "./components/ThemeToggle";
 import { api } from "./api";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -190,10 +191,12 @@ export default function App() {
               <circle cx="12" cy="12" r="3" />
             </svg>
           </NavLink>
+          <ThemeToggle />
         </nav>
 
         {/* Mobile Navigation Controls */}
-        <div className="mobile-nav-controls">
+        <div className="mobile-nav-controls" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <ThemeToggle />
           <NavLink
             to="/settings"
             title="Settings"
