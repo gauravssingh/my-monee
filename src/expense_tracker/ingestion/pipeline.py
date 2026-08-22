@@ -386,6 +386,15 @@ def _persist_parsed(
     
     # Ledger integration
     acc = _get_or_create_account(session, parsed)
+    if acc:
+        if acc.card_last4:
+            tx.account = f"{acc.name} (XX{acc.card_last4})"
+        elif acc.account_number_masked:
+            num = acc.account_number_masked
+            num_str = f"XX{num}" if not num.startswith("XX") else num
+            tx.account = f"{acc.name} ({num_str})"
+        else:
+            tx.account = acc.name
     
     event = FinancialEvent(
         event_type="purchase" if parsed.direction == "debit" else "deposit",
@@ -395,6 +404,7 @@ def _persist_parsed(
     )
     session.add(event)
     session.flush()
+    tx.financial_event_id = event.id
     
     session.add(Posting(
         event_id=event.id,
@@ -403,8 +413,6 @@ def _persist_parsed(
         direction=parsed.direction,
         posting_type="asset_decrease" if parsed.direction == "debit" else "asset_increase"
     ))
-    
-    tx.financial_event_id = event.id
     
     session.add(tx)
     session.flush()

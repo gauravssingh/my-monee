@@ -1174,24 +1174,70 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                       </td>
 
                       {/* Category & Subcategory + Quick Edit Button */}
-                      <td style={{ paddingRight: 12 }}>
+                      <td style={{ minWidth: 160, maxWidth: 240, paddingRight: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
-                          <div>
-                            <div style={{ fontWeight: 500, fontSize: "0.88rem", color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
-                              {tx.category ? (
-                                <>
-                                  <span style={{ fontSize: "0.95rem", lineHeight: 1 }} aria-hidden="true">
+                          <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                            {tx.category ? (
+                              <>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontWeight: 600,
+                                    fontSize: "14px",
+                                    color: "var(--ink)",
+                                    lineHeight: 1.25,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      width: 20,
+                                      minWidth: 20,
+                                      fontSize: "14px",
+                                      lineHeight: 1,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      flexShrink: 0,
+                                    }}
+                                    aria-hidden="true"
+                                  >
                                     {getCategoryIcon(tx.category)}
                                   </span>
-                                  <span>{tx.category}</span>
-                                </>
-                              ) : (
-                                <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>
-                              )}
-                            </div>
-                            {tx.subcategory && (
-                              <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 1, paddingLeft: tx.category ? 22 : 0 }}>
-                                {tx.subcategory}
+                                  <span
+                                    style={{
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                    title={tx.category}
+                                  >
+                                    {tx.category}
+                                  </span>
+                                </div>
+                                {tx.subcategory && (
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      color: "var(--ink-muted)",
+                                      fontWeight: 400,
+                                      marginTop: 1,
+                                      paddingLeft: 26,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                      lineHeight: 1.2,
+                                    }}
+                                    title={tx.subcategory}
+                                  >
+                                    {tx.subcategory}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div style={{ color: "var(--ink-muted)", fontSize: "14px", fontWeight: 400 }}>
+                                Uncategorized
                               </div>
                             )}
                           </div>
@@ -1200,8 +1246,8 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                               type="button"
                               className="btn quiet icon-btn"
                               style={{
-                                width: 26,
-                                height: 26,
+                                width: 24,
+                                height: 24,
                                 padding: 0,
                                 display: "inline-flex",
                                 alignItems: "center",
@@ -1210,6 +1256,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                                 border: "1px solid var(--line)",
                                 borderRadius: "var(--radius-sm)",
                                 flexShrink: 0,
+                                opacity: 0.5,
                               }}
                               title={`Modify classification for ${merchant}`}
                               aria-label={`Modify classification for ${merchant}`}
@@ -1218,7 +1265,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                                 openClassify([tx]);
                               }}
                             >
-                              <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" focusable="false">
+                              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true" focusable="false">
                                 <path
                                   fill="none"
                                   stroke="currentColor"

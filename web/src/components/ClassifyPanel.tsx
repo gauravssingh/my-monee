@@ -91,7 +91,7 @@ export default function ClassifyPanel({
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
-        style={{ display: "flex", flexDirection: "column", height: "min(760px, 86dvh)", maxHeight: "86dvh" }}
+        style={{ display: "flex", flexDirection: "column", maxHeight: "86dvh" }}
       >
         <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
 
@@ -118,7 +118,7 @@ export default function ClassifyPanel({
           </div>
         </header>
 
-        <div className="modal-body classify-panel-body" style={{ overflowY: "auto", flex: 1, WebkitOverflowScrolling: "touch" }}>
+        <div className="modal-body classify-panel-body" style={{ overflowY: "auto", flex: "1 1 auto", WebkitOverflowScrolling: "touch" }}>
           <section className="classify-preview">
             <h3 className="classify-section-title">Selected</h3>
             <ul className="classify-preview-list">
@@ -180,27 +180,30 @@ export default function ClassifyPanel({
                 background: "var(--accent-soft)",
                 borderRadius: "var(--radius)",
                 border: "1px solid var(--accent)",
+                marginBottom: "16px",
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: "1rem" }}>✨</span>
-                  <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    Suggested Category
+                  <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Suggested
                   </span>
                 </div>
                 <span style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 500 }}>
-                  {Math.round(aiSuggestion.confidence * 100)}% confidence
+                  {Math.round(aiSuggestion.confidence * 100)}% confident
                 </span>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                 <div>
-                  <div style={{ fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6, fontSize: "0.95rem" }}>
                     <span aria-hidden="true">{getCategoryIcon(aiSuggestion.category_name)}</span>
                     <span>
                       {aiSuggestion.category_name}
-                      {aiSuggestion.subcategory_name && ` › ${aiSuggestion.subcategory_name}`}
+                      {aiSuggestion.subcategory_name && (
+                        <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}> › {aiSuggestion.subcategory_name}</span>
+                      )}
                     </span>
                   </div>
                   {aiSuggestion.signals.length > 0 && (
@@ -212,15 +215,17 @@ export default function ClassifyPanel({
                 <button
                   type="button"
                   className="btn primary"
-                  style={{ padding: "6px 12px", fontSize: "0.82rem", whiteSpace: "nowrap" }}
+                  style={{ padding: "6px 14px", fontSize: "0.82rem", whiteSpace: "nowrap" }}
                   onClick={() => {
                     setCategoryId(aiSuggestion.category_id);
                     if (aiSuggestion.subcategory_id) {
                       setSubcategoryId(aiSuggestion.subcategory_id);
+                    } else {
+                      setSubcategoryId("");
                     }
                   }}
                 >
-                  Apply
+                  Use suggestion
                 </button>
               </div>
             </section>
@@ -232,107 +237,166 @@ export default function ClassifyPanel({
             </p>
           )}
 
-          <section className="classify-categories">
-            <h3 className="classify-section-title">Category</h3>
-            <div className="classify-chip-grid" role="listbox" aria-label="Categories">
-              {categories.map((cat) => {
-                const active = cat.id === categoryId;
-                return (
+          {/* Progressive Disclosure Category Picker */}
+          {selectedCategory ? (
+            <>
+              {/* Category Selected Breadcrumb State */}
+              <section className="classify-categories" style={{ marginBottom: "16px" }}>
+                <h3 className="classify-section-title" style={{ marginBottom: 6 }}>Category</h3>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    background: "var(--surface)",
+                    border: "1px solid var(--accent, #7c3aed)",
+                    borderRadius: "var(--radius-sm)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, fontSize: "0.95rem", color: "var(--ink)" }}>
+                    <span style={{ color: "var(--accent)", fontWeight: 700 }}>✓</span>
+                    <span aria-hidden="true" style={{ fontSize: "1.05rem", lineHeight: 1 }}>
+                      {getCategoryIcon(selectedCategory.name, selectedCategory.expense_type)}
+                    </span>
+                    <span>{selectedCategory.name}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn quiet"
+                    onClick={() => {
+                      setCategoryId("");
+                      setSubcategoryId("");
+                    }}
+                    style={{
+                      fontSize: "0.84rem",
+                      padding: "4px 10px",
+                      color: "var(--accent)",
+                      fontWeight: 600,
+                      height: "auto",
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    Change
+                  </button>
+                </div>
+              </section>
+
+              {/* Subcategory Picker */}
+              <section className="classify-subcategories" style={{ marginBottom: "16px" }}>
+                <h3 className="classify-section-title" style={{ marginBottom: 6 }}>Subcategory</h3>
+                {selectedCategory.subcategories.length > 0 ? (
+                  <div className="classify-chip-grid" role="listbox" aria-label="Subcategories">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={subcategoryId === ""}
+                      className={`classify-chip${subcategoryId === "" ? " active" : ""}`}
+                      onClick={() => setSubcategoryId("")}
+                    >
+                      {subcategoryId === "" && <span style={{ marginRight: 5 }}>✓</span>}
+                      None
+                    </button>
+                    {selectedCategory.subcategories.map((sub) => {
+                      const active = sub.id === subcategoryId;
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          className={`classify-chip${active ? " active" : ""}`}
+                          onClick={() => setSubcategoryId(sub.id)}
+                        >
+                          {active && <span style={{ marginRight: 5 }}>✓</span>}
+                          {sub.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="metric-hint" style={{ margin: 0, fontSize: "0.84rem" }}>
+                    No specific subcategories for {selectedCategory.name}.
+                  </p>
+                )}
+              </section>
+            </>
+          ) : (
+            /* Initial State: Full Category Grid */
+            <section className="classify-categories" style={{ marginBottom: "16px" }}>
+              <h3 className="classify-section-title" style={{ marginBottom: 8 }}>Category</h3>
+              <div className="classify-chip-grid" role="listbox" aria-label="Categories">
+                {categories.map((cat) => (
                   <button
                     key={cat.id}
                     type="button"
                     role="option"
-                    aria-selected={active}
-                    className={`classify-chip${active ? " active" : ""}`}
+                    aria-selected={false}
+                    className="classify-chip"
                     onClick={() => {
                       setCategoryId(cat.id);
                       setSubcategoryId("");
                     }}
                   >
-                    <span aria-hidden="true">{getCategoryIcon(cat.name, cat.expense_type)}</span>
+                    <span aria-hidden="true" style={{ marginRight: 6 }}>
+                      {getCategoryIcon(cat.name, cat.expense_type)}
+                    </span>
                     <span>{cat.name}</span>
                   </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {selectedCategory && selectedCategory.subcategories.length > 0 && (
-            <section className="classify-subcategories">
-              <h3 className="classify-section-title">{selectedCategory.name} subcategories</h3>
-              <div className="classify-chip-grid" role="listbox" aria-label="Subcategories">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={subcategoryId === ""}
-                  className={`classify-chip${subcategoryId === "" ? " active" : ""}`}
-                  onClick={() => setSubcategoryId("")}
-                >
-                  None
-                </button>
-                {selectedCategory.subcategories.map((sub) => {
-                  const active = sub.id === subcategoryId;
-                  return (
-                    <button
-                      key={sub.id}
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      className={`classify-chip${active ? " active" : ""}`}
-                      onClick={() => setSubcategoryId(sub.id)}
-                    >
-                      {sub.name}
-                    </button>
-                  );
-                })}
+                ))}
               </div>
             </section>
           )}
 
-          <section className="classify-exclude">
-            <h3 className="classify-section-title">Not a transaction?</h3>
-            <p className="metric-hint">
-              Use this when the email is not a real bank/UPI transaction. Removes it from Needs
-              Review, keeps it out of spending totals, and skips it on later syncs.
-            </p>
-            <button
-              className={`btn classify-exclude-btn${excludeArmed ? " confirm-armed" : ""}`}
-              type="button"
-              disabled={saving}
-              onClick={triggerExclude}
-            >
-              {saving
-                ? "Saving…"
-                : excludeArmed
-                  ? "Click again to confirm"
-                  : count === 1
-                    ? "Exclude — not a valid transaction email"
-                    : `Exclude ${count} — not valid transaction emails`}
-            </button>
-          </section>
+          <section style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px solid var(--line)" }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
+              Other Actions
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                className={`btn quiet${excludeArmed ? " confirm-armed" : ""}`}
+                type="button"
+                disabled={saving}
+                onClick={triggerExclude}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "6px 12px",
+                  height: "36px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: excludeArmed ? "var(--debit, #ef4444)" : "var(--ink-muted)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+                title="Exclude: not a valid bank or transaction email. Clears from Needs Review and ignores from spending."
+              >
+                <span>🚫</span>
+                <span>{excludeArmed ? "Confirm: Not a transaction" : "Not a transaction"}</span>
+              </button>
 
-          <section className="classify-exclude">
-            <h3 className="classify-section-title">Reimbursement?</h3>
-            <p className="metric-hint">
-              Covers both sides: a purchase you fronted for someone else (debit), or the payment
-              they sent back to repay you (credit). Either way it's real money movement, but it's
-              not your spending or income — it stays on the ledger, excluded from both totals, and
-              clears Needs Review.
-            </p>
-            <button
-              className={`btn classify-exclude-btn${reimburseArmed ? " confirm-armed" : ""}`}
-              type="button"
-              disabled={saving}
-              onClick={triggerReimburse}
-            >
-              {saving
-                ? "Saving…"
-                : reimburseArmed
-                  ? "Click again to confirm"
-                  : count === 1
-                    ? "Exclude — this is a reimbursement"
-                    : `Exclude ${count} — reimbursements`}
-            </button>
+              <button
+                className={`btn quiet${reimburseArmed ? " confirm-armed" : ""}`}
+                type="button"
+                disabled={saving}
+                onClick={triggerReimburse}
+                style={{
+                  fontSize: "0.82rem",
+                  padding: "6px 12px",
+                  height: "36px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: reimburseArmed ? "var(--credit, #10b981)" : "var(--ink-muted)",
+                  border: "1px solid var(--line)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+                title="Exclude: purchase fronted or repayment received. Excluded from spending and clears Needs Review."
+              >
+                <span>🤝</span>
+                <span>{reimburseArmed ? "Confirm: Reimbursement" : "Reimbursement"}</span>
+              </button>
+            </div>
           </section>
 
           {error && <p className="error">{error}</p>}

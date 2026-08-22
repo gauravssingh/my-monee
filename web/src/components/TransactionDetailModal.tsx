@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { type Transaction } from "../api";
 import { formatDate, formatMoney, formatSource } from "../format";
+import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { getCategoryIcon } from "../utils/categoryIcons";
 import { openInGmail } from "../utils/gmail";
 
@@ -23,6 +24,10 @@ export default function TransactionDetailModal({
   onMarkRecurring,
   onFlagIssue,
 }: Props) {
+  const isVisible = open && Boolean(transaction);
+  useModalChrome(isVisible, onClose);
+  const onBackdropClick = useBackdropClose(isVisible, onClose);
+
   if (!open || !transaction) return null;
 
   const isCredit = transaction.direction === "credit";
@@ -30,7 +35,7 @@ export default function TransactionDetailModal({
   const rawMerchant = transaction.merchant_raw;
 
   return createPortal(
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={onBackdropClick}>
       <div
         className="modal-panel transaction-detail-modal"
         role="dialog"
@@ -40,30 +45,73 @@ export default function TransactionDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Strip */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-          <div>
-            <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px" }}>
+          <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
               Transaction Details
             </div>
-            <h2 id="tx-detail-title" style={{ margin: 0, fontSize: "1.35rem", wordBreak: "break-word", lineHeight: 1.25 }}>
+            <h2
+              id="tx-detail-title"
+              style={{
+                margin: 0,
+                fontSize: "22px",
+                fontWeight: 600,
+                lineHeight: 1.25,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "380px",
+              }}
+              title={merchant}
+            >
               {merchant}
             </h2>
-            <div style={{ fontSize: "0.85rem", color: "var(--ink-muted)", marginTop: 4 }}>
+            <div style={{ fontSize: "13px", color: "var(--ink-muted)", marginTop: 4 }}>
               {formatDate(transaction.transaction_date)}
             </div>
           </div>
-          <button
-            type="button"
-            className="btn quiet"
-            onClick={onClose}
-            aria-label="Close"
-            style={{ fontSize: "1.2rem", padding: "4px 8px", lineHeight: 1 }}
-          >
-            ×
-          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {transaction.source_email_id && (
+              <button
+                type="button"
+                className="btn quiet"
+                onClick={() => {
+                  if (onViewEmail) {
+                    onViewEmail(transaction);
+                  } else if (transaction.source_email_id) {
+                    openInGmail(transaction.source_email_id);
+                  }
+                }}
+                style={{
+                  fontSize: "13px",
+                  color: "var(--ink-muted)",
+                  padding: "4px 8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  fontWeight: 500,
+                }}
+                title="View source notification email"
+              >
+                <span style={{ fontSize: "14px" }}>✉</span>
+                <span>Email</span>
+                <span style={{ fontSize: "11px", opacity: 0.8 }}>↗</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn quiet"
+              onClick={onClose}
+              aria-label="Close"
+              style={{ fontSize: "1.25rem", padding: "4px 8px", lineHeight: 1 }}
+            >
+              ×
+            </button>
+          </div>
         </div>
 
-        {/* Amount Hero Banner */}
+        {/* Amount & Classification Banner */}
         <div
           style={{
             padding: "14px 18px",
@@ -77,15 +125,16 @@ export default function TransactionDetailModal({
           }}
         >
           <div>
-            <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", fontWeight: 500 }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, letterSpacing: "0.04em" }}>
               {isCredit ? "INFLOW / CREDIT" : "OUTFLOW / DEBIT"}
             </div>
             <div
               style={{
-                fontSize: "1.65rem",
+                fontSize: "24px",
                 fontWeight: 700,
                 fontVariantNumeric: "tabular-nums",
                 color: isCredit ? "var(--credit)" : "var(--debit)",
+                marginTop: 2,
               }}
             >
               {isCredit ? "+" : "−"}
@@ -94,80 +143,93 @@ export default function TransactionDetailModal({
           </div>
           <div>
             {transaction.needs_review ? (
-              <span className="badge review" style={{ fontSize: "0.82rem", padding: "4px 10px" }}>
-                Needs Review
+              <span className="badge review" style={{ fontSize: "12px", padding: "4px 9px", fontWeight: 600 }}>
+                ⚠ Needs Review
               </span>
             ) : (
-              <span className="badge ok" style={{ fontSize: "0.82rem", padding: "4px 10px" }}>
-                ✓ Classification OK
+              <span className="badge ok" style={{ fontSize: "12px", padding: "4px 9px", fontWeight: 600 }}>
+                ✓ Classified
               </span>
             )}
           </div>
         </div>
 
         {/* Structured Field Grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "20px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 14px", marginBottom: "20px" }}>
           <div>
-            <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
               Category
             </div>
-            <div style={{ fontWeight: 600, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                fontSize: "14px",
+                lineHeight: 1.4,
+                display: "flex",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "6px",
+                color: "var(--ink)",
+              }}
+            >
               {transaction.category ? (
                 <>
-                  <span style={{ fontSize: "1rem", lineHeight: 1 }} aria-hidden="true">
+                  <span style={{ fontSize: "15px", lineHeight: 1, display: "inline-flex", alignItems: "center" }} aria-hidden="true">
                     {getCategoryIcon(transaction.category)}
                   </span>
-                  <span>{transaction.category}</span>
+                  <span style={{ fontWeight: 600 }}>{transaction.category}</span>
+                  {transaction.subcategory && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ color: "var(--ink-muted)", fontWeight: 400, fontSize: "13px" }}>→</span>
+                      <span style={{ fontWeight: 500, color: "var(--ink)" }}>{transaction.subcategory}</span>
+                    </span>
+                  )}
                 </>
               ) : (
-                <span>Uncategorized</span>
-              )}
-              {transaction.subcategory && (
-                <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>→ {transaction.subcategory}</span>
+                <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>Uncategorized</span>
               )}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
-              Account / Payment Method
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+              Account
             </div>
-            <div style={{ fontWeight: 600, fontSize: "0.92rem" }}>
-              {transaction.account || <span style={{ color: "var(--ink-muted)" }}>Unknown / Unlinked</span>}
+            <div style={{ fontWeight: 600, fontSize: "14px", lineHeight: 1.4 }}>
+              {transaction.account || <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>Unknown / Unlinked</span>}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
               Classification Source
             </div>
-            <div style={{ fontSize: "0.88rem", color: "var(--ink)" }}>
+            <div style={{ fontSize: "14px", color: "var(--ink)", lineHeight: 1.4, fontWeight: 500 }}>
               {formatSource(transaction.classification_source)}
             </div>
           </div>
 
           <div>
-            <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
               Transaction Type
             </div>
-            <div style={{ fontSize: "0.88rem", textTransform: "capitalize", color: "var(--ink)" }}>
+            <div style={{ fontSize: "14px", textTransform: "capitalize", color: "var(--ink)", lineHeight: 1.4, fontWeight: 500 }}>
               {transaction.transaction_type || "Purchase"}
             </div>
           </div>
         </div>
 
-        {/* Raw Merchant / Description */}
+        {/* Raw Bank Notification / Description */}
         <div style={{ marginBottom: "24px" }}>
-          <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+          <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
             Raw Bank Notification / Description
           </div>
           <div
             style={{
-              padding: "10px 12px",
+              padding: "10px 14px",
               background: "var(--surface-muted, rgba(0,0,0,0.02))",
               border: "1px solid var(--line)",
               borderRadius: "var(--radius-sm)",
-              fontSize: "0.84rem",
+              fontSize: "13px",
               lineHeight: 1.45,
               color: "var(--ink)",
               wordBreak: "break-word",
@@ -192,68 +254,42 @@ export default function TransactionDetailModal({
             paddingTop: "16px",
           }}
         >
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {transaction.source_email_id && onViewEmail && (
-              <button
-                type="button"
-                className="btn"
-                onClick={() => onViewEmail(transaction)}
-                style={{ fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5 }}
-              >
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                  <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z"/>
-                </svg>
-                View Email
-              </button>
-            )}
-            {transaction.source_email_id && (
-              <button
-                type="button"
-                className="btn quiet"
-                onClick={() => openInGmail(transaction.source_email_id!)}
-                style={{ fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 5 }}
-                title="Launch native Gmail app on iOS/mobile or open web thread"
-              >
-                <span>Gmail App</span>
-                <span style={{ fontSize: "0.74rem" }}>↗</span>
-              </button>
-            )}
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
             {onMarkRecurring && (
               <button
                 type="button"
-                className="btn"
+                className="btn quiet"
                 onClick={() => onMarkRecurring(transaction)}
-                style={{ fontSize: "0.82rem" }}
+                style={{ fontSize: "0.82rem", height: "36px", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 5 }}
               >
-                ↻ Mark Recurring
+                <span>↻</span>
+                <span>Recurring</span>
               </button>
             )}
             {onFlagIssue && (
               <button
                 type="button"
-                className="btn"
+                className="btn quiet"
                 onClick={() => onFlagIssue(transaction)}
-                style={{ fontSize: "0.82rem" }}
+                style={{ fontSize: "0.82rem", height: "36px", padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 5 }}
               >
-                ⚑ Flag Issue
+                <span>⚑</span>
+                <span>Flag issue</span>
               </button>
             )}
           </div>
 
-          <div style={{ display: "flex", gap: "8px", marginLeft: "auto" }}>
+          <div style={{ marginLeft: "auto" }}>
             {onClassify && (
               <button
                 type="button"
                 className="btn primary"
                 onClick={() => onClassify(transaction)}
-                style={{ fontSize: "0.84rem" }}
+                style={{ fontSize: "0.84rem", height: "36px", padding: "0 16px" }}
               >
                 Reclassify →
               </button>
             )}
-            <button type="button" className="btn quiet" onClick={onClose} style={{ fontSize: "0.84rem" }}>
-              Close
-            </button>
           </div>
         </div>
       </div>
