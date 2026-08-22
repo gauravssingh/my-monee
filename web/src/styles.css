@@ -1,32 +1,35 @@
 :root {
-  /* Surfaces */
-  --bg: #eff1f2;
-  --surface: #f7f8f8;
-  --panel: var(--surface);
-  --panel-solid: var(--surface);
-  --line: #d8dbde;
+  /* Surfaces (Page -> Card -> Modal) */
+  --bg: #F1F3F4;
+  --surface: #FFFFFF;
+  --panel: #FFFFFF;
+  --line: #D9DDE1;
 
   /* Typography */
-  --ink: #1b1d22;
-  --ink-muted: #6b707a;
+  --ink: #1B1D22;
+  --ink-muted: #6B707A;
 
-  /* Brand / interaction */
-  --accent: #4b2e58;
-  --accent-hover: #3b2245;
-  --accent-soft: rgba(75, 46, 88, 0.1);
-  --accent-ink: #ffffff;
+  /* Brand / Interaction (Unified Plum Identity) */
+  --accent: #4B2E58;
+  --accent-hover: #3B2245;
+  --accent-soft: rgba(75, 46, 88, 0.10);
+  --accent-ink: #FFFFFF;
 
-  /* Financial semantics */
-  --debit: #a5333b;
-  --debit-soft: rgba(165, 51, 59, 0.1);
+  /* Financial Semantics (Money Movement) */
+  --debit: #A5333B;
+  --debit-soft: rgba(165, 51, 59, 0.10);
+  --credit: #2F6D4F;
+  --credit-soft: rgba(47, 109, 79, 0.10);
 
-  --credit: #2f6d4f;
-  --credit-soft: rgba(47, 109, 79, 0.1);
+  /* System Status (Verification, Reconciliation, System state) */
+  --success: #287A55;
+  --success-soft: rgba(40, 122, 85, 0.10);
+  --warn: #8A5A12;
+  --warn-soft: rgba(138, 90, 18, 0.10);
 
-  --warn: #8a5a12;
-  --warn-soft: rgba(138, 90, 18, 0.12);
-
-  --danger: #a5333b;
+  /* Destructive Actions */
+  --danger: #B42318;
+  --danger-soft: rgba(180, 35, 24, 0.10);
 
   /* Geometry */
   --radius: 8px;
@@ -46,65 +49,71 @@
 
 :root[data-theme="dark"] {
   /* Dark Mode Surfaces */
-  --bg: #0d1117;
-  --surface: #161b22;
-  --panel: #1e242d;
-  --panel-solid: #1e242d;
-  --line: #2e3642;
+  --bg: #0D1117;
+  --surface: #161B22;
+  --panel: #1E242D;
+  --line: #2E3642;
 
   /* Typography */
-  --ink: #f0f3f6;
-  --ink-muted: #8b949e;
+  --ink: #F0F3F6;
+  --ink-muted: #8B949E;
 
-  /* Brand / interaction (high contrast vivid purple) */
-  --accent: #7c3aed;
-  --accent-hover: #6d28d9;
-  --accent-soft: rgba(124, 58, 237, 0.2);
-  --accent-ink: #ffffff;
+  /* Brand / Interaction (Light Plum with Dark Plum Ink) */
+  --accent: #A77BB5;
+  --accent-hover: #B98CC7;
+  --accent-soft: rgba(167, 123, 181, 0.16);
+  --accent-ink: #1B1220;
 
-  /* Financial semantics */
-  --debit: #f87171;
+  /* Financial Semantics */
+  --debit: #F87171;
   --debit-soft: rgba(248, 113, 113, 0.16);
-
-  --credit: #34d399;
+  --credit: #34D399;
   --credit-soft: rgba(52, 211, 153, 0.16);
 
-  --warn: #fbbf24;
+  /* System Status */
+  --success: #34D399;
+  --success-soft: rgba(52, 211, 153, 0.16);
+  --warn: #FBBF24;
   --warn-soft: rgba(251, 191, 36, 0.16);
 
-  --danger: #f87171;
+  /* Destructive Actions */
+  --danger: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.16);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     /* Dark Mode Surfaces */
-    --bg: #0d1117;
-    --surface: #161b22;
-    --panel: #1e242d;
-    --panel-solid: #1e242d;
-    --line: #2e3642;
+    --bg: #0D1117;
+    --surface: #161B22;
+    --panel: #1E242D;
+    --line: #2E3642;
 
     /* Typography */
-    --ink: #f0f3f6;
-    --ink-muted: #8b949e;
+    --ink: #F0F3F6;
+    --ink-muted: #8B949E;
 
-    /* Brand / interaction */
-    --accent: #7c3aed;
-    --accent-hover: #6d28d9;
-    --accent-soft: rgba(124, 58, 237, 0.2);
-    --accent-ink: #ffffff;
+    /* Brand / Interaction */
+    --accent: #A77BB5;
+    --accent-hover: #B98CC7;
+    --accent-soft: rgba(167, 123, 181, 0.16);
+    --accent-ink: #1B1220;
 
-    /* Financial semantics */
-    --debit: #f87171;
+    /* Financial Semantics */
+    --debit: #F87171;
     --debit-soft: rgba(248, 113, 113, 0.16);
-
-    --credit: #34d399;
+    --credit: #34D399;
     --credit-soft: rgba(52, 211, 153, 0.16);
 
-    --warn: #fbbf24;
+    /* System Status */
+    --success: #34D399;
+    --success-soft: rgba(52, 211, 153, 0.16);
+    --warn: #FBBF24;
     --warn-soft: rgba(251, 191, 36, 0.16);
 
-    --danger: #f87171;
+    /* Destructive Actions */
+    --danger: #F87171;
+    --danger-soft: rgba(248, 113, 113, 0.16);
   }
 }
 
@@ -677,8 +686,8 @@ th {
 }
 
 .badge.ok {
-  background: var(--credit-soft);
-  color: var(--credit);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .classify-cell {
@@ -1119,10 +1128,10 @@ td.row-actions > * + * {
   max-height: min(86vh, 880px);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 16px 40px rgba(27, 29, 34, 0.16);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   animation: rise 0.2s ease both;
 }
@@ -1134,7 +1143,7 @@ td.row-actions > * + * {
   align-items: flex-start;
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--panel);
 }
 
 .modal-header h2 {
