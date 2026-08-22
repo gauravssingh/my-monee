@@ -14,6 +14,7 @@
   --accent: #4b2e58;
   --accent-hover: #3b2245;
   --accent-soft: rgba(75, 46, 88, 0.1);
+  --accent-ink: #ffffff;
 
   /* Financial semantics */
   --debit: #a5333b;
@@ -55,10 +56,11 @@
   --ink: #f0f3f6;
   --ink-muted: #8b949e;
 
-  /* Brand / interaction */
-  --accent: #a78bfa;
-  --accent-hover: #c4b5fd;
-  --accent-soft: rgba(167, 139, 250, 0.16);
+  /* Brand / interaction (high contrast vivid purple) */
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: rgba(124, 58, 237, 0.2);
+  --accent-ink: #ffffff;
 
   /* Financial semantics */
   --debit: #f87171;
@@ -87,9 +89,10 @@
     --ink-muted: #8b949e;
 
     /* Brand / interaction */
-    --accent: #a78bfa;
-    --accent-hover: #c4b5fd;
-    --accent-soft: rgba(167, 139, 250, 0.16);
+    --accent: #7c3aed;
+    --accent-hover: #6d28d9;
+    --accent-soft: rgba(124, 58, 237, 0.2);
+    --accent-ink: #ffffff;
 
     /* Financial semantics */
     --debit: #f87171;
@@ -1567,18 +1570,20 @@ td.row-actions > * + * {
 }
 
 .btn:hover {
-  background: white;
+  background: var(--bg);
   border-color: var(--ink-muted);
 }
 
 .btn.primary {
   background: var(--accent);
-  border-color: transparent;
-  color: white;
+  border-color: var(--accent);
+  color: var(--accent-ink, #ffffff);
+  font-weight: 600;
 }
 
 .btn.primary:hover {
   background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .btn.confirm-armed {
@@ -1593,7 +1598,8 @@ td.row-actions > * + * {
 
 .input {
   border: 1px solid var(--line);
-  background: white;
+  background: var(--surface);
+  color: var(--ink);
   border-radius: var(--radius);
   padding: 8px 12px;
   min-width: 220px;
