@@ -195,7 +195,7 @@ export default function App() {
         </nav>
 
         {/* Mobile Navigation Controls */}
-        <div className="mobile-nav-controls" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="mobile-nav-controls">
           <ThemeToggle />
           <NavLink
             to="/settings"
