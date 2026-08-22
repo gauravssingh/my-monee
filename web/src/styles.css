@@ -1575,15 +1575,21 @@ td.row-actions > * + * {
 }
 
 .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-ink, #ffffff);
+  background: var(--accent) !important;
+  border: 1px solid var(--accent) !important;
+  color: var(--accent-ink, #ffffff) !important;
   font-weight: 600;
 }
 
 .btn.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  color: var(--accent-ink, #ffffff) !important;
+}
+
+.btn.primary svg {
+  color: var(--accent-ink, #ffffff) !important;
+  stroke: var(--accent-ink, #ffffff) !important;
 }
 
 .btn.confirm-armed {
