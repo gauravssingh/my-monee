@@ -12,6 +12,8 @@ data/
 *.db-journal
 *.db-wal
 *.db-shm
+.coverage
+tests/screenshots/
 
 web/node_modules/
 web/dist/

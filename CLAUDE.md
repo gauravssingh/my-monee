@@ -17,6 +17,7 @@ pip install -e ".[dev]"
 cd web && npm install && npm run build && cd ..
 python -m expense_tracker          # API + UI
 pytest                             # tests
+python .agents/skills/playwright-frontend-testing/scripts/ui_test_runner.py --all  # Playwright UI & visual tests
 ruff check src tests               # lint
 launchctl kickstart -k "gui/$(id -u)/com.personal.expense-tracker"  # restart launchd service
 ```

@@ -2,20 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Overview, type FinancialTrends } from "../api";
 import FinancialTrendModal, { type TrendMetricType } from "../components/FinancialTrendModal";
-import { formatMoney, formatCompactMoney, monthLabel, formatDate } from "../format";
+import MonthStrip from "../components/MonthStrip";
+import { formatMoney, formatCompactMoney, formatLakhOrK, formatDate } from "../format";
 
-function getPeriodLabel(year: number, month: number) {
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
-  const startStr = startDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-  const endStr = endDate.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-  return `${startStr} – ${endStr}`;
-}
 
 function getHumanSummary(overview: Overview, date: { year: number; month: number }) {
-  const spentL = (overview.summary.spent / 100000).toFixed(2);
-  const incomeL = (overview.summary.income / 100000).toFixed(2);
-  const netK = (Math.abs(overview.summary.net_cash_flow) / 1000).toFixed(1);
+  const spentStr = formatLakhOrK(overview.summary.spent, overview.currency);
+  const incomeStr = formatLakhOrK(overview.summary.income, overview.currency);
+  const netAbsStr = formatLakhOrK(Math.abs(overview.summary.net_cash_flow), overview.currency);
   const prevMonthName = new Date(date.year, date.month - 2, 1).toLocaleDateString("en-GB", { month: "short" });
 
   let diffText = "";
@@ -30,15 +24,15 @@ function getHumanSummary(overview: Overview, date: { year: number; month: number
 
   let compositionText = "";
   if (commitmentsSpent > 0 && consumerSpent > 0) {
-    const consL = (consumerSpent / 100000).toFixed(2);
-    const commK = (commitmentsSpent / 1000).toFixed(1);
-    compositionText = ` (₹${consL}L living expenses + ₹${commK}k loan commitments)`;
+    const consStr = formatLakhOrK(consumerSpent, overview.currency);
+    const commStr = formatLakhOrK(commitmentsSpent, overview.currency);
+    compositionText = ` (${consStr} living expenses + ${commStr} loan commitments)`;
   }
 
   const flowType = overview.summary.net_cash_flow >= 0 ? "positive cash flow" : "net deficit";
   const flowSign = overview.summary.net_cash_flow >= 0 ? "+" : "-";
 
-  return `You spent ₹${spentL}L this month${compositionText}${diffText}. Income was ₹${incomeL}L, leaving a ${flowType} of ${flowSign}₹${netK}k.`;
+  return `You spent ${spentStr} this month${compositionText}${diffText}. Income was ${incomeStr}, leaving a ${flowType} of ${flowSign}${netAbsStr}.`;
 }
 
 export default function OverviewPage() {
@@ -84,24 +78,6 @@ export default function OverviewPage() {
     };
   }, [date.year, date.month]);
 
-  function prevMonth() {
-    setDate((prev) => {
-      if (prev.month === 1) return { year: prev.year - 1, month: 12 };
-      return { ...prev, month: prev.month - 1 };
-    });
-  }
-
-  function nextMonth() {
-    setDate((prev) => {
-      if (prev.month === 12) return { year: prev.year + 1, month: 1 };
-      return { ...prev, month: prev.month + 1 };
-    });
-  }
-
-  function goToCurrentMonth() {
-    const now = new Date();
-    setDate({ year: now.getFullYear(), month: now.getMonth() + 1 });
-  }
 
   function openTrend(metric: TrendMetricType) {
     setTrendMetric(metric);
@@ -121,10 +97,6 @@ export default function OverviewPage() {
       });
   }
 
-  const isCurrentMonth = useMemo(() => {
-    const now = new Date();
-    return date.year === now.getFullYear() && date.month === now.getMonth() + 1;
-  }, [date.year, date.month]);
 
   const daysInMonth = new Date(date.year, date.month, 0).getDate();
 
@@ -234,7 +206,7 @@ export default function OverviewPage() {
                 const padM = String(date.month).padStart(2, "0");
                 const from = `${date.year}-${padM}-01`;
                 const to = `${date.year}-${padM}-${String(daysInMonth).padStart(2, "0")}`;
-                navigate(`/transactions?date_from=${from}&date_to=${to}&category=${encodeURIComponent(c.category)}`);
+                navigate(`/transactions?date_from=${from}&date_to=${to}&category_id=${encodeURIComponent(c.category_id)}&category=${encodeURIComponent(c.category)}`);
               }}
             >
               <div className="category-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -273,68 +245,22 @@ export default function OverviewPage() {
       {/* ZONE 1: MONTH SUMMARY & FLOW                                  */}
       {/* ───────────────────────────────────────────────────────────── */}
 
-      {/* Page Header with Restrained Typography & Month Controls */}
+      {/* Month Strip Controls */}
       <header
         className="overview-header"
         style={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-          flexWrap: "wrap",
-          gap: "14px",
-          marginBottom: "14px",
+          justifyContent: "center",
+          alignItems: "center",
+          marginBottom: "16px",
         }}
       >
-        <div>
-          <h1 className="page-title" style={{ margin: 0, fontSize: "1.75rem", letterSpacing: "-0.02em" }}>
-            Monthly Analysis
-          </h1>
-          <p className="lead" style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontSize: "0.86rem" }}>
-            {getPeriodLabel(date.year, date.month)}
-          </p>
-        </div>
-
-        {/* Minimal Restrained Month Switcher: ‹ Previous August 2026 Next › */}
-        <div className="month-navigator" style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          {!isCurrentMonth && (
-            <button
-              type="button"
-              className="btn quiet"
-              onClick={goToCurrentMonth}
-              disabled={loading}
-              title="Jump to current month"
-              aria-label="Current month"
-              style={{ fontSize: "0.8rem", padding: "4px 8px", marginRight: 4 }}
-            >
-              This Month
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn quiet"
-            onClick={prevMonth}
-            disabled={loading}
-            title="Previous month"
-            aria-label="Previous month"
-            style={{ fontSize: "0.86rem", padding: "4px 8px", color: "var(--ink)" }}
-          >
-            ‹ Previous
-          </button>
-          <strong style={{ fontFamily: "var(--font-display)", fontSize: "1.02rem", padding: "0 8px", whiteSpace: "nowrap" }}>
-            {monthLabel(date.year, date.month)}
-          </strong>
-          <button
-            type="button"
-            className="btn quiet"
-            onClick={nextMonth}
-            disabled={loading}
-            title="Next month"
-            aria-label="Next month"
-            style={{ fontSize: "0.86rem", padding: "4px 8px", color: "var(--ink)" }}
-          >
-            Next ›
-          </button>
-        </div>
+        <MonthStrip
+          year={date.year}
+          month={date.month}
+          onChange={(y, m) => setDate({ year: y, month: m })}
+          disabled={loading}
+        />
       </header>
 
       {/* Human Deterministic Summary Sentence */}

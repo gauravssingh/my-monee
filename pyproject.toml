@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "expense-tracker"
+name = "my-monee"
 version = "0.2.0"
 description = "Local-first personal expense tracker for macOS"
 readme = "README.md"

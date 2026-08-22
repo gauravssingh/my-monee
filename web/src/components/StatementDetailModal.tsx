@@ -31,56 +31,52 @@ function extractUpiRrn(text: string | null | undefined): string | null {
   return m ? m[1] : null;
 }
 
-function getStatementTitle(stmt: CreditCardStatement): string {
-  const issuerName = stmt.account_name || stmt.issuer || "Statement";
+function formatDateCompact(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function getStatementSubtitle(stmt: CreditCardStatement): string {
   let monthYear = "";
   if (stmt.statement_period_end || stmt.statement_date) {
     try {
       const d = new Date(stmt.statement_period_end || stmt.statement_date || "");
-      monthYear = d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+      monthYear = d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
     } catch {
       monthYear = "";
     }
   }
-  const typeLabel = stmt.statement_type === "BANK_ACCOUNT" ? "Bank Statement" : "Credit Card Statement";
-  return monthYear ? `${issuerName} — ${monthYear} ${typeLabel}` : `${issuerName} ${typeLabel}`;
+  const period = formatPeriod(stmt.statement_period_start, stmt.statement_period_end);
+  return monthYear ? `${monthYear} Statement · ${period}` : `Statement · ${period}`;
 }
 
 function getStatusBadge(status: string, validationStatus?: string | null) {
   if (status === "VALIDATED" || validationStatus === "VALIDATED") {
-    return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600 }}>✓ Validated</span>;
+    return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600, fontSize: "0.74rem" }}>✓ Validated</span>;
   }
   if (status === "REVIEW_REQUIRED" || validationStatus === "REVIEW_REQUIRED") {
-    return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>⚠ Review Required</span>;
+    return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600, fontSize: "0.74rem" }}>⚠ Review Required</span>;
   }
   switch (status) {
     case "READY_FOR_EXTRACTION":
     case "UNLOCKED":
-      return <span className="badge" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--accent, #3b82f6)", fontWeight: 600 }}>⚡ Ready to Extract</span>;
+      return <span className="badge" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--accent, #3b82f6)", fontWeight: 600, fontSize: "0.74rem" }}>⚡ Ready to Extract</span>;
     case "PASSWORD_REQUIRED":
-      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>🔒 Needs Unlocking</span>;
+      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600, fontSize: "0.74rem" }}>🔒 Needs Unlocking</span>;
     case "PASSWORD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>⚠ Password Failed</span>;
+      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600, fontSize: "0.74rem" }}>⚠ Password Failed</span>;
     case "EXTRACTION_FAILED":
     case "VALIDATION_FAILED":
     case "INVALID_PDF":
     case "DOWNLOAD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>✕ Failed</span>;
+      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600, fontSize: "0.74rem" }}>✕ Failed</span>;
     default:
-      return <span className="badge">{status}</span>;
-  }
-}
-
-function getMatchBadge(status: string) {
-  switch (status) {
-    case "MATCHED":
-      return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontSize: "0.68rem", fontWeight: 600 }}>✓ MATCHED</span>;
-    case "POSSIBLE_MATCH":
-      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontSize: "0.68rem", fontWeight: 600 }}>⚠ POSSIBLE MATCH</span>;
-    case "LIABILITY_PAYMENT":
-      return <span className="badge" style={{ background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6", fontSize: "0.68rem", fontWeight: 600 }}>⇄ SETTLEMENT</span>;
-    default:
-      return <span className="badge" style={{ opacity: 0.6, fontSize: "0.68rem" }}>○ UNMATCHED</span>;
+      return <span className="badge" style={{ fontSize: "0.74rem" }}>{status}</span>;
   }
 }
 
@@ -113,7 +109,7 @@ export function StatementDetailModal({
   const [activeStatement, setActiveStatement] = useState<CreditCardStatement | null>(statement);
   const [reconFilter, setReconFilter] = useState<"ALL" | "MATCHED" | "REVIEW" | "UNMATCHED">("ALL");
   const [selectedReviewTx, setSelectedReviewTx] = useState<StatementTransaction | null>(null);
-  const [showAuditDetails, setShowAuditDetails] = useState(false);
+  const [showValDetails, setShowValDetails] = useState(false);
 
   useModalChrome(open, onClose, closeRef);
   const onBackdropClick = useBackdropClose(open, onClose);
@@ -346,18 +342,18 @@ export function StatementDetailModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
-          maxWidth: "min(1160px, 94vw)",
+          maxWidth: "min(1080px, 94vw)",
           display: "flex",
           flexDirection: "column",
-          height: "min(920px, 94dvh)",
-          maxHeight: "94dvh",
+          height: "min(880px, 92dvh)",
+          maxHeight: "92dvh",
           boxSizing: "border-box",
           borderRadius: "var(--radius-lg, 12px)",
         }}
       >
         <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
 
-        {/* Level 1: Persistent Statement Identity Header */}
+        {/* 1. Header: Account name + Last4, Subtitle, Validation Badge, and Action Buttons */}
         <header
           className="modal-header"
           style={{
@@ -371,37 +367,27 @@ export function StatementDetailModal({
           }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 3 }}>
-              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--ink)" }}>
-                {currentStmt.account_name || currentStmt.issuer} {currentStmt.card_last4 ? `•••• ${currentStmt.card_last4}` : ""}
-              </span>
-              <span
-                className="badge"
-                style={{
-                  fontSize: "0.68rem",
-                  padding: "1px 6px",
-                  background: isBank ? "rgba(59, 130, 246, 0.12)" : "rgba(139, 92, 246, 0.12)",
-                  color: isBank ? "var(--accent, #3b82f6)" : "#8b5cf6",
-                  border: "none",
-                }}
-              >
-                {isBank ? "Bank Account" : "Credit Card"}
-              </span>
-              {getStatusBadge(currentStmt.status, currentStmt.validation_status)}
-            </div>
-
-            <h2 id={titleId} style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "var(--ink)", wordBreak: "break-word" }}>
-              {getStatementTitle(currentStmt)}
+            <h2
+              id={titleId}
+              style={{
+                margin: 0,
+                fontSize: "1.1rem",
+                fontWeight: 650,
+                color: "var(--ink)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {currentStmt.account_name || currentStmt.issuer}{currentStmt.card_last4 ? ` ••••${currentStmt.card_last4}` : ""}
             </h2>
-
-            <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 2 }}>
-              <span>Period: <strong>{formatPeriod(currentStmt.statement_period_start, currentStmt.statement_period_end)}</strong></span>
-              <span style={{ margin: "0 6px" }}>·</span>
-              <span>Source: <span style={{ opacity: 0.9 }}>{currentStmt.original_filename}</span></span>
+            <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", marginTop: 3 }}>
+              {getStatementSubtitle(currentStmt)}
             </div>
           </div>
 
           <div className="modal-actions" style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {getStatusBadge(currentStmt.status, currentStmt.validation_status)}
             {currentStmt.has_unlocked_file && (
               <>
                 <button
@@ -409,20 +395,20 @@ export function StatementDetailModal({
                   className="btn quiet"
                   disabled={reExtracting}
                   onClick={handleReExtract}
-                  style={{ fontSize: "0.8rem", padding: "6px 12px" }}
+                  style={{ fontSize: "0.78rem", padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 4 }}
                   title="Re-run deterministic parser & arithmetic validator"
                 >
-                  {reExtracting ? "Extracting..." : "⚡ Re-Extract"}
+                  {reExtracting ? "Extracting..." : "↻"}
                 </button>
                 <button
                   type="button"
                   className="btn primary"
                   disabled={reconciling}
                   onClick={handleReconcile}
-                  style={{ fontSize: "0.8rem", padding: "6px 12px" }}
+                  style={{ fontSize: "0.78rem", padding: "5px 12px", display: "inline-flex", alignItems: "center", gap: 4 }}
                   title="Reconcile extracted transactions against notification alerts"
                 >
-                  {reconciling ? "Reconciling..." : "⇄ Reconcile"}
+                  {reconciling ? "Reconciling..." : "✓ Reconcile"}
                 </button>
               </>
             )}
@@ -432,241 +418,174 @@ export function StatementDetailModal({
           </div>
         </header>
 
-        {/* Scrollable Body Workspace */}
+        {/* Scrollable Body */}
         <div
           className="modal-body"
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 16,
+            gap: 12,
             flex: "1 1 0%",
             minHeight: 0,
             overflowY: "auto",
-            padding: "18px 24px",
+            padding: "16px 24px",
           }}
         >
-          {/* Top Row: Compact Statement Summary Strip */}
+          {/* 2. Metadata Strip: Period, Statement Date, Amount Due, Gmail Source */}
           <section
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 14,
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px 24px",
+              padding: "10px 14px",
+              borderRadius: "var(--radius-sm)",
               background: "var(--surface)",
-              padding: "12px 18px",
-              borderRadius: "var(--radius-md)",
               border: "1px solid var(--line)",
+              fontSize: "0.82rem",
             }}
           >
-            <div>
-              <div style={{ fontSize: "0.7rem", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: 600 }}>Period</div>
-              <div style={{ fontSize: "0.88rem", fontWeight: 600, marginTop: 3 }}>
-                {formatPeriod(currentStmt.statement_period_start, currentStmt.statement_period_end)}
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: "0.7rem", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: 600 }}>Statement Date</div>
-              <div style={{ fontSize: "0.88rem", fontWeight: 500, marginTop: 3 }}>
-                {formatDate(currentStmt.statement_date)}
-              </div>
-            </div>
-
-            {currentStmt.payment_due_date && !isBank && (
-              <div>
-                <div style={{ fontSize: "0.7rem", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: 600 }}>Payment Due Date</div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--warning, #f59e0b)", marginTop: 3 }}>
-                  {formatDate(currentStmt.payment_due_date)}
-                </div>
-              </div>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span>📅</span>
+              <strong>{formatPeriod(currentStmt.statement_period_start, currentStmt.statement_period_end)}</strong>
+            </span>
+            {currentStmt.statement_date && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--ink-muted)" }}>
+                <span>🧾</span>
+                <span style={{ color: "var(--ink)" }}>{formatDateCompact(currentStmt.statement_date)}</span>
+              </span>
             )}
-
             {currentStmt.total_amount_due != null && (
-              <div>
-                <div style={{ fontSize: "0.7rem", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: 600 }}>
-                  {isBank ? "Closing Balance" : "Total Payment Due"}
-                </div>
-                <div style={{ fontSize: "1rem", fontWeight: 700, color: "var(--ink)", marginTop: 3 }}>
-                  ₹{currentStmt.total_amount_due.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                </div>
-              </div>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <strong style={{ color: "var(--ink)" }}>₹{currentStmt.total_amount_due.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
+                <span style={{ color: "var(--ink-muted)", fontSize: "0.78rem" }}>{isBank ? "closing balance" : "due"}</span>
+              </span>
             )}
-
-            <div>
-              <div style={{ fontSize: "0.7rem", color: "var(--ink-muted)", textTransform: "uppercase", fontWeight: 600 }}>Source Email</div>
-              <div style={{ fontSize: "0.84rem", fontWeight: 500, marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
-                {currentStmt.source_email_id ? (
-                  <button
-                    type="button"
-                    onClick={() => openInGmail(currentStmt.source_email_id!)}
-                    style={{ background: "none", border: "none", padding: 0, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, color: "var(--accent, #6366f1)", fontSize: "0.82rem", fontWeight: 500 }}
-                    title="Launch native Gmail app on iOS/mobile or open web thread"
-                  >
-                    <GmailLogo size={13} />
-                    <span>Gmail App →</span>
-                  </button>
-                ) : (
-                  "Manual Upload"
-                )}
-              </div>
-            </div>
+            {currentStmt.source_email_id ? (
+              <button
+                type="button"
+                onClick={() => openInGmail(currentStmt.source_email_id!)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  color: "var(--accent, #6366f1)",
+                  fontSize: "0.82rem",
+                  fontWeight: 500,
+                  marginLeft: "auto",
+                }}
+                title="Open source notification email in Gmail"
+              >
+                <GmailLogo size={14} />
+                <span>Gmail</span>
+              </button>
+            ) : (
+              <span style={{ color: "var(--ink-muted)", marginLeft: "auto", fontSize: "0.78rem" }}>Manual Upload</span>
+            )}
           </section>
 
-          {/* Top Row: Documents + Financial Validation Side by Side */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: 14 }}>
-            {/* Column 1: Documents */}
-            <section
-              style={{
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                borderRadius: "var(--radius-md)",
-                padding: "14px 16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-              }}
-            >
-              <div style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", fontWeight: 700 }}>
-                Documents
+          {/* 3. Documents & Compact Validation Strip */}
+          <section
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: "var(--radius-sm)",
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              fontSize: "0.82rem",
+            }}
+          >
+            {/* Documents Row */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--ink-muted)" }}>
+                <span>📎</span>
+                <strong style={{ color: "var(--ink)" }}>Documents</strong>
+                <span>· {currentStmt.has_unlocked_file ? "2 files" : "1 file"}</span>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {/* Original PDF */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    padding: "8px 12px",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid var(--line)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <a
+                  href={api.statementOriginalUrl(currentStmt.id, false)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn quiet"
+                  style={{ fontSize: "0.76rem", padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}
+                  title="Download original statement PDF"
                 >
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>🔒 Original PDF</span>
-                      <span className="badge" style={{ fontSize: "0.62rem", padding: "1px 4px" }}>Immutable</span>
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", marginTop: 2 }}>
-                      Preserved source as received
-                    </div>
-                  </div>
+                  <DownloadIcon size={12} />
+                  PDF
+                </a>
+                {currentStmt.has_unlocked_file && (
                   <a
-                    href={api.statementOriginalUrl(currentStmt.id, false)}
+                    href={api.statementUnlockedUrl(currentStmt.id, false)}
                     target="_blank"
                     rel="noreferrer"
                     className="btn quiet"
-                    style={{ fontSize: "0.76rem", padding: "4px 8px", display: "inline-flex", alignItems: "center", gap: 4 }}
-                    title="Download original statement"
+                    style={{ fontSize: "0.76rem", padding: "3px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}
+                    title="Download parsed/decrypted copy"
                   >
                     <DownloadIcon size={12} />
-                    <span>Download</span>
+                    Parsed copy
                   </a>
-                </div>
-
-                {/* Unlocked PDF */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    padding: "8px 12px",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid var(--line)",
-                    borderRadius: "var(--radius-sm)",
-                  }}
-                >
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>⚡ Unlocked Copy</span>
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: "0.62rem",
-                          padding: "1px 4px",
-                          background: currentStmt.has_unlocked_file ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
-                          color: currentStmt.has_unlocked_file ? "var(--success, #10b981)" : "var(--warning, #f59e0b)",
-                        }}
-                      >
-                        {currentStmt.has_unlocked_file ? "Ready" : "Locked"}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", marginTop: 2 }}>
-                      Derivative used for parsing
-                    </div>
-                  </div>
-                  {currentStmt.has_unlocked_file ? (
-                    <a
-                      href={api.statementUnlockedUrl(currentStmt.id, false)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="btn quiet"
-                      style={{ fontSize: "0.76rem", padding: "4px 8px", display: "inline-flex", alignItems: "center", gap: 4 }}
-                      title="Download unlocked PDF"
-                    >
-                      <DownloadIcon size={12} />
-                      <span>Download</span>
-                    </a>
-                  ) : (
-                    <span className="badge" style={{ fontSize: "0.7rem", color: "var(--ink-muted)" }}>Locked</span>
-                  )}
-                </div>
+                )}
               </div>
-            </section>
+            </div>
 
-            {/* Column 2: Financial Validation */}
+            {/* Validation Row */}
             {valDetails && (
-              <section
-                style={{
-                  background: currentStmt.validation_status === "VALIDATED" ? "rgba(16, 185, 129, 0.03)" : "rgba(245, 158, 11, 0.03)",
-                  border: `1px solid ${currentStmt.validation_status === "VALIDATED" ? "rgba(16, 185, 129, 0.25)" : "rgba(245, 158, 11, 0.25)"}`,
-                  borderRadius: "var(--radius-md)",
-                  padding: "14px 16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", fontWeight: 700 }}>
-                    Financial Validation
-                  </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: primaryEquation?.is_balanced ? "var(--success, #10b981)" : "var(--warning, #f59e0b)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    {primaryEquation?.is_balanced ? "✓ Exact match" : `⚠ Difference ₹${primaryEquation ? primaryEquation.difference.toFixed(2) : ""}`}
+                  </span>
                   {primaryEquation && (
-                    <span style={{ fontSize: "0.76rem", fontWeight: 600, color: primaryEquation.is_balanced ? "var(--success, #10b981)" : "var(--danger, #ef4444)" }}>
-                      {primaryEquation.is_balanced ? "✓ Exact match (Diff: ₹0.00)" : `⚠ Diff: ₹${primaryEquation.difference.toFixed(2)}`}
+                    <span style={{ color: "var(--ink-muted)", fontSize: "0.78rem" }}>
+                      ₹{primaryEquation.calculated.toLocaleString("en-IN", { minimumFractionDigits: 2 })} = ₹{primaryEquation.expected.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>
+                <button
+                  type="button"
+                  className="btn quiet"
+                  onClick={() => setShowValDetails(!showValDetails)}
+                  style={{ fontSize: "0.74rem", padding: "2px 6px", color: "var(--ink-muted)" }}
+                >
+                  {showValDetails ? "Hide details ▴" : "Details ›"}
+                </button>
+              </div>
+            )}
 
+            {/* Expandable Validation Calculation Details */}
+            {valDetails && showValDetails && (
+              <div style={{ background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--radius-sm)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, fontSize: "0.76rem", marginTop: 4 }}>
                 {primaryEquation && (
-                  <div style={{ fontSize: "0.8rem", display: "flex", flexDirection: "column", gap: 3, background: "rgba(0,0,0,0.15)", padding: "8px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-muted)", fontSize: "0.74rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-muted)" }}>
                       <span>{primaryEquation.name}</span>
-                      <span>{primaryEquation.formula}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                      <span>Calculated: <strong style={{ color: "var(--ink)" }}>₹{primaryEquation.calculated.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></span>
-                      <span>Reported: <strong style={{ color: "var(--ink)" }}>₹{primaryEquation.expected.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong></span>
+                      <code>{primaryEquation.formula}</code>
                     </div>
                   </div>
                 )}
-
                 {valDetails.messages && valDetails.messages.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                    {valDetails.messages.slice(0, 3).map((msg, i) => (
-                      <div key={i} style={{ fontSize: "0.74rem", color: "var(--success, #10b981)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: "1px solid var(--line)", paddingTop: 6 }}>
+                    {valDetails.messages.map((msg, i) => (
+                      <div key={i} style={{ color: "var(--success, #10b981)", display: "flex", alignItems: "center", gap: 6 }}>
                         <span>✓</span>
                         <span>{msg.replace("✓ ", "")}</span>
                       </div>
                     ))}
                   </div>
                 )}
-              </section>
+              </div>
             )}
-          </div>
+          </section>
 
-          {/* Section: Password Unlock Form (if locked) */}
+          {/* Password Unlock Form (when locked) */}
           {isLocked && (
             <section style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "var(--radius-md)", padding: 14 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--warning, #f59e0b)", fontWeight: 600, fontSize: "0.92rem" }}>
@@ -724,218 +643,227 @@ export function StatementDetailModal({
             </section>
           )}
 
-          {/* Level 2: Reconciliation Summary & Actionable Filter Workspace */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-              <div>
-                <div style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", fontWeight: 700 }}>
-                  Reconciliation Workspace
-                </div>
-                <div style={{ fontSize: "0.86rem", color: "var(--ink-muted)", marginTop: 2 }}>
-                  <strong>{transactions.length}</strong> extracted · <span style={{ color: "var(--success, #10b981)" }}>{matchedCount} matched</span> · <span style={{ color: reviewCount > 0 ? "var(--warning, #f59e0b)" : "inherit" }}>{reviewCount} review</span> · <span>{unmatchedCount} unmatched</span>
-                </div>
-              </div>
-
-              {/* Filter Tabs */}
-              <div style={{ display: "inline-flex", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: 2 }}>
-                <button
-                  type="button"
-                  onClick={() => setReconFilter("ALL")}
-                  style={{
-                    border: "none",
-                    background: reconFilter === "ALL" ? "var(--line)" : "transparent",
-                    color: reconFilter === "ALL" ? "var(--ink)" : "var(--ink-muted)",
-                    padding: "4px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  All ({transactions.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReconFilter("MATCHED")}
-                  style={{
-                    border: "none",
-                    background: reconFilter === "MATCHED" ? "var(--line)" : "transparent",
-                    color: reconFilter === "MATCHED" ? "var(--success, #10b981)" : "var(--ink-muted)",
-                    padding: "4px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Matched ({matchedCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReconFilter("REVIEW")}
-                  style={{
-                    border: "none",
-                    background: reconFilter === "REVIEW" ? "var(--line)" : "transparent",
-                    color: reconFilter === "REVIEW" ? "var(--warning, #f59e0b)" : "var(--ink-muted)",
-                    padding: "4px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Review ({reviewCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReconFilter("UNMATCHED")}
-                  style={{
-                    border: "none",
-                    background: reconFilter === "UNMATCHED" ? "var(--line)" : "transparent",
-                    color: reconFilter === "UNMATCHED" ? "var(--ink)" : "var(--ink-muted)",
-                    padding: "4px 12px",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Unmatched ({unmatchedCount})
-                </button>
-              </div>
+          {/* 4. TRANSACTIONS SECTION */}
+          <section style={{ display: "flex", flexDirection: "column", gap: 10, flex: "1 1 0%", minHeight: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+              <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)", fontWeight: 700 }}>
+                TRANSACTIONS
+              </span>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: matchedCount === transactions.length && transactions.length > 0 ? "var(--success, #10b981)" : "var(--ink)" }}>
+                {transactions.length > 0 ? `${matchedCount} / ${transactions.length} ✓ MATCHED` : "0 Transactions"}
+              </span>
             </div>
 
-            {/* Detected EMI Groups Card */}
-            {emiBundles.length > 0 && (
-              <div style={{ background: "rgba(139, 92, 246, 0.05)", border: "1px solid rgba(139, 92, 246, 0.2)", borderRadius: "var(--radius-sm)", padding: "10px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "#8b5cf6", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>💳 Detected Credit Card EMI Plans ({emiBundles.length})</span>
-                </div>
-                {emiBundles.map((b, idx) => (
-                  <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, background: "rgba(0,0,0,0.12)", padding: "8px 12px", borderRadius: "var(--radius-sm)", border: "1px solid var(--line)" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span>{b.merchant} EMI · Installment {b.installment} of {b.tenure}</span>
-                        <span className="badge" style={{ fontSize: "0.65rem", padding: "1px 5px", background: b.allMatched ? "rgba(16, 185, 129, 0.15)" : "rgba(245, 158, 11, 0.15)", color: b.allMatched ? "var(--success, #10b981)" : "var(--warning, #f59e0b)" }}>
-                          {b.allMatched ? "✓ Matched in Ledger" : "○ Unmatched"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", marginTop: 2 }}>
-                        {formatDate(b.date)} · Total Installment: <strong style={{ color: "var(--ink)" }}>₹{b.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong> ({b.txs.length} items: Principal + Interest + GST)
-                      </div>
-                    </div>
+            {/* Filter Pills */}
+            <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className={`pill-btn ${reconFilter === "ALL" ? "active" : ""}`}
+                onClick={() => setReconFilter("ALL")}
+                style={{
+                  border: reconFilter === "ALL" ? "1px solid var(--line-active, #4b5563)" : "1px solid var(--line)",
+                  background: reconFilter === "ALL" ? "var(--line)" : "transparent",
+                  color: reconFilter === "ALL" ? "var(--ink)" : "var(--ink-muted)",
+                  padding: "3px 12px",
+                  borderRadius: "var(--radius-full, 9999px)",
+                  fontSize: "0.76rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                All {transactions.length}
+              </button>
+              <button
+                type="button"
+                className={`pill-btn ${reconFilter === "MATCHED" ? "active" : ""}`}
+                onClick={() => setReconFilter("MATCHED")}
+                style={{
+                  border: reconFilter === "MATCHED" ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid var(--line)",
+                  background: reconFilter === "MATCHED" ? "rgba(16, 185, 129, 0.12)" : "transparent",
+                  color: reconFilter === "MATCHED" ? "var(--success, #10b981)" : "var(--ink-muted)",
+                  padding: "3px 12px",
+                  borderRadius: "var(--radius-full, 9999px)",
+                  fontSize: "0.76rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Matched {matchedCount}
+              </button>
+              <button
+                type="button"
+                className={`pill-btn ${reconFilter === "REVIEW" ? "active" : ""}`}
+                onClick={() => setReconFilter("REVIEW")}
+                style={{
+                  border: reconFilter === "REVIEW" ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid var(--line)",
+                  background: reconFilter === "REVIEW" ? "rgba(245, 158, 11, 0.12)" : "transparent",
+                  color: reconFilter === "REVIEW" ? "var(--warning, #f59e0b)" : "var(--ink-muted)",
+                  padding: "3px 12px",
+                  borderRadius: "var(--radius-full, 9999px)",
+                  fontSize: "0.76rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Review {reviewCount}
+              </button>
+              <button
+                type="button"
+                className={`pill-btn ${reconFilter === "UNMATCHED" ? "active" : ""}`}
+                onClick={() => setReconFilter("UNMATCHED")}
+                style={{
+                  border: reconFilter === "UNMATCHED" ? "1px solid var(--line-active, #4b5563)" : "1px solid var(--line)",
+                  background: reconFilter === "UNMATCHED" ? "var(--line)" : "transparent",
+                  color: reconFilter === "UNMATCHED" ? "var(--ink)" : "var(--ink-muted)",
+                  padding: "3px 12px",
+                  borderRadius: "var(--radius-full, 9999px)",
+                  fontSize: "0.76rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Unmatched {unmatchedCount}
+              </button>
+            </div>
 
-                    {!b.allMatched && (
-                      <button
-                        type="button"
-                        className="btn quiet"
-                        disabled={importingBundle}
-                        onClick={() => handleImportEmiBundle(b.txs.map((t) => t.id))}
-                        style={{ fontSize: "0.76rem", padding: "4px 10px", color: "var(--accent, #6366f1)", fontWeight: 600 }}
-                        title="Import all 3 line items (Principal, Interest, and GST) into ledger"
-                      >
-                        {importingBundle ? "Importing..." : "+ Import EMI to Ledger"}
-                      </button>
-                    )}
+            {/* EMI Bundles */}
+            {emiBundles.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {emiBundles.map((b, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      padding: "6px 12px",
+                      borderRadius: "var(--radius-sm)",
+                      background: b.allMatched ? "rgba(16, 185, 129, 0.05)" : "rgba(139, 92, 246, 0.06)",
+                      border: `1px solid ${b.allMatched ? "rgba(16, 185, 129, 0.2)" : "rgba(139, 92, 246, 0.25)"}`,
+                      fontSize: "0.8rem",
+                    }}
+                  >
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span>💳</span>
+                      <span style={{ fontWeight: 600 }}>{b.merchant} · Installment {b.installment} of {b.tenure}</span>
+                      <span style={{ color: "var(--ink-muted)", fontSize: "0.74rem" }}>({formatDate(b.date)})</span>
+                    </span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                      <strong>₹{b.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</strong>
+                      {b.allMatched ? (
+                        <span style={{ color: "var(--success, #10b981)", fontWeight: 700, fontSize: "0.9rem" }}>✓</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn quiet"
+                          disabled={importingBundle}
+                          onClick={() => handleImportEmiBundle(b.txs.map((t) => t.id))}
+                          style={{ fontSize: "0.74rem", padding: "2px 8px", color: "var(--accent, #6366f1)", fontWeight: 600 }}
+                        >
+                          {importingBundle ? "Importing..." : "+ Import"}
+                        </button>
+                      )}
+                    </span>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Sticky Table Workspace */}
+            {/* Clean Table with Comfortable Spacing */}
             <div
               style={{
-                maxHeight: "440px",
+                flex: "1 1 0%",
+                minHeight: 200,
                 overflowY: "auto",
                 border: "1px solid var(--line)",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "var(--radius-md, 8px)",
                 position: "relative",
               }}
             >
-              <table className="table" style={{ width: "100%", fontSize: "0.83rem", margin: 0 }}>
+              <table className="table" style={{ width: "100%", fontSize: "0.86rem", margin: 0 }}>
                 <thead style={{ position: "sticky", top: 0, background: "var(--surface)", zIndex: 2, borderBottom: "1px solid var(--line)" }}>
                   <tr>
-                    <th style={{ padding: "9px 12px", width: 100 }}>Date</th>
-                    <th style={{ padding: "9px 12px" }}>Description</th>
-                    <th style={{ padding: "9px 12px", textAlign: "right", width: 120 }}>Amount</th>
-                    <th style={{ padding: "9px 12px", textAlign: "right", width: 110 }}>Balance</th>
-                    <th style={{ padding: "9px 12px", width: 110 }}>Account</th>
-                    <th style={{ padding: "9px 12px", width: 140 }}>Match Status</th>
-                    <th style={{ padding: "9px 12px", width: 140, textAlign: "right" }}>Actions</th>
+                    <th style={{ padding: "11px 16px", width: 95, fontSize: "0.74rem", letterSpacing: "0.05em" }}>DATE</th>
+                    <th style={{ padding: "11px 16px", fontSize: "0.74rem", letterSpacing: "0.05em" }}>DESCRIPTION</th>
+                    <th style={{ padding: "11px 16px", textAlign: "right", width: 130, fontSize: "0.74rem", letterSpacing: "0.05em" }}>AMOUNT</th>
+                    <th style={{ padding: "11px 16px", textAlign: "center", width: 110, fontSize: "0.74rem", letterSpacing: "0.05em" }}>STATUS</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredTransactions.map((tx) => {
                     const rrn = extractUpiRrn(tx.description);
                     const isUnmatched = (!tx.match_status || tx.match_status === "UNMATCHED");
+                    const isMatched = tx.match_status === "MATCHED" || tx.match_status === "LIABILITY_PAYMENT";
+                    const isReview = tx.match_status === "POSSIBLE_MATCH";
 
                     return (
                       <tr
                         key={tx.id}
                         onClick={() => {
-                          if (tx.match_status === "POSSIBLE_MATCH" || tx.match_status === "UNMATCHED") {
+                          if (isReview || isUnmatched) {
                             setSelectedReviewTx(tx);
                           }
                         }}
                         style={{
-                          cursor: "pointer",
-                          background: tx.match_status === "POSSIBLE_MATCH" ? "rgba(245, 158, 11, 0.04)" : "transparent",
+                          cursor: (isReview || isUnmatched) ? "pointer" : "default",
+                          background: isReview ? "rgba(245, 158, 11, 0.06)" : "transparent",
+                          borderBottom: "1px solid var(--line)",
                         }}
+                        title={isReview ? `Review candidate: ${tx.match_reason || "Click to verify correlation"}` : undefined}
                       >
-                        <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>{formatDate(tx.transaction_date)}</td>
-                        <td style={{ padding: "9px 12px" }}>
-                          <div style={{ fontWeight: 500, wordBreak: "break-word" }}>{tx.description}</div>
-                          {tx.match_reason && (
-                            <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", marginTop: 2 }}>
-                              {tx.match_reason}
-                            </div>
-                          )}
+                        <td style={{ padding: "12px 16px", whiteSpace: "nowrap", fontSize: "0.84rem", color: "var(--ink-muted)" }}>
+                          {formatDateCompact(tx.transaction_date)}
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ fontWeight: 500, fontSize: "0.88rem", lineHeight: 1.35, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 540 }} title={tx.description}>
+                            {tx.description}
+                          </div>
                           {rrn && isUnmatched && (
-                            <div style={{ fontSize: "0.68rem", color: "var(--accent, #6366f1)", marginTop: 2, display: "inline-block", background: "rgba(99, 102, 241, 0.08)", padding: "1px 5px", borderRadius: 3 }}>
+                            <div style={{ fontSize: "0.7rem", color: "var(--accent, #6366f1)", marginTop: 3, display: "inline-block", background: "rgba(99, 102, 241, 0.08)", padding: "2px 6px", borderRadius: 4 }}>
                               UPI RRN: {rrn}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: 600, color: tx.credit_amount ? "var(--success, #10b981)" : "var(--ink)", whiteSpace: "nowrap" }}>
-                          {tx.credit_amount ? `+₹${tx.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : `₹${tx.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+                        <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600, fontSize: "0.92rem", color: tx.credit_amount ? "var(--success, #10b981)" : "var(--ink)", whiteSpace: "nowrap" }}>
+                          {tx.credit_amount ? `+₹${Math.round(tx.amount).toLocaleString("en-IN")}` : `₹${Math.round(tx.amount).toLocaleString("en-IN")}`}
                         </td>
-                        <td style={{ padding: "9px 12px", textAlign: "right", color: "var(--ink-muted)", fontSize: "0.78rem", whiteSpace: "nowrap" }}>
-                          {tx.running_balance != null ? `₹${tx.running_balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—"}
-                        </td>
-                        <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
-                          <span className="badge" style={{ fontSize: "0.68rem" }}>
-                            {tx.attribution_status === "EXACT" ? (currentStmt.card_last4 ? `•••• ${currentStmt.card_last4}` : "Exact") : "Combined"}
-                          </span>
-                        </td>
-                        <td style={{ padding: "9px 12px", whiteSpace: "nowrap" }}>
-                          {getMatchBadge(tx.match_status)}
-                        </td>
-                        <td style={{ padding: "9px 12px", textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
+                        <td style={{ padding: "12px 16px", textAlign: "center", whiteSpace: "nowrap" }} onClick={(e) => isUnmatched ? e.stopPropagation() : undefined}>
+                          {isMatched && (
+                            <span style={{ color: "var(--success, #10b981)", fontWeight: 700, fontSize: "1.05rem" }} title="Matched in ledger">
+                              ✓
+                            </span>
+                          )}
+                          {isReview && (
+                            <span
+                              style={{
+                                color: "var(--warning, #f59e0b)",
+                                fontWeight: 600,
+                                fontSize: "0.78rem",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 3,
+                                background: "rgba(245, 158, 11, 0.14)",
+                                padding: "3px 9px",
+                                borderRadius: "var(--radius-full, 9999px)",
+                              }}
+                              title={tx.match_reason ? `Click to review (${tx.match_reason})` : "Click to review correlation"}
+                            >
+                              ⚠ Review
+                            </span>
+                          )}
                           {isUnmatched && (
-                            <div style={{ display: "inline-flex", gap: 6, justifyContent: "flex-end" }}>
-                              {rrn && (
-                                <button
-                                  type="button"
-                                  className="btn quiet"
-                                  disabled={scanningTxId === tx.id}
-                                  onClick={() => handleScanGmail(tx)}
-                                  style={{ fontSize: "0.72rem", padding: "2px 7px", color: "var(--accent, #6366f1)" }}
-                                  title={`Scan Gmail for UPI RRN ${rrn}`}
-                                >
-                                  {scanningTxId === tx.id ? "Scanning..." : "🔍 Scan"}
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                className="btn quiet"
-                                disabled={importingTxId === tx.id}
-                                onClick={() => handleImportToLedger(tx)}
-                                style={{ fontSize: "0.72rem", padding: "2px 7px" }}
-                                title="Create corresponding ledger entry and match"
-                              >
-                                {importingTxId === tx.id ? "Adding..." : "+ Add"}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              className="btn quiet"
+                              disabled={importingTxId === tx.id}
+                              onClick={() => handleImportToLedger(tx)}
+                              style={{ fontSize: "0.76rem", padding: "3px 10px" }}
+                              title="Create corresponding ledger entry and match"
+                            >
+                              {importingTxId === tx.id ? "Adding..." : "+ Add"}
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -943,7 +871,7 @@ export function StatementDetailModal({
                   })}
                   {filteredTransactions.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="empty" style={{ padding: 24, textAlign: "center" }}>
+                      <td colSpan={4} className="empty" style={{ padding: 32, textAlign: "center" }}>
                         {transactions.length === 0 ? "No transactions extracted yet. Click Re-Extract to run parser." : "No transactions match the selected filter."}
                       </td>
                     </tr>
@@ -952,54 +880,9 @@ export function StatementDetailModal({
               </table>
             </div>
           </section>
-
-          {/* Level 3: Collapsible Technical Provenance & Processing Audit */}
-          <div style={{ marginTop: 4 }}>
-            <button
-              type="button"
-              className="btn quiet"
-              onClick={() => setShowAuditDetails(!showAuditDetails)}
-              style={{ fontSize: "0.75rem", color: "var(--ink-muted)", padding: "4px 8px" }}
-            >
-              {showAuditDetails ? "▾ Hide Technical Provenance & Processing Audit" : "▸ View Technical Provenance & Processing Audit"}
-            </button>
-
-            {showAuditDetails && (
-              <div style={{ background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: 14, marginTop: 8, fontSize: "0.78rem", display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
-                  <div>
-                    <span style={{ color: "var(--ink-muted)" }}>Parser:</span>{" "}
-                    <strong>{currentStmt.parser_name || "auto"} v{currentStmt.parser_version || "1.0.0"}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--ink-muted)" }}>Discovered:</span>{" "}
-                    <span>{formatDate(currentStmt.discovered_at)}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--ink-muted)" }}>Original SHA-256:</span>{" "}
-                    <code style={{ fontSize: "0.72rem" }}>{currentStmt.original_sha256 ? `${currentStmt.original_sha256.slice(0, 16)}...` : "—"}</code>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--ink-muted)" }}>Unlocked SHA-256:</span>{" "}
-                    <code style={{ fontSize: "0.72rem" }}>{currentStmt.unlocked_sha256 ? `${currentStmt.unlocked_sha256.slice(0, 16)}...` : "—"}</code>
-                  </div>
-                </div>
-
-                <div style={{ borderTop: "1px solid var(--line)", paddingTop: 8, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", color: "var(--ink-muted)", fontSize: "0.75rem" }}>
-                  <span>✓ Ingested from Gmail</span>
-                  <span>→</span>
-                  <span>{currentStmt.has_unlocked_file ? "✓ Password Unlocked" : "🔒 Password Required"}</span>
-                  <span>→</span>
-                  <span>✓ Extracted ({transactions.length} rows)</span>
-                  <span>→</span>
-                  <span>✓ Validated ({currentStmt.validation_status || "Pending"})</span>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Modal Footer */}
+        {/* 5. Footer */}
         <footer
           className="modal-footer"
           style={{
@@ -1012,7 +895,7 @@ export function StatementDetailModal({
           }}
         >
           <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)" }}>
-            {transactions.length > 0 ? `Showing ${filteredTransactions.length} of ${transactions.length} transactions` : "No transactions"}
+            Showing {filteredTransactions.length} transactions
           </div>
           <button type="button" className="btn quiet" onClick={onClose}>
             Close

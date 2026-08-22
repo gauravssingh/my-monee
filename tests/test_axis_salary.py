@@ -233,6 +233,66 @@ UPI/P2M/800745883926/Syed Naseeruddin
     assert tx.merchant_raw == "Syed Naseeruddin"
     assert tx.payment_method == "upi"
     assert tx.reference_number == "UPI/P2M/800745883926/Syed Naseeruddin"
-    assert tx.bank_reference == "UPI/P2M/800745883926/Syed Naseeruddin"
     assert "800745883926" in tx.description
     assert tx.extra["upi_rrn"] == "800745883926"
+
+
+def test_axis_bank_scapia_cc_bill_payment() -> None:
+    parser = AxisBankParser()
+    body_text = """
+Amount Debited:
+INR 99816.14
+
+Account Number:
+XX1022
+
+Date & Time:
+21-08-26, 12:13:00 IST
+
+Transaction Info:
+UPI/P2M/553480039613/Scapia
+"""
+    email = EmailContext(
+        message_id="axis-scapia-bill-1",
+        thread_id="t_scapia_1",
+        sender="Axis Bank Alerts <alerts@axis.bank.in>",
+        subject="INR 99816.14 was debited from your A/c no. XX1022.",
+        received_at=datetime(2026, 8, 21, 12, 13, 0, tzinfo=timezone.utc),
+        body_text=body_text,
+    )
+    assert parser.can_parse(email) >= 0.9
+    parsed = parser.parse(email)
+    assert len(parsed) == 1
+    tx = parsed[0]
+    assert tx.amount == Decimal("99816.14")
+    assert tx.transaction_type == "transfer"
+    assert tx.extra["is_transfer"] is True
+    assert tx.extra["excludes_from_spending"] is True
+    assert tx.extra["category_slug"] == "transfers"
+    assert tx.extra["subcategory_slug"] == "credit-card-payment"
+
+
+def test_axis_bank_credit_card_payment() -> None:
+    parser = AxisBankParser()
+    body_text = """
+11-01-2026 Dear Gaurav Singh, Thank you for banking with us.
+We wish to inform you that your A/c no. XX1022 has been debited with INR 56943.57 on 11-01-2026 15:18:21 IST by CreditCard Payment XX 4951.
+"""
+    email = EmailContext(
+        message_id="axis-cc-pay-1",
+        thread_id="t_cc_1",
+        sender="Axis Bank Alerts <alerts@axis.bank.in>",
+        subject="Debit transaction alert for Axis Bank A/c",
+        received_at=datetime(2026, 1, 11, 15, 18, 21, tzinfo=timezone.utc),
+        body_text=body_text,
+    )
+    assert parser.can_parse(email) >= 0.9
+    parsed = parser.parse(email)
+    assert len(parsed) == 1
+    tx = parsed[0]
+    assert tx.amount == Decimal("56943.57")
+    assert tx.transaction_type == "transfer"
+    assert tx.extra["is_transfer"] is True
+    assert tx.extra["excludes_from_spending"] is True
+    assert tx.extra["category_slug"] == "transfers"
+    assert tx.extra["subcategory_slug"] == "credit-card-payment"

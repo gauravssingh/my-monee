@@ -38,6 +38,8 @@ class ScapiaCardParser:
     def can_parse(self, email: EmailContext) -> float:
         sender = email.sender or ""
         subject = email.subject or ""
+        if re.search(r"statements@|cc\.statements@", sender, re.I) or "statement" in subject.lower():
+            return 0.0  # Handled exclusively by Statement Vault, never as raw email txs
         if not SENDER_HINT.search(sender) and not SENDER_HINT.search(subject):
             text = _scapia_text(email)
             if not SENDER_HINT.search(text):
@@ -59,6 +61,52 @@ class ScapiaCardParser:
         if amount <= 0:
             return []
 
+        tx_date = parse_date_near_amount(text, email.received_at)
+        if tx_date is None:
+            return []
+
+        card = None
+        card_match = CARD_ENDING.search(text)
+        if card_match:
+            card = card_match.group(1)
+
+        is_bill_payment = bool(
+            re.search(
+                r"\b(?:credit\s*card\s*bill\s*payment|bill\s*payment\s*successful|received your credit card bill payment|payment received towards your (?:scapia|federal|credit card))\b",
+                text,
+                re.I,
+            )
+        )
+        if is_bill_payment:
+            return [
+                ParsedTransaction(
+                    amount=amount,
+                    currency="INR",
+                    direction="credit",
+                    transaction_date=tx_date,
+                    transaction_type="transfer",
+                    merchant_raw="Credit card payment",
+                    payment_method="upi" if "upi" in text.lower() else "transfer",
+                    card=card,
+                    description=(email.subject or "Scapia bill payment")[:500],
+                    extra={
+                        "parser": self.name,
+                        "classification_source": "rule",
+                        "classification_confidence": 0.95,
+                        "classification_signals": {
+                            "rule": "scapia_card_bill_payment",
+                            "sender": email.sender,
+                        },
+                        "needs_review": False,
+                        "is_transfer": True,
+                        "is_refund": False,
+                        "excludes_from_spending": True,
+                        "category_slug": "transfers",
+                        "subcategory_slug": "credit-card-payment",
+                    },
+                )
+            ]
+
         merchant = None
         merchant_match = MERCHANT_LABEL.search(text)
         if merchant_match:
@@ -75,14 +123,6 @@ class ScapiaCardParser:
         is_refund = bool(re.search(r"\brefund", text, re.I))
         direction = "credit" if is_refund else "debit"
         tx_type = "refund" if is_refund else "purchase"
-        tx_date = parse_date_near_amount(text, email.received_at)
-        if tx_date is None:
-            return []
-
-        card = None
-        card_match = CARD_ENDING.search(text)
-        if card_match:
-            card = card_match.group(1)
 
         return [
             ParsedTransaction(

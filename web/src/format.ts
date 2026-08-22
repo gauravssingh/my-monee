@@ -10,15 +10,17 @@ export function formatMoney(amount: number, currency = "INR"): string {
   }
 }
 
-export function formatCompactMoney(amount: number, currency = "INR"): string {
+export function formatLakhOrK(amount: number, currency = "INR"): string {
   const sym = currency === "INR" ? "₹" : "$";
   const abs = Math.abs(amount);
   const sign = amount < 0 ? "−" : "";
-  if (abs >= 1_000_000) {
-    return `${sign}${sym}${(abs / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  }
-  if (abs >= 100_000) {
-    return `${sign}${sym}${(abs / 1000).toFixed(0)}k`;
+  if (currency === "INR") {
+    if (abs >= 10_000_000) {
+      return `${sign}${sym}${(abs / 10_000_000).toFixed(2).replace(/\.00$/, "")}Cr`;
+    }
+    if (abs >= 100_000) {
+      return `${sign}${sym}${(abs / 100_000).toFixed(2).replace(/\.00$/, "")}L`;
+    }
   }
   if (abs >= 1_000) {
     return `${sign}${sym}${(abs / 1000).toFixed(1).replace(/\.0$/, "")}k`;
@@ -27,6 +29,10 @@ export function formatCompactMoney(amount: number, currency = "INR"): string {
     return `${sign}${sym}${Math.round(abs)}`;
   }
   return `${sym}0`;
+}
+
+export function formatCompactMoney(amount: number, currency = "INR"): string {
+  return formatLakhOrK(amount, currency);
 }
 
 export function monthLabel(year: number, month: number): string {

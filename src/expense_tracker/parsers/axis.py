@@ -335,17 +335,21 @@ class AxisBankParser:
                     "needs_review": False,
                 }
             )
-        elif re.search(r"credit.?card payment|by CreditCard|cc[- ]?payment", text, re.I):
+        elif (
+            re.search(r"credit.?card payment|by CreditCard|cc[- ]?payment", text, re.I)
+            or (channel_ref and re.search(r"\b(?:scapia|cred(?:\s+app|\s+club)?|ccbill|billdesk|creditcard)\b", channel_ref, re.I))
+            or (merchant_raw and re.search(r"^(?:scapia|cred(?:\s+app|\s+club)?|credit\s*card\s*payment|billdesk)$", merchant_raw, re.I))
+        ):
             enrichment.update(
                 {
                     "transaction_type": "transfer",
-                    "merchant_raw": "Credit card payment",
+                    "merchant_raw": merchant_raw or "Credit card payment",
                     "is_transfer": True,
                     "excludes_from_spending": True,
                     "category_slug": "transfers",
                     "subcategory_slug": "credit-card-payment",
                     "classification_source": "rule",
-                    "classification_confidence": 0.92,
+                    "classification_confidence": 0.95,
                     "classification_signals": {"rule": "axis_cc_payment"},
                     "needs_review": False,
                 }

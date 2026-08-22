@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { type Transaction } from "../api";
 import { formatDate, formatMoney, formatSource } from "../format";
+import { getCategoryIcon } from "../utils/categoryIcons";
 import { openInGmail } from "../utils/gmail";
 
 type Props = {
@@ -111,7 +112,16 @@ export default function TransactionDetailModal({
               Category
             </div>
             <div style={{ fontWeight: 600, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: 6 }}>
-              <span>{transaction.category ?? "Uncategorized"}</span>
+              {transaction.category ? (
+                <>
+                  <span style={{ fontSize: "1rem", lineHeight: 1 }} aria-hidden="true">
+                    {getCategoryIcon(transaction.category)}
+                  </span>
+                  <span>{transaction.category}</span>
+                </>
+              ) : (
+                <span>Uncategorized</span>
+              )}
               {transaction.subcategory && (
                 <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>→ {transaction.subcategory}</span>
               )}

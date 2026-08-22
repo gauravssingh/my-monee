@@ -4,11 +4,12 @@ type Props = {
   dir: "asc" | "desc";
   onClick: () => void;
   className?: string;
+  style?: React.CSSProperties;
 };
 
-export default function SortHeader({ label, active, dir, onClick, className }: Props) {
+export default function SortHeader({ label, active, dir, onClick, className, style }: Props) {
   return (
-    <th className={className} aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}>
+    <th className={className} style={style} aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"}>
       <button type="button" className="th-sort" onClick={onClick}>
         {label}
         <span className="th-sort-arrow" aria-hidden="true">

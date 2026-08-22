@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from expense_tracker.ingestion.discovery import ProviderHint
 from expense_tracker.parsers.base import EmailContext, ParsedTransaction
 from expense_tracker.parsers.extract import (
@@ -29,6 +31,10 @@ class ProviderRuleParser:
         self._fallback = GenericHeuristicParser()
 
     def can_parse(self, email: EmailContext) -> float:
+        sender = email.sender or ""
+        subject = email.subject or ""
+        if re.search(r"statements@|cc\.statements@", sender, re.I) or "statement" in subject.lower():
+            return 0.0  # Handled exclusively by Statement Vault, never as raw email txs
         text = combined_text(email.subject, email.body_text, email.body_html)
         provider_score = self._hint.score(
             (email.sender or "").lower(),

@@ -36,7 +36,7 @@ def providers_dir() -> Path:
 
 
 class AppConfig(BaseModel):
-    name: str = "ExpenseTracker"
+    name: str = "my-monee"
     host: str = "127.0.0.1"
     port: int = 8477
     data_dir: Path | None = None

@@ -2,7 +2,7 @@
 # Override with ~/Library/Application Support/ExpenseTracker/config.local.yaml
 
 app:
-  name: ExpenseTracker
+  name: my-monee
   host: 0.0.0.0
   port: 8477
   data_dir: null  # null → ~/Library/Application Support/ExpenseTracker

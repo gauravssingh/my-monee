@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, type AISuggestion, type CategoryTree, type Transaction } from "../api";
 import { formatDate, formatMoney } from "../format";
+import { getCategoryIcon } from "../utils/categoryIcons";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { useConfirm } from "../hooks/useConfirm";
 
@@ -195,9 +196,12 @@ export default function ClassifyPanel({
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                 <div>
-                  <div style={{ fontWeight: 600, color: "var(--ink)" }}>
-                    {aiSuggestion.category_name}
-                    {aiSuggestion.subcategory_name && ` › ${aiSuggestion.subcategory_name}`}
+                  <div style={{ fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <span aria-hidden="true">{getCategoryIcon(aiSuggestion.category_name)}</span>
+                    <span>
+                      {aiSuggestion.category_name}
+                      {aiSuggestion.subcategory_name && ` › ${aiSuggestion.subcategory_name}`}
+                    </span>
                   </div>
                   {aiSuggestion.signals.length > 0 && (
                     <div style={{ fontSize: "0.75rem", color: "var(--ink-muted)", marginTop: 2 }}>
@@ -245,7 +249,8 @@ export default function ClassifyPanel({
                       setSubcategoryId("");
                     }}
                   >
-                    {cat.name}
+                    <span aria-hidden="true">{getCategoryIcon(cat.name, cat.expense_type)}</span>
+                    <span>{cat.name}</span>
                   </button>
                 );
               })}

@@ -14,7 +14,17 @@ from sqlalchemy.orm import joinedload
 
 IST = ZoneInfo("Asia/Kolkata")
 
-from expense_tracker.db.models import Account, Category, DataIssueFlag, Email, IngestionRun, Merchant, SyncState, Transaction
+from expense_tracker.db.models import (
+    Account,
+    Category,
+    DataIssueFlag,
+    Email,
+    IngestionRun,
+    Merchant,
+    Subcategory,
+    SyncState,
+    Transaction,
+)
 from expense_tracker.domain.enums import DataIssueStatus
 
 
@@ -55,12 +65,25 @@ def _valid_spending_filters() -> list[Any]:
         DataIssueFlag.status == DataIssueStatus.OPEN,
         DataIssueFlag.issue_type.in_(["not_a_transaction", "duplicate"]),
     )
+    transfers_cat_subq = select(Category.id).where(Category.slug == "transfers")
+    cc_subcat_subq = select(Subcategory.id).where(Subcategory.slug == "credit-card-payment")
     return [
         Transaction.direction == "debit",
         Transaction.is_duplicate.is_(False),
         Transaction.is_transfer.is_(False),
         Transaction.excludes_from_spending.is_(False),
-        Transaction.transaction_type.notin_(["not_a_transaction", "declined", "transfer"]),
+        Transaction.transaction_type.notin_(
+            [
+                "not_a_transaction",
+                "declined",
+                "transfer",
+                "credit_card_payment",
+                "cc_payment",
+                "statement",
+            ]
+        ),
+        (Transaction.category_id.is_(None) | ~Transaction.category_id.in_(transfers_cat_subq)),
+        (Transaction.subcategory_id.is_(None) | ~Transaction.subcategory_id.in_(cc_subcat_subq)),
         ~Transaction.id.in_(open_issue_subq),
     ]
 

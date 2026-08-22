@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, type Merchant } from "../api";
 import { formatMoney } from "../format";
 import MerchantDetailsModal from "../components/MerchantDetailsModal";
+import SortHeader from "../components/SortHeader";
 import { useToast } from "../hooks/useToast";
 
 type SortField = "lifetime" | "30day" | "merchant" | "txcount";
@@ -210,45 +211,32 @@ export default function MerchantsPage() {
           <table style={{ marginTop: 8 }}>
             <thead>
               <tr>
-                <th className="col-check" />
-                <th
-                  style={{ cursor: "pointer", userSelect: "none" }}
+                <th className="col-check" style={{ width: 36 }} />
+                <SortHeader
+                  label="Merchant"
+                  active={sortField === "merchant"}
+                  dir={sortDir}
                   onClick={() => handleSort("merchant")}
-                  title="Sort by Merchant Name"
-                >
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <span>Merchant</span>
-                    <span style={{ fontSize: "0.72rem", opacity: sortField === "merchant" ? 1 : 0.3 }}>
-                      {sortField === "merchant" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-                    </span>
-                  </div>
-                </th>
-                <th>Canonical Name</th>
-                <th>Aliases</th>
-                <th
-                  style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
+                  style={{ width: "32%", maxWidth: 320 }}
+                />
+                <th style={{ width: "20%", minWidth: 140, maxWidth: 220 }}>Canonical Name</th>
+                <th style={{ width: "14%", minWidth: 100, maxWidth: 140 }}>Aliases</th>
+                <SortHeader
+                  label="30-Day Spend"
+                  className="num"
+                  active={sortField === "30day"}
+                  dir={sortDir}
                   onClick={() => handleSort("30day")}
-                  title="Sort by 30-Day Spend"
-                >
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: "flex-end", width: "100%" }}>
-                    <span>30-Day Spend</span>
-                    <span style={{ fontSize: "0.72rem", opacity: sortField === "30day" ? 1 : 0.3 }}>
-                      {sortField === "30day" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-                    </span>
-                  </div>
-                </th>
-                <th
-                  style={{ textAlign: "right", cursor: "pointer", userSelect: "none" }}
+                  style={{ width: 140, minWidth: 120 }}
+                />
+                <SortHeader
+                  label="Lifetime Spend"
+                  className="num"
+                  active={sortField === "lifetime"}
+                  dir={sortDir}
                   onClick={() => handleSort("lifetime")}
-                  title="Sort by Lifetime Spend"
-                >
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 4, justifyContent: "flex-end", width: "100%" }}>
-                    <span>Lifetime Spend</span>
-                    <span style={{ fontSize: "0.72rem", opacity: sortField === "lifetime" ? 1 : 0.3 }}>
-                      {sortField === "lifetime" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
-                    </span>
-                  </div>
-                </th>
+                  style={{ width: 140, minWidth: 120 }}
+                />
               </tr>
             </thead>
             <tbody>
@@ -272,11 +260,11 @@ export default function MerchantsPage() {
                         aria-label={`Select ${m.display_name}`}
                       />
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
-                        <span>{m.display_name}</span>
+                    <td style={{ maxWidth: 320, wordBreak: "break-word", overflowWrap: "anywhere" }}>
+                      <div style={{ fontWeight: 600, color: "var(--ink)", wordBreak: "break-word", overflowWrap: "anywhere", lineHeight: 1.35 }}>
+                        {m.display_name}
                       </div>
-                      <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", wordBreak: "break-word" }}>
                         <span>{m.transaction_count ?? 0} {m.transaction_count === 1 ? "transaction" : "transactions"}</span>
                         {m.default_category && (
                           <>
@@ -286,9 +274,9 @@ export default function MerchantsPage() {
                         )}
                       </div>
                     </td>
-                    <td>
+                    <td style={{ maxWidth: 220, wordBreak: "break-word", overflowWrap: "anywhere" }}>
                       {m.canonical_name ? (
-                        <span style={{ color: "var(--accent)", fontWeight: 600, fontSize: "0.88rem" }}>
+                        <span style={{ color: "var(--accent)", fontWeight: 600, fontSize: "0.88rem", wordBreak: "break-word", overflowWrap: "anywhere" }}>
                           {m.canonical_name}
                         </span>
                       ) : (
@@ -306,6 +294,8 @@ export default function MerchantsPage() {
                             background: "var(--surface)",
                             border: "1px solid var(--line)",
                             color: "var(--ink)",
+                            display: "inline-flex",
+                            alignItems: "center",
                           }}
                           title={m.aliases.join(", ")}
                         >
@@ -315,7 +305,7 @@ export default function MerchantsPage() {
                         <span style={{ color: "var(--ink-muted)", fontSize: "0.85rem" }}>—</span>
                       )}
                     </td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontSize: "0.88rem" }}>
+                    <td className="num tx-amount" style={{ fontSize: "0.88rem" }}>
                       {last30 > 0 ? (
                         <span style={{ fontWeight: 500, color: "var(--ink)" }}>
                           {formatMoney(last30, "INR")}
@@ -324,7 +314,7 @@ export default function MerchantsPage() {
                         <span style={{ color: "var(--ink-muted)" }}>—</span>
                       )}
                     </td>
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontSize: "0.92rem", fontWeight: 600, color: "var(--ink)" }}>
+                    <td className="num tx-amount" style={{ fontSize: "0.92rem", fontWeight: 600, color: "var(--ink)" }}>
                       {overall > 0 ? formatMoney(overall, "INR") : "₹0"}
                     </td>
                   </tr>

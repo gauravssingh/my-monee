@@ -60,3 +60,40 @@ def test_scapia_parser_purchase() -> None:
     assert tx.merchant_raw and "Cursor" in tx.merchant_raw
     assert tx.card == "0863"
     assert tx.payment_method == "card"
+
+
+def test_scapia_parser_bill_payment() -> None:
+    email = EmailContext(
+        message_id="scapia-test-bill-pay",
+        thread_id=None,
+        sender="Scapia <alerts@scapia.cards>",
+        subject="Bill payment successful!",
+        received_at=datetime(2026, 8, 21, 12, 13, tzinfo=timezone.utc),
+        body_text="Great news! We received your credit card bill payment in just 1.3 seconds. Card: Federal Bank XXXX-0863 Amount Paid: ₹99816.14 Paid Via: upi",
+        body_html=None,
+    )
+    parser = ScapiaCardParser()
+    assert parser.can_parse(email) >= 0.75
+    parsed = parser.parse(email)
+    assert len(parsed) == 1
+    tx = parsed[0]
+    assert tx.amount == Decimal("99816.14")
+    assert tx.transaction_type == "transfer"
+    assert tx.extra["is_transfer"] is True
+    assert tx.extra["excludes_from_spending"] is True
+    assert tx.extra["category_slug"] == "transfers"
+    assert tx.extra["subcategory_slug"] == "credit-card-payment"
+
+
+def test_scapia_ignores_statement_email() -> None:
+    email = EmailContext(
+        message_id="scapia-test-stmt",
+        thread_id=None,
+        sender="Scapia Federal Credit Card <scapiacards@federalbank.co.in>",
+        subject="Your Scapia Federal credit card statement for August, 2026",
+        received_at=datetime(2026, 8, 21, 12, 13, tzinfo=timezone.utc),
+        body_text="Your latest statement for the cycle 21 Jul 2026 - 20 Aug 2026 has landed. Total Amount Due ₹99816.14",
+        body_html=None,
+    )
+    parser = ScapiaCardParser()
+    assert parser.can_parse(email) == 0.0

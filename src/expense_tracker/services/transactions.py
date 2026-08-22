@@ -178,20 +178,47 @@ def list_transactions(
     if cats:
         has_uncat = "uncategorized" in cats
         specific_cats = [c for c in cats if c != "uncategorized"]
-        if has_uncat and specific_cats:
+        resolved_category_ids: set[str] = set()
+
+        if specific_cats:
+            matched_db_ids = session.scalars(
+                select(Category.id).where(
+                    (Category.id.in_(specific_cats))
+                    | (func.lower(Category.slug).in_([c.lower() for c in specific_cats]))
+                    | (func.lower(Category.name).in_([c.lower() for c in specific_cats]))
+                )
+            ).all()
+            resolved_category_ids.update(matched_db_ids)
+            if not matched_db_ids:
+                resolved_category_ids.update(specific_cats)
+
+        if has_uncat and resolved_category_ids:
             stmt = stmt.where(
-                (Transaction.category_id.is_(None)) | (Transaction.category_id.in_(specific_cats))
+                (Transaction.category_id.is_(None)) | (Transaction.category_id.in_(resolved_category_ids))
             )
         elif has_uncat:
             stmt = stmt.where(Transaction.category_id.is_(None))
-        elif specific_cats:
-            if len(specific_cats) == 1 and subcategory_id:
+        elif resolved_category_ids:
+            if len(resolved_category_ids) == 1 and subcategory_id:
+                single_cat_id = next(iter(resolved_category_ids))
+                subcat_id_resolved = session.scalar(
+                    select(Subcategory.id).where(
+                        (Subcategory.id == subcategory_id)
+                        | (
+                            (Subcategory.category_id == single_cat_id)
+                            & (
+                                (func.lower(Subcategory.slug) == subcategory_id.lower())
+                                | (func.lower(Subcategory.name) == subcategory_id.lower())
+                            )
+                        )
+                    )
+                ) or subcategory_id
                 stmt = stmt.where(
-                    (Transaction.category_id == specific_cats[0])
-                    & (Transaction.subcategory_id == subcategory_id)
+                    (Transaction.category_id == single_cat_id)
+                    & (Transaction.subcategory_id == subcat_id_resolved)
                 )
             else:
-                stmt = stmt.where(Transaction.category_id.in_(specific_cats))
+                stmt = stmt.where(Transaction.category_id.in_(resolved_category_ids))
 
     base_filtered_stmt = stmt
     stmt = _apply_sort(base_filtered_stmt, sort_by, sort_dir)
@@ -225,7 +252,7 @@ def _apply_category_side_effects(
 ) -> None:
     slug = category.slug
     sub_slug = subcategory.slug if subcategory else None
-    if slug == "transfers":
+    if slug == "transfers" or sub_slug == "credit-card-payment":
         tx.is_transfer = True
         tx.is_refund = False
         tx.excludes_from_spending = True

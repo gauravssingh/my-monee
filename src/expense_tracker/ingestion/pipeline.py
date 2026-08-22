@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -243,6 +244,45 @@ def _apply_parsed_fields(
 
 
 def _get_or_create_account(session: Session, parsed: ParsedTransaction) -> Account:
+    """Resolve an existing Account by card_last4, account_number_masked, UPI identifier, or name,
+    creating one only as a fallback."""
+    all_accounts = session.query(Account).all()
+
+    # 1. Match by card last 4 digits (e.g. 4951, 1221, 0863)
+    if parsed.card:
+        card_clean = parsed.card.strip()
+        # Prefer credit card accounts first when matching card numbers
+        for acc in sorted(all_accounts, key=lambda a: (a.account_type != "CREDIT_CARD", a.name)):
+            if acc.card_last4 and acc.card_last4.strip() == card_clean:
+                return acc
+            if acc.account_number_masked:
+                masked_digits = "".join(re.findall(r"\d+", acc.account_number_masked))
+                if masked_digits and masked_digits.endswith(card_clean):
+                    return acc
+
+    # 2. Match by account number or masked account (e.g. ****1022, 801022, 1022)
+    if parsed.account:
+        raw_digits = "".join(re.findall(r"\d+", parsed.account))
+        acc_clean = parsed.account.replace("*", "").replace("X", "").strip()
+        last4 = raw_digits[-4:] if len(raw_digits) >= 4 else acc_clean
+        if last4:
+            # When matching an account number without card, prefer BANK accounts over CREDIT_CARD
+            for acc in sorted(all_accounts, key=lambda a: (a.account_type != "BANK", a.name)):
+                if acc.account_number_masked:
+                    masked_digits = "".join(re.findall(r"\d+", acc.account_number_masked))
+                    if masked_digits and masked_digits.endswith(last4):
+                        return acc
+                if acc.card_last4 and acc.card_last4.strip() == last4:
+                    return acc
+
+    # 3. Match by UPI ID
+    if parsed.upi_id:
+        upi_clean = parsed.upi_id.lower().strip()
+        for acc in all_accounts:
+            if acc.upi_identifier_masked and acc.upi_identifier_masked.lower() in upi_clean:
+                return acc
+
+    # 4. Fallback matching by name
     if parsed.account:
         name = f"{parsed.account} Account"
         acc_type = "BANK"
@@ -264,22 +304,29 @@ def _get_or_create_account(session: Session, parsed: ParsedTransaction) -> Accou
         acc_type = "CASH"
         is_liability = False
 
-    acc = session.query(Account).filter_by(name=name).first()
-    if not acc:
-        inst = session.query(Institution).filter_by(name="Unknown Institution").first()
-        if not inst:
-            inst = Institution(name="Unknown Institution", institution_type="BANK")
-            session.add(inst)
-            session.flush()
-        acc = Account(
-            name=name,
-            institution_id=inst.id,
-            account_type=acc_type,
-            is_asset=not is_liability,
-            is_liability=is_liability,
-        )
-        session.add(acc)
+    for acc in all_accounts:
+        if acc.name.strip().lower() == name.strip().lower():
+            return acc
+
+    # 5. Create new account with populated identifier fields
+    inst = session.query(Institution).filter_by(name="Unknown Institution").first()
+    if not inst:
+        inst = Institution(name="Unknown Institution", institution_type="BANK")
+        session.add(inst)
         session.flush()
+
+    acc = Account(
+        name=name,
+        institution_id=inst.id,
+        account_type=acc_type,
+        is_asset=not is_liability,
+        is_liability=is_liability,
+        card_last4=parsed.card if parsed.card else None,
+        account_number_masked=parsed.account if parsed.account else None,
+        upi_identifier_masked=parsed.upi_id if parsed.upi_id else None,
+    )
+    session.add(acc)
+    session.flush()
     return acc
 
 

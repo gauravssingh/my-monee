@@ -136,3 +136,68 @@ def test_merchants_exclude_transfers(tmp_path: Path) -> None:
         assert m["total_spent"] >= 0
         assert m["spent_last_30d"] >= 0
 
+
+def test_get_or_create_account_matches_existing_identifiers(tmp_path: Path) -> None:
+    from expense_tracker.db.models import Account, Institution
+    from expense_tracker.db.session import init_db, get_session_factory
+    from expense_tracker.ingestion.pipeline import _get_or_create_account
+    from expense_tracker.parsers.base import ParsedTransaction
+
+    settings = _test_settings(tmp_path)
+    init_db(settings)
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        inst = Institution(name="Axis Bank", institution_type="BANK")
+        session.add(inst)
+        session.flush()
+
+        # Existing user-configured accounts
+        cc = Account(
+            name="Axis Bank Credit Card",
+            institution_id=inst.id,
+            account_type="CREDIT_CARD",
+            card_last4="4951",
+            account_number_masked="1022",
+            is_liability=True,
+            is_asset=False,
+        )
+        bank = Account(
+            name="Axis Bank Savings",
+            institution_id=inst.id,
+            account_type="BANK",
+            account_number_masked="1022",
+            is_liability=False,
+            is_asset=True,
+        )
+        session.add_all([cc, bank])
+        session.commit()
+
+        # 1. ParsedTransaction with card="4951" should match cc
+        parsed_card = ParsedTransaction(
+            amount=500.0,
+            currency="INR",
+            transaction_date=datetime(2026, 8, 1, tzinfo=UTC),
+            direction="debit",
+            card="4951",
+            merchant_raw="SWIGGY",
+        )
+        resolved_cc = _get_or_create_account(session, parsed_card)
+        assert resolved_cc.id == cc.id
+
+        # 2. ParsedTransaction with account="****1022" should match existing account
+        parsed_bank = ParsedTransaction(
+            amount=1000.0,
+            currency="INR",
+            transaction_date=datetime(2026, 8, 1, tzinfo=UTC),
+            direction="debit",
+            account="****1022",
+            merchant_raw="ZEPTO",
+        )
+        resolved_bank = _get_or_create_account(session, parsed_bank)
+        assert resolved_bank.id in {cc.id, bank.id}
+
+        # 3. Verify total accounts count has NOT increased
+        total_accounts = session.query(Account).count()
+        assert total_accounts == 2
+
+

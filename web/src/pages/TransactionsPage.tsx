@@ -15,6 +15,7 @@ import FlagIssueModal from "../components/FlagIssueModal";
 import MarkRecurringModal from "../components/MarkRecurringModal";
 import SortHeader from "../components/SortHeader";
 import TransactionDetailModal from "../components/TransactionDetailModal";
+import { getCategoryIcon } from "../utils/categoryIcons";
 import { formatDate, formatMoney } from "../format";
 
 type Props = {
@@ -26,6 +27,27 @@ type SortBy = "date" | "merchant" | "amount" | "category" | "source" | "status";
 type SortDir = "asc" | "desc";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function resolveCategoryTokens(tokens: string[], categoryList: CategoryTree[]): Set<string> {
+  const result = new Set<string>();
+  for (const token of tokens) {
+    if (!token) continue;
+    const lower = token.toLowerCase();
+    if (lower === "uncategorized") {
+      result.add("uncategorized");
+      continue;
+    }
+    const matched = categoryList.find(
+      (c) => c.id === token || c.slug.toLowerCase() === lower || c.name.toLowerCase() === lower
+    );
+    if (matched) {
+      result.add(matched.id);
+    } else {
+      result.add(token);
+    }
+  }
+  return result;
+}
 
 function dateValue(date: Date): string {
   const year = date.getFullYear();
@@ -309,7 +331,8 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     setQ(urlQ);
     setDebouncedQ(urlQ);
     if (urlCategory) {
-      setSelectedCategoryIds(new Set(urlCategory.split(",").map((s) => s.trim()).filter(Boolean)));
+      const tokens = urlCategory.split(",").map((s) => s.trim()).filter(Boolean);
+      setSelectedCategoryIds(categories.length > 0 ? resolveCategoryTokens(tokens, categories) : new Set(tokens));
     } else {
       setSelectedCategoryIds(new Set());
     }
@@ -317,7 +340,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     setDateFrom(urlFrom);
     setDateTo(urlTo);
     setOffset(0);
-  }, [searchParams]);
+  }, [searchParams, categories]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -333,7 +356,14 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     api
       .categories()
       .then((data) => {
-        if (!cancelled) setCategories(data.items);
+        if (!cancelled) {
+          setCategories(data.items);
+          const urlCategory = searchParams.get("category_ids") || searchParams.get("category_id") || searchParams.get("category") || "";
+          if (urlCategory) {
+            const tokens = urlCategory.split(",").map((s) => s.trim()).filter(Boolean);
+            setSelectedCategoryIds(resolveCategoryTokens(tokens, data.items));
+          }
+        }
       })
       .catch((err: Error) => {
         if (!cancelled) setError(err.message);
@@ -351,7 +381,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [searchParams]);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -946,7 +976,7 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                                 setOffset(0);
                               }}
                             />
-                            <span>{c.name}</span>
+                            <span>{getCategoryIcon(c.name, c.expense_type)} {c.name}</span>
                           </label>
                         );
                       })}
@@ -1147,11 +1177,20 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                       <td style={{ paddingRight: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
                           <div>
-                            <div style={{ fontWeight: 500, fontSize: "0.88rem", color: "var(--ink)" }}>
-                              {tx.category ?? <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>}
+                            <div style={{ fontWeight: 500, fontSize: "0.88rem", color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
+                              {tx.category ? (
+                                <>
+                                  <span style={{ fontSize: "0.95rem", lineHeight: 1 }} aria-hidden="true">
+                                    {getCategoryIcon(tx.category)}
+                                  </span>
+                                  <span>{tx.category}</span>
+                                </>
+                              ) : (
+                                <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>
+                              )}
                             </div>
                             {tx.subcategory && (
-                              <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 1 }}>
+                              <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 1, paddingLeft: tx.category ? 22 : 0 }}>
                                 {tx.subcategory}
                               </div>
                             )}
@@ -1373,17 +1412,26 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: 6,
+                          gap: 5,
                           background: "var(--bg)",
                           border: "1px solid var(--line)",
                           borderRadius: "var(--radius-sm)",
-                          padding: "2px 6px 2px 8px",
+                          padding: "2px 6px 2px 7px",
                           fontWeight: 500,
                           fontSize: "0.78rem",
                           color: "var(--ink)",
                         }}
                       >
-                        <span>{tx.category ?? <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>}</span>
+                        {tx.category ? (
+                          <>
+                            <span style={{ fontSize: "0.88rem", lineHeight: 1 }} aria-hidden="true">
+                              {getCategoryIcon(tx.category)}
+                            </span>
+                            <span>{tx.category}</span>
+                          </>
+                        ) : (
+                          <span style={{ color: "var(--ink-muted)" }}>Uncategorized</span>
+                        )}
                         {tx.subcategory && (
                           <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>· {tx.subcategory}</span>
                         )}

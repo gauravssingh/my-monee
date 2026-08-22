@@ -1,11 +1,12 @@
 {
-  "name": "expense-tracker-web",
+  "name": "my-monee",
   "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "lint": "eslint .",
+    "test": "vitest run",
     "build": "eslint . && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
@@ -23,6 +24,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "typescript": "~5.7.0",
     "typescript-eslint": "^8.67.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vitest": "^4.1.11"
   }
 }
