@@ -153,21 +153,25 @@ class Settings(BaseSettings):
         return path
 
     def database_path(self) -> Path:
-        # Check standard flat or db/ nested path
-        flat_path = self.resolved_data_dir() / self.database.filename
-        if flat_path.exists():
-            return flat_path
-        nested_path = self.resolved_data_dir() / "db" / self.database.filename
+        data_dir = self.resolved_data_dir()
+        configured = data_dir / self.database.filename
+        legacy = data_dir / "expense_tracker.db"
+        legacy_nested = data_dir / "db" / "expense_tracker.db"
+
+        # If legacy database with data exists and configured is smaller/empty, use legacy
+        if legacy.exists() and (not configured.exists() or legacy.stat().st_size > configured.stat().st_size):
+            return legacy
+        if legacy_nested.exists() and (not configured.exists() or legacy_nested.stat().st_size > configured.stat().st_size):
+            return legacy_nested
+
+        if configured.exists():
+            return configured
+        nested_path = data_dir / "db" / self.database.filename
         if nested_path.exists():
             return nested_path
-        # Legacy fallback if mymonee.db exists
-        legacy_flat = self.resolved_data_dir() / "mymonee.db"
-        if legacy_flat.exists():
-            return legacy_flat
-        legacy_nested = self.resolved_data_dir() / "db" / "mymonee.db"
-        if legacy_nested.exists():
-            return legacy_nested
-        return flat_path
+        if legacy.exists():
+            return legacy
+        return configured
 
     def log_path(self) -> Path:
         if self.logging.file:
