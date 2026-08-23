@@ -26,81 +26,36 @@ class AccountUpdate(AccountCreate):
 
 @router.get("")
 def list_accounts(session: Session = Depends(db_session)) -> dict[str, Any]:
-    accounts = session.scalars(select(Account).order_by(Account.name)).all()
+    from expense_tracker.services.ledger import calculate_ledger_balances
     
-    # Calculate net worth
-    assets = sum(a.current_balance for a in accounts if a.is_asset)
-    liabilities = sum(a.current_balance for a in accounts if a.is_liability)
-    net_worth = assets - liabilities
-
-    # Calculate actual balances from Postings
-    # For now, since we migrated existing txs to Postings, let's just query Postings
-    # to sum up the balances dynamically if needed, but our migration set default balance 0.
-    # Actually, we should calculate current balance dynamically from postings!
-    from expense_tracker.db.models import Posting
-    postings_summary = session.execute(
-        select(
-            Posting.account_id, 
-            Posting.direction,
-            func.sum(Posting.amount)
-        ).group_by(Posting.account_id, Posting.direction)
-    ).all()
-
-    balances = {}
-    for acc_id, direction, amount in postings_summary:
-        if acc_id not in balances:
-            balances[acc_id] = 0.0
-        # If it's a debit and account is asset -> asset increase? No, in banking debit usually means money out, but in double entry debit is +Asset.
-        # Let's look at migration script:
-        # "asset_decrease" if direction == "debit" else "asset_increase"
-        # debit (spent) = asset decrease. credit (income) = asset increase.
-        if direction == "debit":
-            balances[acc_id] -= float(amount)
-        else:
-            balances[acc_id] += float(amount)
+    summary = calculate_ledger_balances(session)
+    accounts_by_id = {a.id: a for a in session.scalars(select(Account)).all()}
 
     items = []
-    total_assets = 0.0
-    total_liabilities = 0.0
-
-    for a in accounts:
-        bal = balances.get(a.id, 0.0)
-        a.current_balance = bal
-        
-        if a.is_asset:
-            total_assets += bal
-        if a.is_liability:
-            # Liability balance: a positive balance means we owe money.
-            # When we spend on credit card (debit), liability increases. 
-            # In our migration, debit = asset_decrease... wait.
-            # If it's a credit card (is_liability), a "debit" transaction means we spent money, so our liability increases.
-            # In migration script: "asset_decrease" if direction == "debit".
-            # If it's a liability, the logic is technically liability_increase. 
-            # To keep it simple, if bal < 0 on a liability, it means we owe that much (it decreased our net worth).
-            total_liabilities += abs(bal)
-
+    for proj in summary.accounts:
+        acc = accounts_by_id.get(proj.account_id)
+        if not acc:
+            continue
         items.append({
-            "id": a.id,
-            "name": a.name,
-            "account_type": a.account_type,
-            "is_asset": a.is_asset,
-            "is_liability": a.is_liability,
-            "balance": abs(bal),
-            "raw_balance": bal,
-            "currency": a.currency,
-            "account_number_masked": a.account_number_masked,
-            "card_last4": a.card_last4,
-            "upi_identifier_masked": a.upi_identifier_masked,
-            "credit_limit": float(a.credit_limit) if a.credit_limit else None,
-            "opening_balance": float(a.opening_balance),
+            "id": acc.id,
+            "name": acc.name,
+            "account_type": acc.account_type,
+            "is_asset": acc.is_asset,
+            "is_liability": acc.is_liability,
+            "balance": float(proj.current_balance),
+            "raw_balance": float(proj.current_balance),
+            "currency": acc.currency,
+            "account_number_masked": acc.account_number_masked,
+            "card_last4": acc.card_last4,
+            "upi_identifier_masked": acc.upi_identifier_masked,
+            "credit_limit": float(acc.credit_limit) if acc.credit_limit else None,
+            "opening_balance": float(acc.opening_balance),
         })
-        
-    net_worth = total_assets - total_liabilities
 
     return {
-        "net_worth": net_worth,
-        "assets": total_assets,
-        "liabilities": total_liabilities,
+        "net_worth": float(summary.net_worth),
+        "assets": float(summary.total_assets),
+        "liabilities": float(summary.total_liabilities),
         "accounts": items,
     }
 

@@ -286,6 +286,7 @@ export default function App() {
           <Route path="/merchants" element={<MerchantsPage />} />
           <Route path="/review" element={<TransactionsPage needsReview />} />
           <Route path="/data-issues" element={<DataIssuesPage />} />
+          <Route path="/issues" element={<Navigate to="/data-issues" replace />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/statements" element={<CreditCardStatementsPage />} />

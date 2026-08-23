@@ -15,8 +15,8 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.models import DataIssueFlag, Transaction, utcnow
-from expense_tracker.domain.enums import DataIssueStatus, DataIssueType
+from expense_tracker.db.models import DataIssueFlag, Email, Transaction, utcnow
+from expense_tracker.domain.enums import DataIssueStatus, DataIssueType, EmailParseStatus, TransactionType
 
 VALID_ISSUE_TYPES = {member.value for member in DataIssueType}
 VALID_STATUSES = {member.value for member in DataIssueStatus}
@@ -224,6 +224,31 @@ def resolve_data_issues_bulk(
         issue.resolved_at = utcnow() if status != DataIssueStatus.OPEN else None
         if resolved_note is not None:
             issue.resolved_note = resolved_note
+
+        # When resolving, ensure the underlying transaction reflects the confirmed status
+        if status == DataIssueStatus.RESOLVED:
+            tx = session.get(Transaction, issue.transaction_id)
+            if tx is not None:
+                if issue.issue_type == DataIssueType.NOT_A_TRANSACTION.value:
+                    tx.transaction_type = TransactionType.NOT_A_TRANSACTION
+                    tx.excludes_from_spending = True
+                    tx.needs_review = False
+                    tx.user_verified = True
+                    tx.classification_source = "user"
+                    tx.updated_at = utcnow()
+                    if tx.source_email_id:
+                        email = session.get(Email, tx.source_email_id)
+                        if email is not None:
+                            email.parse_status = EmailParseStatus.SKIPPED
+                            email.parse_error = "Marked by user as not a transaction email"
+                            email.updated_at = utcnow()
+                elif issue.issue_type == DataIssueType.DUPLICATE.value:
+                    tx.is_duplicate = True
+                    tx.excludes_from_spending = True
+                    tx.needs_review = False
+                    tx.user_verified = True
+                    tx.updated_at = utcnow()
+
         updated.append(issue)
 
     session.flush()

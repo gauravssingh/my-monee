@@ -51,6 +51,53 @@ Local-first personal finance intelligence for macOS. Connect Gmail once; continu
 
 ---
 
+## 1.1 Core Domain Axiom & 5-Stage Ledger Pipeline
+
+> **Architectural Law:**  
+> **Source data is evidence. The ledger is the application's financial truth.**  
+> *No downstream projection, parser, classifier, statement, or AI component may become an independent source of financial truth.*
+
+```text
+                 EXTERNAL EVIDENCE
+          (Gmail Alerts, PDF Statements, Manual Inputs)
+                        │
+                        ▼
+                 INGESTION RECORD
+          (Raw MIME payload, PDFs, file hashes, timestamps)
+                        │
+                        ▼
+                INTERPRETATION LAYER
+          (Parsing, Normalization, Classification, Matching)
+                        │
+                        ▼
+                DOMAIN VALIDATION
+          (Invariants, balance checks, entity resolution)
+                        │
+              ╔═════════▼═════════╗
+              ║ CANONICAL LEDGER  ║
+              ║ Financial Truth   ║
+              ╚═════════╤═════════╝
+                        │
+          ┌─────────────┼─────────────┐
+          ▼             ▼             ▼
+       BALANCES     ANALYTICS    RECONCILIATION
+     (Projections)  (Reporting)  (Audit & Integrity)
+          │
+          ▼
+       PLANNING
+  (Budgets & Commitments)
+```
+
+**The 6 Core Domain Areas:**
+1. **Ledger** (`Account`, `Transaction`, `JournalEntry`, `Posting`, `TransactionLink`) — *Financial Truth*
+2. **Classification** (`Merchant`, `MerchantAlias`, `Category`, `ClassificationRule`) — *Semantics & Learning*
+3. **Statements & Reconciliation** (`CreditCardStatement`, `StatementTransaction`, `Reconciliation`) — *Audit & Verification*
+4. **Ingestion & Provenance** (`Email`, `SyncCursor`, `IngestionRun`) — *Immutable Evidence Pipeline*
+5. **Planning** (`Subscription`, `Bill`, `Budget`) — *Expectations & Intent*
+6. **Data Quality** (`DataIssue`) — *Health & Anomaly Flags*
+
+---
+
 ## 2. Technology Stack (with rationale)
 
 | Layer | Choice | Why |

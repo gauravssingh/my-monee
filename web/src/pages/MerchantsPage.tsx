@@ -23,6 +23,9 @@ export default function MerchantsPage() {
   const [mergeLoading, setMergeLoading] = useState(false);
   const [detailsMerchant, setDetailsMerchant] = useState<{ id: string; name: string } | null>(null);
 
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [page, setPage] = useState<number>(1);
+
   const fetchMerchants = () => {
     setLoading(true);
     api.getMerchants()
@@ -34,6 +37,10 @@ export default function MerchantsPage() {
   useEffect(() => {
     fetchMerchants();
   }, []);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, sortField, sortDir]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -104,6 +111,14 @@ export default function MerchantsPage() {
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [merchants, searchQuery, sortField, sortDir]);
+
+  const totalMerchants = filteredAndSortedMerchants.length;
+  const totalPages = Math.max(1, Math.ceil(totalMerchants / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const offset = (currentPage - 1) * pageSize;
+  const paginatedMerchants = useMemo(() => {
+    return filteredAndSortedMerchants.slice(offset, offset + pageSize);
+  }, [filteredAndSortedMerchants, offset, pageSize]);
 
   const totalSpendOverall = useMemo(
     () => merchants.reduce((sum, m) => sum + (m.total_spent || 0), 0),
@@ -241,7 +256,7 @@ export default function MerchantsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredAndSortedMerchants.map((m) => {
+              {paginatedMerchants.map((m) => {
                 const last30 = m.spent_last_30d ?? 0;
                 const overall = m.total_spent ?? 0;
                 const aliasCount = m.aliases.length;
@@ -357,7 +372,7 @@ export default function MerchantsPage() {
             </div>
           </div>
 
-          {filteredAndSortedMerchants.map((m) => {
+          {paginatedMerchants.map((m) => {
             const last30 = m.spent_last_30d ?? 0;
             const overall = m.total_spent ?? 0;
             const aliasCount = m.aliases.length;
@@ -432,6 +447,93 @@ export default function MerchantsPage() {
           {filteredAndSortedMerchants.length === 0 && (
             <div className="empty" style={{ padding: 24 }}>No merchants match your search filter.</div>
           )}
+        </div>
+
+        {/* Pagination Footer */}
+        <div
+          className="tx-pagination-footer"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 14,
+            padding: "10px 14px",
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--radius-sm)",
+            fontSize: "0.85rem",
+            flexWrap: "wrap",
+          }}
+        >
+          {/* Left summary */}
+          <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
+            <span style={{ whiteSpace: "nowrap" }}>
+              Showing <strong>{totalMerchants === 0 ? 0 : offset + 1}–{Math.min(offset + paginatedMerchants.length, totalMerchants)}</strong> of{" "}
+              <strong>{totalMerchants}</strong>
+            </span>
+            {searchQuery.trim() && (
+              <>
+                <span style={{ color: "var(--line)" }}>·</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)", whiteSpace: "nowrap" }}>
+                  Filtered from {merchants.length} total
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Right pagination & page size controls */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+            <select
+              className="input"
+              style={{
+                height: 30,
+                minHeight: 30,
+                fontSize: "0.8rem",
+                padding: "0 6px",
+                width: "auto",
+                borderRadius: "var(--radius-sm)",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                cursor: "pointer",
+                boxSizing: "border-box",
+              }}
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              title="Rows per page"
+              aria-label="Rows per page"
+            >
+              <option value={25}>25 / page</option>
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
+              <option value={250}>250 / page</option>
+            </select>
+
+            <button
+              type="button"
+              className="btn"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              style={{ fontSize: "0.8rem", height: 30, padding: "0 10px", display: "inline-flex", alignItems: "center" }}
+            >
+              ‹ Prev
+            </button>
+            <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)", whiteSpace: "nowrap", padding: "0 2px" }}>
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              className="btn"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              style={{ fontSize: "0.8rem", height: 30, padding: "0 10px", display: "inline-flex", alignItems: "center" }}
+            >
+              Next ›
+            </button>
+          </div>
         </div>
       </div>
 

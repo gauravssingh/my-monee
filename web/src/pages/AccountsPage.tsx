@@ -103,44 +103,73 @@ function AccountModal({
         aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}
-        style={{ width: "100%", maxWidth: 650, display: "flex", flexDirection: "column", height: "min(760px, 86dvh)", maxHeight: "86dvh", boxSizing: "border-box" }}
+        style={{
+          width: "100%",
+          maxWidth: 520,
+          display: "flex",
+          flexDirection: "column",
+          maxHeight: "min(90vh, 700px)",
+          boxSizing: "border-box",
+        }}
       >
         <div className="sheet-handle" onClick={onClose} aria-label="Dismiss sheet" />
 
-        <header className="modal-header" style={{ flexShrink: 0 }}>
+        <header className="modal-header" style={{ flexShrink: 0, padding: "16px 20px 12px", borderBottom: "1px solid var(--line)" }}>
           <div>
-            <h2 id={titleId}>{account?.id ? "Edit Account" : "Add Account"}</h2>
-            <p className="lead">Add a bank, card, wallet, or other financial account.</p>
+            <h2 id={titleId} style={{ margin: 0, fontSize: "1.15rem", fontWeight: 600, color: "var(--ink)" }}>
+              {account?.id ? "Edit Account" : "Add Account"}
+            </h2>
+            <p className="lead" style={{ margin: "2px 0 0", fontSize: "0.8rem", color: "var(--ink-muted)" }}>
+              {account?.id ? "Update account details and identifiers." : "Add a bank, card, wallet, or other financial account."}
+            </p>
           </div>
           <div className="modal-actions">
             <button ref={closeRef} type="button" className="btn icon-btn" onClick={onClose} aria-label="Close modal">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
           </div>
         </header>
 
-        <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 20, flex: "1 1 0%", minHeight: 0, overflowY: "auto", width: "100%", boxSizing: "border-box" }}>
-          
+        <div
+          className="modal-body"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            flex: "0 1 auto",
+            minHeight: 0,
+            overflowY: "auto",
+            padding: "16px 20px",
+            width: "100%",
+            boxSizing: "border-box",
+          }}
+        >
           {/* Section: Basic Info */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
-            <h3 style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", margin: 0, fontWeight: 600 }}>BASIC INFORMATION</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
+          <section style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", minWidth: 0 }}>
+            <h3 style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)", margin: 0, fontWeight: 700 }}>
+              BASIC INFORMATION
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", minWidth: 0 }}>
               <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                <label className="label">Account Name <span style={{color: "var(--accent)"}}>*</span></label>
+                <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                  Account Name <span style={{ color: "var(--accent)" }}>*</span>
+                </label>
                 <input
                   type="text"
                   className="input"
                   value={formData.name || ""}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                  placeholder="e.g. HDFC Checking"
-                  style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+                  placeholder="e.g. HDFC Checking, Scapia VISA"
+                  style={{ width: "100%", height: 34, minWidth: 0, boxSizing: "border-box" }}
                 />
               </div>
 
               <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                <label className="label">Account Type</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, width: "100%", minWidth: 0 }}>
+                <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>
+                  Account Type
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, width: "100%", minWidth: 0 }}>
                   {[
                     { id: "BANK", label: "Bank" },
                     { id: "CREDIT_CARD", label: "Credit Card" },
@@ -148,58 +177,69 @@ function AccountModal({
                     { id: "INVESTMENT", label: "Investment" },
                     { id: "LOAN", label: "Loan" },
                     { id: "CASH", label: "Cash" },
-                  ].map(type => (
-                    <button
-                      key={type.id}
-                      type="button"
-                      onClick={() => {
-                        const isLiab = type.id === "CREDIT_CARD" || type.id.includes("LOAN");
-                        setFormData({
-                          ...formData,
-                          account_type: type.id,
-                          is_asset: !isLiab,
-                          is_liability: isLiab,
-                        });
-                      }}
-                      style={{
-                        padding: "6px 12px",
-                        borderRadius: "var(--radius-sm)",
-                        border: `1px solid ${formData.account_type === type.id ? "var(--accent)" : "var(--line)"}`,
-                        background: formData.account_type === type.id ? "var(--accent-soft)" : "transparent",
-                        color: formData.account_type === type.id ? "var(--accent)" : "var(--ink)",
-                        fontWeight: formData.account_type === type.id ? 500 : 400,
-                        cursor: "pointer",
-                        fontSize: "0.85rem",
-                        outline: "none"
-                      }}
-                    >
-                      {type.label}
-                    </button>
-                  ))}
+                  ].map((type) => {
+                    const isSelected = formData.account_type === type.id;
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => {
+                          const isLiab = type.id === "CREDIT_CARD" || type.id.includes("LOAN");
+                          setFormData({
+                            ...formData,
+                            account_type: type.id,
+                            is_asset: !isLiab,
+                            is_liability: isLiab,
+                          });
+                        }}
+                        style={{
+                          padding: "4px 11px",
+                          height: 28,
+                          borderRadius: "var(--radius-sm)",
+                          border: `1px solid ${isSelected ? "var(--accent)" : "var(--line)"}`,
+                          background: isSelected ? "var(--accent-soft)" : "var(--surface)",
+                          color: isSelected ? "var(--accent)" : "var(--ink)",
+                          fontWeight: isSelected ? 600 : 400,
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          outline: "none",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        {type.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </section>
 
           {/* Section: Identifiers */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
-            <h3 style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", margin: 0, fontWeight: 600 }}>IDENTIFIERS (OPTIONAL)</h3>
-            <div className="account-form-grid">
+          <section style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", minWidth: 0 }}>
+            <h3 style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)", margin: 0, fontWeight: 700 }}>
+              IDENTIFIERS (OPTIONAL)
+            </h3>
+            <div className="account-form-grid" style={{ gap: 10 }}>
               <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                <label className="label">Account Mask (Last 4)</label>
+                <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                  Account Mask (Last 4)
+                </label>
                 <input
                   type="text"
                   className="input"
                   value={formData.account_number_masked || ""}
                   onChange={(e) => setFormData({ ...formData, account_number_masked: e.target.value })}
-                  placeholder="e.g. x1234"
-                  style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+                  placeholder="e.g. 1234 or XX1234"
+                  style={{ width: "100%", height: 34, minWidth: 0, boxSizing: "border-box" }}
                 />
               </div>
-              
+
               {formData.account_type === "CREDIT_CARD" ? (
                 <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                  <label className="label">Card Last 4</label>
+                  <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                    Card Last 4
+                  </label>
                   <input
                     type="text"
                     className="input"
@@ -207,15 +247,17 @@ function AccountModal({
                     onChange={(e) => setFormData({ ...formData, card_last4: e.target.value })}
                     placeholder="e.g. 5678"
                     maxLength={4}
-                    style={{ width: "100%", minWidth: 0, boxSizing: "border-box" }}
+                    style={{ width: "100%", height: 34, minWidth: 0, boxSizing: "border-box" }}
                   />
                 </div>
               ) : (
                 <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                  <label className="label">UPI IDs / Phones</label>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", minWidth: 0 }}>
+                  <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                    UPI IDs / Handles
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%", minWidth: 0 }}>
                     {(formData.upi_identifier_masked ? formData.upi_identifier_masked.split(",") : [""]).map((upi, i, arr) => (
-                      <div key={i} style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
+                      <div key={i} style={{ display: "flex", gap: 6, width: "100%", minWidth: 0 }}>
                         <input
                           type="text"
                           className="input"
@@ -226,32 +268,32 @@ function AccountModal({
                             setFormData({ ...formData, upi_identifier_masked: newUpis.join(",") });
                           }}
                           placeholder="e.g. user@okhdfcbank"
-                          style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}
+                          style={{ flex: 1, height: 34, minWidth: 0, boxSizing: "border-box" }}
                         />
                         {arr.length > 1 && (
-                          <button 
-                            type="button" 
-                            className="btn quiet icon-btn" 
+                          <button
+                            type="button"
+                            className="btn quiet icon-btn"
                             title="Remove UPI ID"
                             onClick={() => {
                               const newUpis = arr.filter((_, idx) => idx !== i);
                               setFormData({ ...formData, upi_identifier_masked: newUpis.join(",") });
                             }}
-                            style={{ padding: 8, flexShrink: 0 }}
+                            style={{ height: 34, width: 34, padding: 0, flexShrink: 0 }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                           </button>
                         )}
                       </div>
                     ))}
-                    <button 
-                      type="button" 
-                      className="btn quiet" 
+                    <button
+                      type="button"
+                      className="btn quiet"
                       onClick={() => {
                         const arr = formData.upi_identifier_masked ? formData.upi_identifier_masked.split(",") : [""];
                         setFormData({ ...formData, upi_identifier_masked: [...arr, ""].join(",") });
                       }}
-                      style={{ fontSize: "0.85rem", padding: "4px 8px", alignSelf: "flex-start" }}
+                      style={{ fontSize: "0.78rem", height: 26, padding: "0 8px", alignSelf: "flex-start" }}
                     >
                       + Add UPI ID
                     </button>
@@ -262,19 +304,37 @@ function AccountModal({
           </section>
 
           {/* Section: Balances */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%", minWidth: 0 }}>
-            <h3 style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", margin: 0, fontWeight: 600 }}>BALANCES & LIMITS</h3>
-            <div className="account-form-grid">
+          <section style={{ display: "flex", flexDirection: "column", gap: 10, width: "100%", minWidth: 0 }}>
+            <h3 style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)", margin: 0, fontWeight: 700 }}>
+              BALANCES & LIMITS
+            </h3>
+            <div className="account-form-grid" style={{ gap: 10 }}>
               <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                <label className="label">Opening Balance</label>
-                <div style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
-                  <div style={{ padding: "0 10px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.85rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
+                <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                  Opening Balance
+                </label>
+                <div style={{ display: "flex", width: "100%", minWidth: 0 }}>
+                  <div
+                    style={{
+                      height: 34,
+                      padding: "0 10px",
+                      border: "1px solid var(--line)",
+                      borderRight: "none",
+                      borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)",
+                      background: "var(--surface-muted)",
+                      color: "var(--ink-muted)",
+                      fontSize: "0.8rem",
+                      display: "flex",
+                      alignItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
                     ₹ INR
                   </div>
                   <input
                     type="number"
                     className="input"
-                    style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}
+                    style={{ flex: 1, height: 34, borderRadius: "0 var(--radius-sm) var(--radius-sm) 0", minWidth: 0, boxSizing: "border-box" }}
                     value={formData.opening_balance || ""}
                     onChange={(e) => setFormData({ ...formData, opening_balance: parseFloat(e.target.value) || 0 })}
                     placeholder="0.00"
@@ -285,15 +345,31 @@ function AccountModal({
 
               {formData.account_type === "CREDIT_CARD" && (
                 <div className="field" style={{ width: "100%", minWidth: 0 }}>
-                  <label className="label">Credit Limit</label>
-                  <div style={{ display: "flex", gap: 8, width: "100%", minWidth: 0 }}>
-                    <div style={{ padding: "0 10px", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", background: "var(--surface)", color: "var(--ink-muted)", fontSize: "0.85rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
+                  <label className="label" style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>
+                    Credit Limit
+                  </label>
+                  <div style={{ display: "flex", width: "100%", minWidth: 0 }}>
+                    <div
+                      style={{
+                        height: 34,
+                        padding: "0 10px",
+                        border: "1px solid var(--line)",
+                        borderRight: "none",
+                        borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)",
+                        background: "var(--surface-muted)",
+                        color: "var(--ink-muted)",
+                        fontSize: "0.8rem",
+                        display: "flex",
+                        alignItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
                       ₹ INR
                     </div>
                     <input
                       type="number"
                       className="input"
-                      style={{ flex: 1, minWidth: 0, boxSizing: "border-box" }}
+                      style={{ flex: 1, height: 34, borderRadius: "0 var(--radius-sm) var(--radius-sm) 0", minWidth: 0, boxSizing: "border-box" }}
                       value={formData.credit_limit || ""}
                       onChange={(e) => setFormData({ ...formData, credit_limit: parseFloat(e.target.value) || 0 })}
                       placeholder="e.g. 500000"
@@ -307,8 +383,20 @@ function AccountModal({
           </section>
         </div>
 
-        <footer className="modal-footer" style={{ flexShrink: 0, padding: "12px 18px max(16px, env(safe-area-inset-bottom, 16px))" }}>
-          <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>Cancel</button>
+        <footer
+          className="modal-footer"
+          style={{
+            flexShrink: 0,
+            padding: "12px 20px max(14px, env(safe-area-inset-bottom, 14px))",
+            borderTop: "1px solid var(--line)",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+          }}
+        >
+          <button type="button" className="btn quiet" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
           <button type="submit" className="btn primary" disabled={saving}>
             {saving ? "Saving..." : "Save Account"}
           </button>
@@ -1012,7 +1100,7 @@ export default function AccountsPage() {
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>Total Balance</div>
-            <div className="tx-amount credit" style={{ fontWeight: 700, fontSize: "1.1rem" }}>
+            <div className={`tx-amount ${totalAssetBalance >= 0 ? "credit" : "debit"}`} style={{ fontWeight: 700, fontSize: "1.1rem" }}>
               {formatMoney(totalAssetBalance)}
             </div>
           </div>
@@ -1077,7 +1165,7 @@ export default function AccountsPage() {
                         style={{ textDecoration: "none" }}
                         title={`View transactions for ${a.name}`}
                       >
-                        <span className="tx-amount credit" style={{ fontWeight: 600 }}>
+                        <span className={`tx-amount ${a.balance >= 0 ? "credit" : "debit"}`} style={{ fontWeight: 600 }}>
                           {formatMoney(a.balance, a.currency)}
                         </span>
                       </Link>
@@ -1131,7 +1219,7 @@ export default function AccountsPage() {
                     to={`/transactions?account=${encodeURIComponent(a.name)}`}
                     style={{ textDecoration: "none" }}
                   >
-                    <div className="tx-card-amount credit">{formatMoney(a.balance, a.currency)}</div>
+                    <div className={`tx-card-amount ${a.balance >= 0 ? "credit" : "debit"}`}>{formatMoney(a.balance, a.currency)}</div>
                   </Link>
                 </div>
                 <div className="tx-card-footer" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}>

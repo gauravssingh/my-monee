@@ -27,7 +27,10 @@ export default function RecurringPage() {
   if (loading) return <div className="empty">Loading recurring items...</div>;
   if (error) return <div className="error">{error}</div>;
 
-  const totalMonthlySub = subscriptions.reduce((acc, sub) => acc + (sub.annual_cost / 12), 0);
+  const totalMonthlySub = subscriptions.reduce((acc, sub) => {
+    const monthly = sub.annual_cost > 0 ? sub.annual_cost / 12 : (sub.billing_frequency === "yearly" ? sub.amount / 12 : sub.amount);
+    return acc + monthly;
+  }, 0);
   const totalBillsExpected = bills.reduce((acc, bill) => acc + bill.expected_amount, 0);
 
   const showSubs = mobileTab === "all" || mobileTab === "subscriptions";

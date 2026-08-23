@@ -146,9 +146,83 @@ async def test_transactions(page, outdir: Path, is_mobile: bool, errors: list):
     print(f"  • Transactions view rendered and captured.")
 
 
+async def test_accounts(page, outdir: Path, is_mobile: bool, errors: list):
+    """Test Accounts page and Add Account modal."""
+    prefix = "mobile" if is_mobile else "desktop"
+    print(f"\n[Testing Accounts ({prefix})]")
+    
+    await page.goto("http://127.0.0.1:8477/accounts", wait_until="networkidle")
+    await page.wait_for_timeout(500)
+    await page.screenshot(path=str(outdir / f"{prefix}_accounts.png"))
+    print(f"  • Accounts main view captured.")
+
+    # Open Add Account Modal
+    add_btn = page.locator("button:has-text('Add Account'), button:has-text('+ Add Account')").first
+    if await add_btn.is_visible():
+        await add_btn.click()
+        await page.wait_for_timeout(300)
+        modal = page.locator(".modal-panel")
+        assert await modal.is_visible(), "Add Account modal failed to open"
+        await page.screenshot(path=str(outdir / f"{prefix}_accounts_add_modal.png"))
+        print(f"  • Add Account modal verified and captured.")
+        
+        # Close modal
+        close_btn = page.locator(".modal-panel button:has-text('Cancel'), .modal-panel .icon-btn").first
+        await close_btn.click()
+        await page.wait_for_timeout(200)
+
+
+async def test_statements(page, outdir: Path, is_mobile: bool, errors: list):
+    """Test Credit Card Statements page."""
+    prefix = "mobile" if is_mobile else "desktop"
+    print(f"\n[Testing Credit Card Statements ({prefix})]")
+    
+    await page.goto("http://127.0.0.1:8477/statements", wait_until="networkidle")
+    await page.wait_for_timeout(500)
+    await page.screenshot(path=str(outdir / f"{prefix}_statements.png"))
+    print(f"  • Statements view rendered and captured.")
+
+
+async def test_merchants(page, outdir: Path, is_mobile: bool, errors: list):
+    """Test Merchants page and pagination controls."""
+    prefix = "mobile" if is_mobile else "desktop"
+    print(f"\n[Testing Merchants ({prefix})]")
+    
+    await page.goto("http://127.0.0.1:8477/merchants", wait_until="networkidle")
+    await page.wait_for_timeout(500)
+    
+    # Verify pagination footer exists
+    pagination = page.locator(".tx-pagination-footer")
+    assert await pagination.is_visible(), "Merchants pagination footer is missing"
+    print(f"  • Merchants pagination controls verified.")
+    await page.screenshot(path=str(outdir / f"{prefix}_merchants.png"))
+
+
+async def test_recurring(page, outdir: Path, is_mobile: bool, errors: list):
+    """Test Recurring subscriptions and income page."""
+    prefix = "mobile" if is_mobile else "desktop"
+    print(f"\n[Testing Recurring ({prefix})]")
+    
+    await page.goto("http://127.0.0.1:8477/recurring", wait_until="networkidle")
+    await page.wait_for_timeout(500)
+    await page.screenshot(path=str(outdir / f"{prefix}_recurring.png"))
+    print(f"  • Recurring view rendered and captured.")
+
+
+async def test_issues(page, outdir: Path, is_mobile: bool, errors: list):
+    """Test Data Issues diagnostic page."""
+    prefix = "mobile" if is_mobile else "desktop"
+    print(f"\n[Testing Data Issues ({prefix})]")
+    
+    await page.goto("http://127.0.0.1:8477/issues", wait_until="networkidle")
+    await page.wait_for_timeout(500)
+    await page.screenshot(path=str(outdir / f"{prefix}_issues.png"))
+    print(f"  • Data Issues view rendered and captured.")
+
+
 async def main():
     parser = argparse.ArgumentParser(description="MyMonee Playwright UI Test Runner")
-    parser.add_argument("--page", choices=["overview", "settings", "transactions", "all"], default="all", help="Specific page to test")
+    parser.add_argument("--page", choices=["overview", "settings", "transactions", "accounts", "statements", "merchants", "recurring", "issues", "all"], default="all", help="Specific page to test")
     parser.add_argument("--all", action="store_true", help="Run full test suite across all pages and viewports")
     parser.add_argument("--mobile", action="store_true", help="Run in mobile viewport (390x844)")
     parser.add_argument("--desktop", action="store_true", help="Run in desktop viewport (1200x850)")
@@ -184,15 +258,34 @@ async def main():
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
             page.on("pageerror", lambda e: errors.append(str(e)))
 
-            pages_to_run = ["overview", "settings", "transactions"] if (args.all or args.page == "all") else [args.page]
+            pages_to_run = [
+                "overview",
+                "transactions",
+                "accounts",
+                "statements",
+                "merchants",
+                "recurring",
+                "issues",
+                "settings",
+            ] if (args.all or args.page == "all") else [args.page]
 
             for pg in pages_to_run:
                 if pg == "overview":
                     await test_overview(page, outdir, is_mobile, errors)
-                elif pg == "settings":
-                    await test_settings(page, outdir, is_mobile, errors)
                 elif pg == "transactions":
                     await test_transactions(page, outdir, is_mobile, errors)
+                elif pg == "accounts":
+                    await test_accounts(page, outdir, is_mobile, errors)
+                elif pg == "statements":
+                    await test_statements(page, outdir, is_mobile, errors)
+                elif pg == "merchants":
+                    await test_merchants(page, outdir, is_mobile, errors)
+                elif pg == "recurring":
+                    await test_recurring(page, outdir, is_mobile, errors)
+                elif pg == "issues":
+                    await test_issues(page, outdir, is_mobile, errors)
+                elif pg == "settings":
+                    await test_settings(page, outdir, is_mobile, errors)
 
             if args.interactive:
                 print("\n[Interactive Mode]: Browser session active. Press Enter in terminal to close...")

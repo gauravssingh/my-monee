@@ -60,14 +60,17 @@ def list_recurring(session: Session = Depends(db_session)) -> dict[str, Any]:
     
     sub_items = []
     for s, rt in subscriptions:
+        amount = float(s.amount) if s.amount else 0.0
+        freq = rt.frequency if rt.frequency else "monthly"
+        annual = float(s.annual_cost) if s.annual_cost else (amount if freq == "yearly" else amount * 12)
         sub_items.append({
             "id": s.id,
             "name": s.name,
-            "amount": float(s.amount) if s.amount else 0.0,
-            "billing_frequency": rt.frequency if rt.frequency else "monthly",
+            "amount": amount,
+            "billing_frequency": freq,
             "next_billing_date": rt.next_expected_date.isoformat() if rt.next_expected_date else None,
             "status": s.status,
-            "annual_cost": float(s.annual_cost) if s.annual_cost else 0.0,
+            "annual_cost": annual,
             "recurring_transaction_id": rt.id
         })
         
