@@ -56,7 +56,7 @@ Whether running on native macOS or inside a Docker volume mount, MyMonee enforce
 
 ```text
 /data
-├── db/                # Durable SQLite database (expense_tracker.db)
+├── db/                # Durable SQLite database (mymonee.db)
 ├── statements/        # Ingested & decrypted PDF/CSV bank/card statements
 ├── evidence/          # Audit receipts, transaction crops, and parsed proof
 ├── attachments/       # Raw transaction proof attachments
@@ -142,7 +142,7 @@ MyMonee Doctor
 Application
   ✓ Version: MyMonee v0.8.0 (Schema: 2026_08_ledger_v2, Archive: v1)
 Database
-  ✓ SQLite Accessible: Found at /data/db/expense_tracker.db
+  ✓ SQLite Accessible: Found at /data/db/mymonee.db
   ✓ WAL Journal Mode: WAL enabled
   ✓ Integrity Check: PRAGMA integrity_check passed
 Storage
@@ -236,8 +236,8 @@ Ideal for running 24/7 on a Mac mini or MacBook:
 
 4. **Background Service (`launchd`)**:
    ```bash
-   cp scripts/launchd/com.personal.expense-tracker.plist.example ~/Library/LaunchAgents/com.personal.expense-tracker.plist
-   launchctl load -w ~/Library/LaunchAgents/com.personal.expense-tracker.plist
+   cp scripts/launchd/com.personal.mymonee.plist.example ~/Library/LaunchAgents/com.personal.mymonee.plist
+   launchctl load -w ~/Library/LaunchAgents/com.personal.mymonee.plist
    ```
 
 ---
