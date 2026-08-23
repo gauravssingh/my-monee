@@ -204,6 +204,26 @@ def cmd_reconcile(args: argparse.Namespace) -> None:
         print(f"  • Matched Refunds:   {stats.get('refunds_paired', 0)}")
 
 
+def cmd_serve(args: argparse.Namespace) -> None:
+    import uvicorn
+    from expense_tracker.config import reload_settings
+    from expense_tracker.logging_setup import setup_logging
+
+    settings = reload_settings()
+    setup_logging(settings)
+    host = args.host or settings.app.host
+    port = args.port or settings.app.port
+    print(f"Starting MyMonee Server on http://{host}:{port}…")
+    uvicorn.run(
+        "expense_tracker.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        reload=args.reload,
+        log_level=settings.logging.level.lower(),
+    )
+
+
 def cmd_data_export(args: argparse.Namespace) -> None:
     settings = load_settings()
     init_db(settings)
@@ -216,6 +236,13 @@ def cmd_data_export(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="mymonee", description="MyMonee Local-First Expense Ledger CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # serve
+    p_serve = subparsers.add_parser("serve", help="Start the MyMonee Web UI & API server")
+    p_serve.add_argument("--host", default=None, help="Bind host (default from config)")
+    p_serve.add_argument("--port", type=int, default=None, help="Bind port (default from config)")
+    p_serve.add_argument("--reload", action="store_true", help="Dev auto-reload")
+    p_serve.set_defaults(func=cmd_serve)
 
     # version
     p_ver = subparsers.add_parser("version", help="Show application version and schema details")
