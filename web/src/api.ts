@@ -968,6 +968,66 @@ export const api = {
     }),
   resetOnboarding: () =>
     request<{ success: boolean; completed: boolean }>("/api/onboarding/reset", { method: "POST" }),
+  dbHealth: () =>
+    request<{
+      healthy: boolean;
+      integrity_ok: boolean;
+      foreign_keys_ok: boolean;
+      database_size_bytes: number;
+      wal_size_bytes: number;
+      total_disk_bytes: number;
+      page_count: number;
+      page_size: number;
+      freelist_pages: number;
+      fragmentation_pct: number;
+      table_metrics: Record<string, number>;
+    }>("/api/system/db-health"),
+  dbVacuum: () =>
+    request<{
+      success: boolean;
+      before_bytes: number;
+      after_bytes: number;
+      reclaimed_bytes: number;
+      health: any;
+    }>("/api/system/db-vacuum", { method: "POST" }),
+  listBackups: () =>
+    request<
+      Array<{
+        filename: string;
+        path: string;
+        size_bytes: number;
+        created_at: string;
+        integrity_verified: boolean;
+        note?: string | null;
+      }>
+    >("/api/system/backups"),
+  createBackup: (note?: string) =>
+    request<{
+      filename: string;
+      created_at: string;
+      size_bytes: number;
+      integrity_verified: boolean;
+      note?: string | null;
+    }>("/api/system/backups/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note }),
+    }),
+  restoreBackup: (filename: string) =>
+    request<{
+      success: boolean;
+      restored_file: string;
+      safety_backup?: string | null;
+      health: any;
+    }>("/api/system/backups/restore", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename }),
+    }),
+  deleteBackup: (filename: string) =>
+    request<{ success: boolean; deleted: string }>(`/api/system/backups/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+    }),
 };
 
 
