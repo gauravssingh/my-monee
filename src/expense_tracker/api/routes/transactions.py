@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from expense_tracker.api.deps import db_session
@@ -26,12 +27,15 @@ router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 class ClassifyBody(BaseModel):
     category_id: str = Field(min_length=1)
     subcategory_id: str | None = None
+    create_rule: bool = True
+    apply_to_past: bool = False
 
 
 class BulkClassifyBody(BaseModel):
     transaction_ids: list[str] = Field(min_length=1)
     category_id: str = Field(min_length=1)
     subcategory_id: str | None = None
+    create_rule: bool = True
 
 
 class ExcludeBody(BaseModel):
@@ -130,6 +134,7 @@ def post_classify_bulk(
         transaction_ids=body.transaction_ids,
         category_id=body.category_id,
         subcategory_id=body.subcategory_id,
+        create_rule=body.create_rule,
     )
     return {
         "updated": len(rows),
@@ -173,6 +178,8 @@ def patch_classify(
         transaction_id,
         category_id=body.category_id,
         subcategory_id=body.subcategory_id,
+        create_rule=body.create_rule,
+        apply_to_past=body.apply_to_past,
     )
     return serialize_transaction(tx)
 
@@ -208,3 +215,49 @@ def post_flag_issue_bulk(
         note=body.note,
     )
     return {"created": len(issues), "items": [serialize_issue(i) for i in issues]}
+
+
+@router.post("/reconcile-all")
+def post_reconcile_all(
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    from expense_tracker.services.reconciliation import run_full_reconciliation
+    return run_full_reconciliation(session)
+
+
+@router.get("/{transaction_id}/links")
+def get_transaction_links_route(
+    transaction_id: str,
+    session: Session = Depends(db_session),
+) -> dict[str, Any]:
+    from expense_tracker.db.models import TransactionLink, Transaction
+    links_out = session.scalars(
+        select(TransactionLink).where(TransactionLink.from_transaction_id == transaction_id)
+    ).all()
+    links_in = session.scalars(
+        select(TransactionLink).where(TransactionLink.to_transaction_id == transaction_id)
+    ).all()
+
+    items = []
+    for l in links_out:
+        target = session.get(Transaction, l.to_transaction_id)
+        items.append({
+            "id": l.id,
+            "direction": "out",
+            "kind": l.kind,
+            "confidence": l.confidence,
+            "notes": l.notes,
+            "related_transaction": serialize_transaction(target) if target else None,
+        })
+    for l in links_in:
+        source = session.get(Transaction, l.from_transaction_id)
+        items.append({
+            "id": l.id,
+            "direction": "in",
+            "kind": l.kind,
+            "confidence": l.confidence,
+            "notes": l.notes,
+            "related_transaction": serialize_transaction(source) if source else None,
+        })
+
+    return {"transaction_id": transaction_id, "links": items}

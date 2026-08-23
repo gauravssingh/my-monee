@@ -499,7 +499,12 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     setPanelError(null);
   }
 
-  async function saveClassification(categoryId: string, subcategoryId: string | null) {
+  async function saveClassification(
+    categoryId: string,
+    subcategoryId: string | null,
+    createRule: boolean = true,
+    applyToPast: boolean = false,
+  ) {
     if (panelTargets.length === 0) return;
     setSaving(true);
     setPanelError(null);
@@ -509,15 +514,20 @@ export default function TransactionsPage({ needsReview = false }: Props) {
         await api.classifyTransaction(ids[0], {
           category_id: categoryId,
           subcategory_id: subcategoryId,
+          create_rule: createRule,
+          apply_to_past: applyToPast,
         });
       } else {
         await api.classifyTransactionsBulk({
           transaction_ids: ids,
           category_id: categoryId,
           subcategory_id: subcategoryId,
+          create_rule: createRule,
         });
       }
-      if (needsReview) {
+      if (applyToPast) {
+        void load();
+      } else if (needsReview) {
         applyRemoved(ids);
       } else {
         const chosenCat = categories.find((c) => c.id === categoryId);
@@ -1767,7 +1777,9 @@ export default function TransactionsPage({ needsReview = false }: Props) {
         saving={saving}
         error={panelError}
         onClose={closePanel}
-        onSave={(categoryId, subcategoryId) => void saveClassification(categoryId, subcategoryId)}
+        onSave={(categoryId, subcategoryId, createRule, applyToPast) =>
+          void saveClassification(categoryId, subcategoryId, createRule, applyToPast)
+        }
         onExclude={() => void excludeSelected()}
         onReimburse={() => void reimburseSelected()}
         onFlag={(tx) => {

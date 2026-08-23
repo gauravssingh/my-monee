@@ -23,6 +23,7 @@ from expense_tracker.api.routes import (
     gmail,
     health,
     merchants,
+    onboarding,
     overview,
     recurring,
     statements,
@@ -115,6 +116,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(merchants.router)
     app.include_router(recurring.router)
     app.include_router(statements.router)
+    app.include_router(onboarding.router)
     app.include_router(ai.router)
     app.include_router(auth.router)
 

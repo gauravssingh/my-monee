@@ -13,7 +13,7 @@ type Props = {
   saving: boolean;
   error: string | null;
   onClose: () => void;
-  onSave: (categoryId: string, subcategoryId: string | null) => void;
+  onSave: (categoryId: string, subcategoryId: string | null, createRule?: boolean, applyToPast?: boolean) => void;
   onExclude: () => void;
   onReimburse: () => void;
   onFlag: (tx: Transaction) => void;
@@ -35,6 +35,8 @@ export default function ClassifyPanel({
   const closeRef = useRef<HTMLButtonElement>(null);
   const [categoryId, setCategoryId] = useState("");
   const [subcategoryId, setSubcategoryId] = useState("");
+  const [createRule, setCreateRule] = useState(true);
+  const [applyToPast, setApplyToPast] = useState(false);
 
   const [aiSuggestion, setAiSuggestion] = useState<AISuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -320,6 +322,38 @@ export default function ClassifyPanel({
                   </p>
                 )}
               </section>
+
+              {/* Persistent Rule Options */}
+              {selectedCategory && (
+                <section style={{ marginTop: 12, marginBottom: 14, padding: "10px 14px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.84rem", cursor: "pointer", fontWeight: 500, color: "var(--ink)" }}>
+                    <input
+                      type="checkbox"
+                      checked={createRule}
+                      onChange={(e) => setCreateRule(e.target.checked)}
+                      style={{ accentColor: "var(--accent)", width: 16, height: 16 }}
+                    />
+                    <span>
+                      {count === 1 ? (
+                        <>Always categorize <strong>{transactions[0]?.merchant_normalized || transactions[0]?.merchant_raw || "this merchant"}</strong> as <strong>{selectedCategory.name}</strong></>
+                      ) : (
+                        <>Save merchant rule for selected transactions</>
+                      )}
+                    </span>
+                  </label>
+                  {count === 1 && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.80rem", color: "var(--ink-muted)", marginTop: 8, marginLeft: 24, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={applyToPast}
+                        onChange={(e) => setApplyToPast(e.target.checked)}
+                        style={{ accentColor: "var(--accent)", width: 15, height: 15 }}
+                      />
+                      <span>Also auto-categorize past unreviewed transactions for this merchant</span>
+                    </label>
+                  )}
+                </section>
+              )}
             </>
           ) : (
             /* Initial State: Full Category Grid */
@@ -426,7 +460,7 @@ export default function ClassifyPanel({
             className="btn primary"
             type="button"
             disabled={saving || !categoryId}
-            onClick={() => onSave(categoryId, subcategoryId || null)}
+            onClick={() => onSave(categoryId, subcategoryId || null, createRule, applyToPast)}
             style={{ flex: 1, height: 38, padding: "0 18px", fontSize: "0.88rem", fontWeight: 600 }}
           >
             {saving

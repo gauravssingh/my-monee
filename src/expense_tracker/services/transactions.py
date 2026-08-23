@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from expense_tracker.db.models import (
@@ -70,6 +70,7 @@ def serialize_transaction(tx: Transaction) -> dict[str, Any]:
         "is_transfer": tx.is_transfer,
         "excludes_from_spending": tx.excludes_from_spending,
         "needs_review": tx.needs_review,
+        "classification_signals": tx.classification_signals or {},
         "created_at": tx.created_at.isoformat() if tx.created_at else None,
     }
 
@@ -311,6 +312,8 @@ def classify_transaction(
     *,
     category_id: str,
     subcategory_id: str | None = None,
+    create_rule: bool = True,
+    apply_to_past: bool = False,
 ) -> Transaction:
     tx = session.get(Transaction, transaction_id)
     if tx is None:
@@ -342,14 +345,35 @@ def classify_transaction(
     tx.needs_review = False
     tx.classification_source = "user"
     tx.classification_confidence = 1.0
+
     signals = dict(tx.classification_signals or {})
     signals.update(
         {
             "rule": "user_correction",
             "category_slug": category.slug,
             "subcategory_slug": subcategory.slug if subcategory else None,
+            "user_verified": True,
         }
     )
+
+    # 1. Deterministic User Rule Persistence
+    if create_rule:
+        from expense_tracker.classification.rules import upsert_user_classification_rule
+        rule = upsert_user_classification_rule(
+            session,
+            tx,
+            category_id=category.id,
+            subcategory_id=subcategory.id if subcategory else None,
+        )
+        signals.update(
+            {
+                "rule": "user_rule",
+                "rule_id": rule.id,
+                "rule_name": rule.name,
+                "priority": rule.priority,
+            }
+        )
+
     tx.classification_signals = signals
     _apply_category_side_effects(tx, category, subcategory)
     tx.updated_at = utcnow()
@@ -362,14 +386,43 @@ def classify_transaction(
         chosen_subcategory_id=subcategory.id if subcategory else None,
     )
 
+    # 2. Optionally backfill all past unreviewed transactions for this merchant
+    if apply_to_past:
+        merchant_name = (tx.merchant_normalized or tx.merchant_raw or "").strip()
+        if merchant_name:
+            past_txs = session.scalars(
+                select(Transaction).where(
+                    Transaction.id != tx.id,
+                    Transaction.user_verified == False,
+                    or_(
+                        Transaction.merchant_entity_id == tx.merchant_entity_id if tx.merchant_entity_id else False,
+                        Transaction.merchant_normalized.ilike(merchant_name),
+                        Transaction.merchant_raw.ilike(merchant_name),
+                    ),
+                )
+            ).all()
+            for ptx in past_txs:
+                ptx.category_id = category.id
+                ptx.subcategory_id = subcategory.id if subcategory else None
+                ptx.user_verified = True
+                ptx.needs_review = False
+                ptx.classification_source = "user"
+                ptx.classification_confidence = 1.0
+                ptx_signals = dict(ptx.classification_signals or {})
+                ptx_signals.update(signals)
+                ptx.classification_signals = ptx_signals
+                _apply_category_side_effects(ptx, category, subcategory)
+                ptx.updated_at = utcnow()
+            logger.info("Backfilled %d historical transactions for merchant %s", len(past_txs), merchant_name)
+
     session.flush()
     session.refresh(tx, attribute_names=["category", "subcategory"])
     logger.info(
-        "Classified transaction %s -> %s (sub: %s, correction: %s)",
+        "Classified transaction %s -> %s (sub: %s, rule_created: %s)",
         tx.id,
         category.name,
         subcategory.name if subcategory else "none",
-        "yes" if correction else "no",
+        "yes" if create_rule else "no",
     )
     return tx
 
@@ -389,6 +442,7 @@ def classify_transactions_bulk(
     transaction_ids: list[str],
     category_id: str,
     subcategory_id: str | None = None,
+    create_rule: bool = True,
 ) -> list[Transaction]:
     ids = _normalize_transaction_ids(transaction_ids)
 
@@ -418,6 +472,7 @@ def classify_transactions_bulk(
                 tid,
                 category_id=category_id,
                 subcategory_id=subcategory_id,
+                create_rule=create_rule,
             )
         )
     return updated

@@ -2791,9 +2791,45 @@ textarea.input {
   color: var(--accent);
 }
 
+.wizard-desktop-steps {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.wizard-mobile-steps {
+  display: none;
+}
+
+.hide-mobile {
+  display: inline;
+}
+
+.mobile-only {
+  display: none;
+}
+
+.wizard-footer-nav {
+  margin-top: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
 
 /* Mobile & iPhone Optimizations (< 768px) */
 @media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: inline !important;
+  }
+
   .app-shell {
     padding: 0 max(12px, var(--sal)) max(100px, calc(80px + var(--sab))) max(12px, var(--sar));
   }
@@ -2813,6 +2849,14 @@ textarea.input {
 
   .desktop-nav {
     display: none !important;
+  }
+
+  .wizard-desktop-steps {
+    display: none !important;
+  }
+
+  .wizard-mobile-steps {
+    display: block !important;
   }
 
   .mobile-nav-controls {

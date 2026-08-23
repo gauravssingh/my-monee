@@ -360,6 +360,7 @@ export type Transaction = {
   is_transfer?: boolean;
   is_refund?: boolean;
   excludes_from_spending?: boolean;
+  classification_signals?: Record<string, any>;
 };
 
 export type DataIssueType =
@@ -596,7 +597,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transaction_id: transactionId, force_refresh: !!forceRefresh }),
     }),
-  classifyTransaction: (id: string, body: { category_id: string; subcategory_id?: string | null }) =>
+  classifyTransaction: (
+    id: string,
+    body: {
+      category_id: string;
+      subcategory_id?: string | null;
+      create_rule?: boolean;
+      apply_to_past?: boolean;
+    }
+  ) =>
     request<Transaction>(`/api/transactions/${encodeURIComponent(id)}/classify`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -606,12 +615,25 @@ export const api = {
     transaction_ids: string[];
     category_id: string;
     subcategory_id?: string | null;
+    create_rule?: boolean;
   }) =>
     request<{ updated: number; items: Transaction[] }>("/api/transactions/classify-bulk", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  getTransactionLinks: (id: string) =>
+    request<{
+      transaction_id: string;
+      links: Array<{
+        id: string;
+        direction: "in" | "out";
+        kind: string;
+        confidence: number | null;
+        notes: string | null;
+        related_transaction: Transaction | null;
+      }>;
+    }>(`/api/transactions/${encodeURIComponent(id)}/links`),
   excludeTransactions: (transactionIds: string[]) =>
     request<{ updated: number; items: Transaction[] }>("/api/transactions/exclude", {
       method: "POST",
@@ -895,6 +917,57 @@ export const api = {
       `/api/statements/${statementId}/transactions/${transactionId}/scan-gmail`,
       { method: "POST" }
     ),
+  onboardingStatus: () =>
+    request<{
+      completed: boolean;
+      accounts_configured: number;
+      transactions_ingested: number;
+      recurring_configured: number;
+      income_sources_configured: number;
+    }>("/api/onboarding/status"),
+  onboardingDiscover: () =>
+    request<{
+      accounts: Array<{
+        id: string;
+        name: string;
+        account_type: string;
+        card_last4?: string | null;
+        account_number_masked?: string | null;
+        is_asset: boolean;
+        is_liability: boolean;
+      }>;
+      income_sources: Array<{
+        name: string;
+        amount: number;
+        currency: string;
+        account?: string | null;
+        last_date?: string | null;
+        expected_day: number;
+      }>;
+      recurring: Array<{
+        id?: string | null;
+        name: string;
+        expected_amount: number;
+        frequency: string;
+        expected_day: number;
+        status: string;
+      }>;
+    }>("/api/onboarding/discover"),
+  completeOnboarding: (body: {
+    primary_salary?: { name: string; expected_amount: number; frequency?: string } | null;
+    recurring_items?: Array<{ name: string; expected_amount: number; frequency?: string; expected_day?: number }>;
+  }) =>
+    request<{
+      success: boolean;
+      completed: boolean;
+      reconciliation: any;
+    }>("/api/onboarding/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  resetOnboarding: () =>
+    request<{ success: boolean; completed: boolean }>("/api/onboarding/reset", { method: "POST" }),
 };
 
 

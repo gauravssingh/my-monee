@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { type Transaction } from "../api";
+import { api, type Transaction } from "../api";
 import { formatDate, formatMoney, formatSource } from "../format";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { getCategoryIcon } from "../utils/categoryIcons";
@@ -28,6 +29,18 @@ export default function TransactionDetailModal({
   const isVisible = open && Boolean(transaction);
   useModalChrome(isVisible, onClose);
   const onBackdropClick = useBackdropClose(isVisible, onClose);
+
+  const [links, setLinks] = useState<Array<any>>([]);
+
+  useEffect(() => {
+    if (!open || !transaction) {
+      setLinks([]);
+      return;
+    }
+    api.getTransactionLinks(transaction.id)
+      .then((data) => setLinks(data.links || []))
+      .catch(() => setLinks([]));
+  }, [open, transaction?.id]);
 
   if (!open || !transaction) return null;
 
@@ -210,6 +223,11 @@ export default function TransactionDetailModal({
             </div>
             <div style={{ fontSize: "14px", color: "var(--ink)", lineHeight: 1.4, fontWeight: 500 }}>
               {formatSource(transaction.classification_source)}
+              {transaction.classification_signals?.rule_name && (
+                <span style={{ fontSize: "11px", color: "var(--accent)", marginLeft: 6, display: "inline-block", fontWeight: 600 }}>
+                  ({transaction.classification_signals.rule_name})
+                </span>
+              )}
             </div>
           </div>
 
@@ -222,6 +240,54 @@ export default function TransactionDetailModal({
             </div>
           </div>
         </div>
+
+        {/* Linked Relationships (Refunds / Transfers) */}
+        {links.length > 0 && (
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+              Reconciled Relationships ({links.length})
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {links.map((link) => {
+                const isRefund = link.kind === "refund_of";
+                const isTransfer = link.kind === "transfer_to";
+                const relTx = link.related_transaction;
+                return (
+                  <div
+                    key={link.id}
+                    style={{
+                      padding: "10px 14px",
+                      background: isRefund ? "rgba(16, 185, 129, 0.06)" : "rgba(59, 130, 246, 0.06)",
+                      border: `1px solid ${isRefund ? "var(--credit, #10b981)" : "var(--accent, #3b82f6)"}`,
+                      borderRadius: "var(--radius-sm)",
+                      fontSize: "13px",
+                      lineHeight: 1.4,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
+                        <span>{isRefund ? "↩ Paired Refund" : isTransfer ? "⇄ Matched Transfer" : "🔗 Linked Event"}</span>
+                        <span style={{ fontSize: "11px", opacity: 0.7 }}>({Math.round((link.confidence || 1) * 100)}% match)</span>
+                      </div>
+                      <div style={{ fontSize: "12px", color: "var(--ink-muted)", marginTop: 2 }}>
+                        {link.notes || (relTx ? `${relTx.merchant_normalized || relTx.merchant_raw || relTx.description} (${formatMoney(relTx.amount, relTx.currency)} on ${formatDate(relTx.transaction_date)})` : "")}
+                      </div>
+                    </div>
+                    {relTx && (
+                      <span style={{ fontWeight: 600, fontFamily: "var(--font-mono, monospace)" }}>
+                        {formatMoney(relTx.amount, relTx.currency)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Raw Bank Notification / Description */}
         <div style={{ marginBottom: "24px" }}>

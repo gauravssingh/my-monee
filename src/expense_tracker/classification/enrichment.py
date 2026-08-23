@@ -1,7 +1,4 @@
-"""Apply parser enrichment (category slugs, transfer/income flags) onto Transaction rows."""
-
-from __future__ import annotations
-
+import logging
 from typing import Any
 
 from sqlalchemy import select
@@ -9,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from expense_tracker.db.models import Category, Subcategory, Transaction
 from expense_tracker.parsers.base import ParsedTransaction
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_category_ids(
@@ -39,23 +38,42 @@ def apply_parsed_enrichment(
     tx: Transaction,
     parsed: ParsedTransaction,
 ) -> None:
-    extra: dict[str, Any] = dict(parsed.extra or {})
-    cat_id, sub_id = resolve_category_ids(
-        session,
-        category_slug=extra.get("category_slug"),
-        subcategory_slug=extra.get("subcategory_slug"),
+    from expense_tracker.classification.rules import (
+        apply_classification_rule_to_transaction,
+        find_matching_rule,
     )
-    if cat_id:
-        tx.category_id = cat_id
-        tx.subcategory_id = sub_id
-    if "classification_source" in extra:
-        tx.classification_source = str(extra["classification_source"])
-    if "classification_confidence" in extra:
-        tx.classification_confidence = float(extra["classification_confidence"])
-    if "classification_signals" in extra and isinstance(extra["classification_signals"], dict):
-        tx.classification_signals = extra["classification_signals"]
-    if "needs_review" in extra:
-        tx.needs_review = bool(extra["needs_review"])
+
+    # 1. First priority: Check active user and persistent classification rules
+    matched_rule = find_matching_rule(session, tx)
+    if matched_rule:
+        apply_classification_rule_to_transaction(session, tx, matched_rule)
+        logger.info(
+            "Enriched tx %s using persistent rule %s (%s)",
+            tx.id,
+            matched_rule.id,
+            matched_rule.name,
+        )
+    else:
+        # 2. Fallback to parser-provided category hints
+        extra: dict[str, Any] = dict(parsed.extra or {})
+        cat_id, sub_id = resolve_category_ids(
+            session,
+            category_slug=extra.get("category_slug"),
+            subcategory_slug=extra.get("subcategory_slug"),
+        )
+        if cat_id:
+            tx.category_id = cat_id
+            tx.subcategory_id = sub_id
+        if "classification_source" in extra:
+            tx.classification_source = str(extra["classification_source"])
+        if "classification_confidence" in extra:
+            tx.classification_confidence = float(extra["classification_confidence"])
+        if "classification_signals" in extra and isinstance(extra["classification_signals"], dict):
+            tx.classification_signals = extra["classification_signals"]
+        if "needs_review" in extra:
+            tx.needs_review = bool(extra["needs_review"])
+
+    extra: dict[str, Any] = dict(parsed.extra or {})
     if "is_transfer" in extra:
         tx.is_transfer = bool(extra["is_transfer"])
     if "is_refund" in extra:

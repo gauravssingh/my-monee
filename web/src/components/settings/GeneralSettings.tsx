@@ -98,6 +98,19 @@ export default function GeneralSettings({ status }: GeneralSettingsProps) {
             <span className="status-badge-healthy">● Local-First</span>
           </div>
         </div>
+
+        <div className="settings-row">
+          <div className="settings-row-info">
+            <div className="settings-row-label">Onboarding & Setup Wizard</div>
+            <div className="settings-row-desc">Re-run the initial configuration wizard to recalibrate income, accounts, and obligations.</div>
+          </div>
+          <div className="settings-row-value">
+            <a href="/onboarding" className="btn quiet" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+              <span>🚀</span>
+              <span>Launch Wizard</span>
+            </a>
+          </div>
+        </div>
       </div>
     </div>
   );

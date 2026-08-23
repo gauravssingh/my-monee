@@ -8,6 +8,7 @@ import MerchantsPage from "./pages/MerchantsPage";
 import RecurringPage from "./pages/RecurringPage";
 import AccountsPage from "./pages/AccountsPage";
 import CreditCardStatementsPage from "./pages/CreditCardStatementsPage";
+import OnboardingPage from "./pages/OnboardingPage";
 import LockScreen from "./components/LockScreen";
 import { api } from "./api";
 
@@ -287,6 +288,7 @@ export default function App() {
           <Route path="/review" element={<TransactionsPage needsReview />} />
           <Route path="/data-issues" element={<DataIssuesPage />} />
           <Route path="/issues" element={<Navigate to="/data-issues" replace />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
           <Route path="/statements" element={<CreditCardStatementsPage />} />
