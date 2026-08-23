@@ -4,8 +4,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from expense_tracker.app import create_app
-from expense_tracker.config import Settings, AppConfig, DatabaseConfig, LoggingConfig
+from mymonee.app import create_app
+from mymonee.config import Settings, AppConfig, DatabaseConfig, LoggingConfig
 
 
 def _test_settings(tmp_path: Path) -> Settings:

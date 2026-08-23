@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from expense_tracker.parsers.base import EmailContext
-from expense_tracker.parsers.extract import extract_merchant, infer_direction
-from expense_tracker.parsers.scapia import ScapiaCardParser
+from mymonee.parsers.base import EmailContext
+from mymonee.parsers.extract import extract_merchant, infer_direction
+from mymonee.parsers.scapia import ScapiaCardParser
 
 
 SCAPIA_BODY = """

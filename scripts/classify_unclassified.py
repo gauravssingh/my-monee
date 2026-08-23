@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Transaction, Email, Category, Subcategory
-from expense_tracker.parsers.extract import html_to_text
-from expense_tracker.services.transactions import classify_transaction
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Transaction, Email, Category, Subcategory
+from mymonee.parsers.extract import html_to_text
+from mymonee.services.transactions import classify_transaction
 
 
 def get_classification_map(session: Session) -> dict[str, tuple[str, str | None]]:

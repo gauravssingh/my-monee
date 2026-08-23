@@ -1,6 +1,6 @@
 ---
 description: Dashboard income and classification service rules
-globs: src/expense_tracker/services/**/*.py,src/expense_tracker/api/routes/**/*.py,tests/test_income*.py,tests/test_classify.py
+globs: src/mymonee/services/**/*.py,src/mymonee/api/routes/**/*.py,tests/test_income*.py,tests/test_classify.py
 alwaysApply: false
 ---
 

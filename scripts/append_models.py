@@ -1,4 +1,4 @@
-from expense_tracker.db.models import Base
+from mymonee.db.models import Base
 
 new_models = """
 
@@ -146,7 +146,7 @@ class Budget(Base):
 import sys
 
 def main():
-    target_file = "/Users/gauravsingh/projects/expense-tracker/src/expense_tracker/db/models.py"
+    target_file = "/Users/gauravsingh/projects/expense-tracker/src/mymonee/db/models.py"
     with open(target_file, "r") as f:
         content = f.read()
 

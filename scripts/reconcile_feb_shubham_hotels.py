@@ -20,10 +20,10 @@ if str(src_dir) not in sys.path:
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from expense_tracker.config import get_settings
-from expense_tracker.db.models import Category, Subcategory, Transaction, new_id
-from expense_tracker.db.session import init_engine
-from expense_tracker.services.transactions import classify_transaction
+from mymonee.config import get_settings
+from mymonee.db.models import Category, Subcategory, Transaction, new_id
+from mymonee.db.session import init_engine
+from mymonee.services.transactions import classify_transaction
 
 
 def main() -> None:

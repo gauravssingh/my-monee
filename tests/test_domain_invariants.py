@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from expense_tracker.db.models import (
+from mymonee.db.models import (
     Account,
     Base,
     Category,
@@ -16,7 +16,7 @@ from expense_tracker.db.models import (
     MerchantAlias,
     Posting,
 )
-from expense_tracker.services.ledger import (
+from mymonee.services.ledger import (
     calculate_ledger_balances,
     verify_event_double_entry,
 )

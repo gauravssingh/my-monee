@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from expense_tracker.parsers.extract import dates_look_day_month_swapped, parse_date_near_amount
+from mymonee.parsers.extract import dates_look_day_month_swapped, parse_date_near_amount
 
 
 def test_iso_date_not_swapped_by_dayfirst() -> None:

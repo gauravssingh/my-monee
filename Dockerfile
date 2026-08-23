@@ -59,4 +59,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://127.0.0.1:8477/health/ready || exit 1
 
 # Default command launches FastAPI server with graceful SIGTERM handling
-CMD ["python", "-m", "expense_tracker"]
+CMD ["python", "-m", "mymonee"]

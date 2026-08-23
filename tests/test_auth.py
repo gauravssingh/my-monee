@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from fastapi.testclient import TestClient
 
-from expense_tracker.app import create_app
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.app import create_app
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
 
 
 def _settings(tmp_path: Path) -> Settings:

@@ -3,8 +3,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from expense_tracker.parsers.base import EmailContext
-from expense_tracker.parsers.phonepe import PhonePeParser
+from mymonee.parsers.base import EmailContext
+from mymonee.parsers.phonepe import PhonePeParser
 
 
 def test_phonepe_challan_parsing():

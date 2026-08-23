@@ -7,9 +7,9 @@ import re
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Email, Transaction, Merchant, MerchantAlias
-from expense_tracker.merchants.normalize import normalize_merchant
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Email, Transaction, Merchant, MerchantAlias
+from mymonee.merchants.normalize import normalize_merchant
 
 
 def clean_raw_merchant(raw: str | None) -> str | None:

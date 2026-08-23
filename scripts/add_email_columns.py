@@ -1,7 +1,7 @@
 import sys
 from sqlalchemy import text
-from expense_tracker.db.session import init_engine, get_session_factory
-from expense_tracker.config import get_settings
+from mymonee.db.session import init_engine, get_session_factory
+from mymonee.config import get_settings
 
 def run():
     init_engine()

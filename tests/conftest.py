@@ -7,9 +7,9 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from expense_tracker.app import create_app
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.session import get_session_factory, init_db
+from mymonee.app import create_app
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.session import get_session_factory, init_db
 
 
 @pytest.fixture

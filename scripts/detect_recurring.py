@@ -4,8 +4,8 @@ import statistics
 
 from sqlalchemy import select, delete
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Transaction, Merchant, Subscription, Bill
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Transaction, Merchant, Subscription, Bill
 
 def detect_recurring():
     SessionLocal = get_session_factory()

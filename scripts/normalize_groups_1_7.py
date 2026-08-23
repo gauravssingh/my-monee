@@ -6,9 +6,9 @@ import argparse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Transaction, Category, Subcategory, Merchant, MerchantAlias, new_id, utcnow
-from expense_tracker.services.transactions import classify_transaction
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Transaction, Category, Subcategory, Merchant, MerchantAlias, new_id, utcnow
+from mymonee.services.transactions import classify_transaction
 
 
 # (Pattern match, Canonical Display Name, Category Slug, Subcategory Slug)

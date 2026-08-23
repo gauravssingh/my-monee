@@ -36,11 +36,11 @@ dev = [
 ]
 
 [project.scripts]
-expense-tracker = "expense_tracker.__main__:main"
-mymonee = "expense_tracker.cli.main:main"
+expense-tracker = "mymonee.__main__:main"
+mymonee = "mymonee.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/expense_tracker"]
+packages = ["src/mymonee"]
 
 [tool.ruff]
 line-length = 100

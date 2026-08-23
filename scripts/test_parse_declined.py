@@ -1,10 +1,10 @@
 import sys
-from expense_tracker.db.session import init_engine, get_session_factory
-from expense_tracker.config import get_settings
-from expense_tracker.ingestion.gmail.client import GmailApiSource
-from expense_tracker.ingestion.pipeline import _to_email_context
-from expense_tracker.parsers.registry import registry
-from expense_tracker.parsers.bootstrap import bootstrap_parsers
+from mymonee.db.session import init_engine, get_session_factory
+from mymonee.config import get_settings
+from mymonee.ingestion.gmail.client import GmailApiSource
+from mymonee.ingestion.pipeline import _to_email_context
+from mymonee.parsers.registry import registry
+from mymonee.parsers.bootstrap import bootstrap_parsers
 import re
 
 def run():

@@ -13,9 +13,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from sqlalchemy import select
-from expense_tracker.config import load_settings
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import (
+from mymonee.config import load_settings
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import (
     Bill,
     RecurringTransaction,
     TransactionRecurringLink,

@@ -13,8 +13,8 @@ import sys
 
 from sqlalchemy import select
 
-from expense_tracker.config import get_settings
-from expense_tracker.db.models import (
+from mymonee.config import get_settings
+from mymonee.db.models import (
     Account,
     CreditCardStatement,
     IncomeSource,
@@ -22,9 +22,9 @@ from expense_tracker.db.models import (
     RecurringTransaction,
     StatementAccount,
 )
-from expense_tracker.db.session import init_db, get_session_factory
+from mymonee.db.session import init_db, get_session_factory
 
-logger = logging.getLogger("expense_tracker.scripts.cleanup_duplicate_accounts")
+logger = logging.getLogger("mymonee.scripts.cleanup_duplicate_accounts")
 
 # Explicit mapping of known auto-created duplicate names to canonical primary account names
 MERGE_TARGET_MAP = {

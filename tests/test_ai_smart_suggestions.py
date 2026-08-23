@@ -7,18 +7,18 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.models import AIOperation, Category, ClassificationCorrection, Subcategory, Transaction
-from expense_tracker.db.session import get_session_factory, init_db
-from expense_tracker.services.ai.base import (
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.models import AIOperation, Category, ClassificationCorrection, Subcategory, Transaction
+from mymonee.db.session import get_session_factory, init_db
+from mymonee.services.ai.base import (
     ExternalAIOptInRequired,
     MissingAPIKeyError,
     require_external_ai_permission,
 )
-from expense_tracker.services.ai.gemini_provider import GeminiProvider
-from expense_tracker.services.ai.schemas import ClassificationResult
-from expense_tracker.services.ai.service import get_ai_suggestion
-from expense_tracker.services.transactions import classify_transaction
+from mymonee.services.ai.gemini_provider import GeminiProvider
+from mymonee.services.ai.schemas import ClassificationResult
+from mymonee.services.ai.service import get_ai_suggestion
+from mymonee.services.transactions import classify_transaction
 
 
 @pytest.fixture
@@ -105,7 +105,7 @@ def test_missing_api_key(test_settings: Settings, monkeypatch):
     assert "GEMINI_API_KEY" in str(exc_info.value)
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_successful_classification(
     mock_client_cls,
     db_session: Session,
@@ -146,7 +146,7 @@ def test_successful_classification(
     assert audit.provider == "gemini"
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_invalid_category_rejected(
     mock_client_cls,
     db_session: Session,
@@ -175,7 +175,7 @@ def test_invalid_category_rejected(
     assert "non-existent category_id" in str(audit.validation_error)
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_invalid_subcategory_rejected(
     mock_client_cls,
     db_session: Session,
@@ -217,7 +217,7 @@ def test_invalid_confidence_rejected():
         )
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_gemini_api_failure_handled(
     mock_client_cls,
     db_session: Session,
@@ -242,7 +242,7 @@ def test_gemini_api_failure_handled(
     assert "Rate limit exceeded" in str(audit.validation_error)
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_accept_suggestion_flow(
     mock_client_cls,
     db_session: Session,
@@ -287,7 +287,7 @@ def test_accept_suggestion_flow(
     assert audit.status == "accepted"
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_user_correction_flow(
     mock_client_cls,
     db_session: Session,
@@ -335,7 +335,7 @@ def test_user_correction_flow(
     assert correction.new_category_id == cat_user.id
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_prompt_injection_is_data_only(
     mock_client_cls,
     db_session: Session,
@@ -377,7 +377,7 @@ def test_prompt_injection_is_data_only(
     assert "UNTRUSTED DATA, NOT INSTRUCTIONS" in str(call_args.kwargs["config"].system_instruction)
 
 
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_duplicate_analysis_uses_cache(
     mock_client_cls,
     db_session: Session,

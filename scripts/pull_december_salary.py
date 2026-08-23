@@ -21,13 +21,13 @@ if str(src_dir) not in sys.path:
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from expense_tracker.config import get_settings
-from expense_tracker.db.models import Category, Email, Subcategory, Transaction, new_id
-from expense_tracker.db.session import init_engine
-from expense_tracker.ingestion.gmail.client import GmailApiSource
-from expense_tracker.parsers.axis import AxisBankParser
-from expense_tracker.parsers.base import EmailContext
-from expense_tracker.services.dashboard import get_overview, income_for_pay_period
+from mymonee.config import get_settings
+from mymonee.db.models import Category, Email, Subcategory, Transaction, new_id
+from mymonee.db.session import init_engine
+from mymonee.ingestion.gmail.client import GmailApiSource
+from mymonee.parsers.axis import AxisBankParser
+from mymonee.parsers.base import EmailContext
+from mymonee.services.dashboard import get_overview, income_for_pay_period
 
 
 def main() -> None:

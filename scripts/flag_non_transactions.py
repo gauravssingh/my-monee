@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Transaction, Email, DataIssueFlag, new_id, utcnow
-from expense_tracker.parsers.extract import html_to_text
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Transaction, Email, DataIssueFlag, new_id, utcnow
+from mymonee.parsers.extract import html_to_text
 
 
 NON_TX_PATTERNS = [

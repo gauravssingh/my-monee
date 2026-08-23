@@ -8,13 +8,13 @@ from fastapi.testclient import TestClient
 from google.oauth2.credentials import Credentials
 from keyring.errors import KeyringError
 
-from expense_tracker.app import create_app
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.ingestion.gmail.oauth import is_connected
-from expense_tracker.parsers.base import EmailContext
-from expense_tracker.parsers.bootstrap import bootstrap_parsers
-from expense_tracker.parsers.extract import infer_direction, parse_amount
-from expense_tracker.parsers.generic import GenericHeuristicParser
+from mymonee.app import create_app
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.ingestion.gmail.oauth import is_connected
+from mymonee.parsers.base import EmailContext
+from mymonee.parsers.bootstrap import bootstrap_parsers
+from mymonee.parsers.extract import infer_direction, parse_amount
+from mymonee.parsers.generic import GenericHeuristicParser
 
 
 def _test_settings(tmp_path: Path) -> Settings:
@@ -28,7 +28,7 @@ def _test_settings(tmp_path: Path) -> Settings:
 def test_gmail_status_disconnected(tmp_path: Path) -> None:
     app = create_app(_test_settings(tmp_path))
     client = TestClient(app)
-    with patch("expense_tracker.ingestion.gmail.oauth.keyring.get_password", return_value=None):
+    with patch("mymonee.ingestion.gmail.oauth.keyring.get_password", return_value=None):
         status = client.get("/api/gmail/status")
     assert status.status_code == 200
     body = status.json()
@@ -40,7 +40,7 @@ def test_connection_check_refreshes_expired_access_token(tmp_path: Path) -> None
     settings = _test_settings(tmp_path)
     refreshed = Credentials(token="new-access-token", refresh_token="refresh-token")
     with patch(
-        "expense_tracker.ingestion.gmail.oauth.get_valid_credentials",
+        "mymonee.ingestion.gmail.oauth.get_valid_credentials",
         return_value=refreshed,
     ) as get_valid:
         assert is_connected(settings) is True
@@ -51,7 +51,7 @@ def test_gmail_status_handles_unavailable_keychain(tmp_path: Path) -> None:
     app = create_app(_test_settings(tmp_path))
     client = TestClient(app)
     with patch(
-        "expense_tracker.ingestion.gmail.oauth.keyring.get_password",
+        "mymonee.ingestion.gmail.oauth.keyring.get_password",
         side_effect=KeyringError("unavailable"),
     ):
         response = client.get("/api/gmail/status")
@@ -114,7 +114,7 @@ def test_infer_credit_refund() -> None:
 def test_sync_requires_connection(tmp_path: Path) -> None:
     app = create_app(_test_settings(tmp_path))
     client = TestClient(app)
-    with patch("expense_tracker.ingestion.gmail.oauth.keyring.get_password", return_value=None):
+    with patch("mymonee.ingestion.gmail.oauth.keyring.get_password", return_value=None):
         response = client.post("/api/gmail/sync")
     assert response.status_code == 400
 
@@ -138,10 +138,10 @@ def test_merchants_exclude_transfers(tmp_path: Path) -> None:
 
 
 def test_get_or_create_account_matches_existing_identifiers(tmp_path: Path) -> None:
-    from expense_tracker.db.models import Account, Institution
-    from expense_tracker.db.session import init_db, get_session_factory
-    from expense_tracker.ingestion.pipeline import _get_or_create_account
-    from expense_tracker.parsers.base import ParsedTransaction
+    from mymonee.db.models import Account, Institution
+    from mymonee.db.session import init_db, get_session_factory
+    from mymonee.ingestion.pipeline import _get_or_create_account
+    from mymonee.parsers.base import ParsedTransaction
 
     settings = _test_settings(tmp_path)
     init_db(settings)

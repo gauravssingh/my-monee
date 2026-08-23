@@ -234,7 +234,7 @@ Ideal for running 24/7 on a Mac mini or MacBook:
 
 3. **Run Application**:
    ```bash
-   python -m expense_tracker
+   python -m mymonee
    ```
    Open **`http://localhost:8477`** in your browser.
 

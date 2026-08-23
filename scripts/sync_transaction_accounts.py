@@ -14,9 +14,9 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from expense_tracker.config import get_settings
-from expense_tracker.db.models import Account, Posting, Transaction
-from expense_tracker.db.session import get_session_factory, init_db
+from mymonee.config import get_settings
+from mymonee.db.models import Account, Posting, Transaction
+from mymonee.db.session import get_session_factory, init_db
 
 
 def sync_transaction_accounts(execute: bool = False) -> None:

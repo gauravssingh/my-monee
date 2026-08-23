@@ -1,5 +1,5 @@
-from expense_tracker.db.session import init_db, get_session_factory, get_engine
-from expense_tracker.db.models import (
+from mymonee.db.session import init_db, get_session_factory, get_engine
+from mymonee.db.models import (
     Transaction,
     Account,
     Institution,

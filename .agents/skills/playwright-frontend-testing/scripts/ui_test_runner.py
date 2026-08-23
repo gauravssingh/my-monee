@@ -13,9 +13,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from expense_tracker.config import load_settings
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.services.auth import _get_or_create_secret, create_session_token
+from mymonee.config import load_settings
+from mymonee.db.session import get_session_factory
+from mymonee.services.auth import _get_or_create_secret, create_session_token
 
 
 def get_auth_token() -> str:

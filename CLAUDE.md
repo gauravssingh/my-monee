@@ -15,7 +15,7 @@ Local-first personal finance app for macOS. Gmail alerts → parse → classify 
 source .venv/bin/activate
 pip install -e ".[dev]"
 cd web && npm install && npm run build && cd ..
-python -m expense_tracker          # API + UI
+python -m mymonee          # API + UI
 pytest                             # tests
 python .agents/skills/playwright-frontend-testing/scripts/ui_test_runner.py --all  # Playwright UI & visual tests
 ruff check src tests               # lint
@@ -29,7 +29,7 @@ Dev frontend (HMR): `scripts/run_dev.sh` or Vite against the API.
 
 ```
 config/                 # default.yaml + providers/*.yaml discovery rules
-src/expense_tracker/
+src/mymonee/
   api/routes/           # FastAPI routes
   ingestion/            # Gmail client, OAuth, sync pipeline
   parsers/              # AxisBankParser, generic, provider rule parsers
@@ -101,7 +101,7 @@ Data lives under `~/Library/Application Support/ExpenseTracker/` (DB, logs, cred
 ## Gotchas
 
 - After frontend changes: `cd web && npm run build` then restart the server/launchd job (API serves `web/dist`)
-- Re-parse Axis credits: `python -m expense_tracker.reclassify_axis` (force_reparse)
+- Re-parse Axis credits: `python -m mymonee.reclassify_axis` (force_reparse)
 - Amounts like `INR .52` are valid — parsers must allow leading decimal
 - `UPILITE` is a real Axis channel token (include in patterns)
 - Do not commit credentials, Keychain material, `config.local.yaml`, SQLite data, or `scripts/launchd/com.personal.expense-tracker.plist`; use `config/local.example.yaml` and the launchd `.example` as templates
@@ -111,10 +111,10 @@ Data lives under `~/Library/Application Support/ExpenseTracker/` (DB, logs, cred
 
 - `ARCHITECTURE.md` — full design
 - `README.md` — setup / Gmail connect
-- `src/expense_tracker/ingestion/pipeline.py` — sync + persist
-- `src/expense_tracker/services/dashboard.py` — overview / income trend
-- `src/expense_tracker/parsers/axis.py` — Axis salary/transfer rules
+- `src/mymonee/ingestion/pipeline.py` — sync + persist
+- `src/mymonee/services/dashboard.py` — overview / income trend
+- `src/mymonee/parsers/axis.py` — Axis salary/transfer rules
 - `web/src/pages/TransactionsPage.tsx` — ledger/review tables, sortable columns, date and direction filters, bulk classify, per-row flag action
 - `web/src/pages/SettingsPage.tsx` — Gmail connection/sync, category and local storage settings
-- `src/expense_tracker/services/data_issues.py` — data-issue flags + classification-correction history
+- `src/mymonee/services/data_issues.py` — data-issue flags + classification-correction history
 - `web/src/pages/DataIssuesPage.tsx` — flagged-issue aggregation and bulk resolve/dismiss

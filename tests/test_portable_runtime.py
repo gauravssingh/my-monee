@@ -5,17 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 from fastapi.testclient import TestClient
 
-from expense_tracker.app import create_app
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.models import (
+from mymonee.app import create_app
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.models import (
     Account,
     Category,
     Transaction,
     utcnow,
 )
-from expense_tracker.db.session import get_session_factory, init_db
-from expense_tracker.services.archive import create_archive, restore_archive, verify_archive
-from expense_tracker.services.doctor import run_diagnostics
+from mymonee.db.session import get_session_factory, init_db
+from mymonee.services.archive import create_archive, restore_archive, verify_archive
+from mymonee.services.doctor import run_diagnostics
 
 
 def test_fresh_installation_filesystem_contract(tmp_path: Path):

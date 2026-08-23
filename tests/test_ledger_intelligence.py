@@ -7,19 +7,19 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from expense_tracker.app import create_app
-from expense_tracker.classification.enrichment import apply_parsed_enrichment
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.models import (
+from mymonee.app import create_app
+from mymonee.classification.enrichment import apply_parsed_enrichment
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.models import (
     Account,
     Category,
     Institution,
     Subcategory,
     Transaction,
 )
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.parsers.base import ParsedTransaction
-from expense_tracker.services.reconciliation import (
+from mymonee.db.session import get_session_factory
+from mymonee.parsers.base import ParsedTransaction
+from mymonee.services.reconciliation import (
     pair_refunds,
     run_full_reconciliation,
 )

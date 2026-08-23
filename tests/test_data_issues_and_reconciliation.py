@@ -5,20 +5,20 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.models import (
+from mymonee.db.models import (
     CreditCardStatement,
     StatementTransaction,
     Transaction,
 )
-from expense_tracker.domain.enums import DataIssueStatus
-from expense_tracker.services.data_issues import (
+from mymonee.domain.enums import DataIssueStatus
+from mymonee.services.data_issues import (
     flag_transaction_issue,
     flag_transactions_bulk,
     list_data_issues,
     resolve_data_issues_bulk,
     summarize_data_issues,
 )
-from expense_tracker.statements.reconciliation import (
+from mymonee.statements.reconciliation import (
     match_statement_transaction,
     reconcile_statement_in_db,
 )

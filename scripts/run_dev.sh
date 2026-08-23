@@ -15,4 +15,4 @@ if [[ ! -d web/node_modules ]]; then
 fi
 (cd web && npm run build)
 
-exec python -m expense_tracker "$@"
+exec python -m mymonee "$@"

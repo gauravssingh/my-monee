@@ -1,4 +1,4 @@
-from expense_tracker.merchants.normalize import normalize_merchant
+from mymonee.merchants.normalize import normalize_merchant
 
 
 def test_normalize_strips_gateway_prefix() -> None:

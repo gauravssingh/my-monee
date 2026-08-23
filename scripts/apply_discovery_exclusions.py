@@ -19,7 +19,7 @@ logger = logging.getLogger("apply_discovery_exclusions")
 
 def get_db_path() -> Path:
     # Try local config or standard default path
-    default_path = Path.home() / "Library" / "Application Support" / "ExpenseTracker" / "expense_tracker.db"
+    default_path = Path.home() / "Library" / "Application Support" / "ExpenseTracker" / "mymonee.db"
     return default_path
 
 

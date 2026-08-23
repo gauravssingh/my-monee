@@ -1,5 +1,5 @@
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Transaction, Merchant, MerchantAlias
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Transaction, Merchant, MerchantAlias
 from sqlalchemy import select
 
 def migrate():

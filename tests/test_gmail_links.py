@@ -1,4 +1,4 @@
-from expense_tracker.ingestion.gmail.links import gmail_web_url
+from mymonee.ingestion.gmail.links import gmail_web_url
 
 
 def test_gmail_web_url_prefers_thread() -> None:

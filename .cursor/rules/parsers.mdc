@@ -1,6 +1,6 @@
 ---
 description: Axis / bank email parser conventions
-globs: src/expense_tracker/parsers/**/*.py,config/providers/**/*.yaml,tests/test_axis*.py
+globs: src/mymonee/parsers/**/*.py,config/providers/**/*.yaml,tests/test_axis*.py
 alwaysApply: false
 ---
 
@@ -16,4 +16,4 @@ alwaysApply: false
 - Amount regexes must accept leading decimals (`INR .52`)
 - Include `UPILITE` alongside UPI/NEFT/IMPS/RTGS channel tokens
 - Enrichment fields go through `classification/enrichment.py` via pipeline persist
-- Backfill: `python -m expense_tracker.reclassify_axis` or `python -m expense_tracker.reclassify_scapia` with `force_reparse`
+- Backfill: `python -m mymonee.reclassify_axis` or `python -m mymonee.reclassify_scapia` with `force_reparse`

@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from expense_tracker.parsers.axis import AxisBankParser, classify_axis_credit, extract_axis_channel_ref
-from expense_tracker.parsers.base import EmailContext
-from expense_tracker.parsers.bootstrap import bootstrap_parsers
-from expense_tracker.parsers.registry import registry
+from mymonee.parsers.axis import AxisBankParser, classify_axis_credit, extract_axis_channel_ref
+from mymonee.parsers.base import EmailContext
+from mymonee.parsers.bootstrap import bootstrap_parsers
+from mymonee.parsers.registry import registry
 
 
 SALARY_BODY = """

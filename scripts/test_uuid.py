@@ -1,9 +1,9 @@
 import sys
-from expense_tracker.db.session import init_engine, get_session_factory
-from expense_tracker.db.models import Email
-from expense_tracker.parsers.registry import registry
-from expense_tracker.parsers.bootstrap import bootstrap_parsers
-from expense_tracker.parsers.base import EmailContext
+from mymonee.db.session import init_engine, get_session_factory
+from mymonee.db.models import Email
+from mymonee.parsers.registry import registry
+from mymonee.parsers.bootstrap import bootstrap_parsers
+from mymonee.parsers.base import EmailContext
 
 def run():
     init_engine()

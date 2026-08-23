@@ -6,8 +6,8 @@ import argparse
 from sqlalchemy import select, update, delete
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Account, Transaction, Posting, RecurringTransaction
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Account, Transaction, Posting, RecurringTransaction
 
 
 def consolidate_accounts(*, apply: bool = False) -> None:

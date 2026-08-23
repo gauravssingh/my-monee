@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.models import Transaction, Category, Subcategory, new_id
-from expense_tracker.db.session import get_session_factory, init_db
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.models import Transaction, Category, Subcategory, new_id
+from mymonee.db.session import get_session_factory, init_db
 from sqlalchemy import select
-from expense_tracker.services.dashboard import (
+from mymonee.services.dashboard import (
     _pct_change,
     get_overview,
     income_trend,
@@ -150,7 +150,7 @@ def test_financial_trends_points(tmp_path: Path) -> None:
     init_db(settings)
     session = get_session_factory()()
     try:
-        from expense_tracker.services.dashboard import financial_trends
+        from mymonee.services.dashboard import financial_trends
         trends = financial_trends(session, months=6, year=2026, month=8)
         assert trends["currency"] == "INR"
         assert len(trends["points"]) == 6

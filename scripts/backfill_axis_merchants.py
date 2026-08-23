@@ -7,11 +7,11 @@ import sys
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.db.models import Email, Transaction, Merchant, MerchantAlias
-from expense_tracker.merchants.normalize import normalize_merchant
-from expense_tracker.parsers.axis import AxisBankParser
-from expense_tracker.parsers.base import EmailContext
+from mymonee.db.session import get_session_factory
+from mymonee.db.models import Email, Transaction, Merchant, MerchantAlias
+from mymonee.merchants.normalize import normalize_merchant
+from mymonee.parsers.axis import AxisBankParser
+from mymonee.parsers.base import EmailContext
 
 
 def resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | None) -> str | None:

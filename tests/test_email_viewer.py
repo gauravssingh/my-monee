@@ -4,10 +4,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from expense_tracker.app import create_app
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.models import Email
-from expense_tracker.db.session import get_session_factory
+from mymonee.app import create_app
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.models import Email
+from mymonee.db.session import get_session_factory
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -34,7 +34,7 @@ def test_fetch_message_404_when_not_indexed_even_if_connected_mocked(
     client = TestClient(app)
 
     monkeypatch.setattr(
-        "expense_tracker.api.routes.gmail.is_connected",
+        "mymonee.api.routes.gmail.is_connected",
         lambda _settings: True,
     )
 
@@ -45,7 +45,7 @@ def test_fetch_message_404_when_not_indexed_even_if_connected_mocked(
 def test_fetch_message_success_path(tmp_path: Path, monkeypatch) -> None:
     from datetime import datetime, timezone
 
-    from expense_tracker.ingestion.gmail.client import GmailMessage
+    from mymonee.ingestion.gmail.client import GmailMessage
 
     settings = _settings(tmp_path)
     app = create_app(settings)
@@ -65,7 +65,7 @@ def test_fetch_message_success_path(tmp_path: Path, monkeypatch) -> None:
     session.close()
 
     monkeypatch.setattr(
-        "expense_tracker.api.routes.gmail.is_connected",
+        "mymonee.api.routes.gmail.is_connected",
         lambda _settings: True,
     )
 
@@ -86,7 +86,7 @@ def test_fetch_message_success_path(tmp_path: Path, monkeypatch) -> None:
             )
 
     monkeypatch.setattr(
-        "expense_tracker.api.routes.gmail.GmailApiSource",
+        "mymonee.api.routes.gmail.GmailApiSource",
         lambda _settings: FakeSource(),
     )
 

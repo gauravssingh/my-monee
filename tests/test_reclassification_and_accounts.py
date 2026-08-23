@@ -5,10 +5,10 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.models import Account, Category, Institution, Subcategory, Transaction
-from expense_tracker.ingestion.pipeline import _get_or_create_account
-from expense_tracker.parsers.base import ParsedTransaction
-from expense_tracker.services.transactions import _apply_category_side_effects
+from mymonee.db.models import Account, Category, Institution, Subcategory, Transaction
+from mymonee.ingestion.pipeline import _get_or_create_account
+from mymonee.parsers.base import ParsedTransaction
+from mymonee.services.transactions import _apply_category_side_effects
 
 
 def test_category_side_effects_transfers() -> None:

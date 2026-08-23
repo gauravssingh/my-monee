@@ -11,9 +11,9 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
-from expense_tracker.statements.extractor import load_pdf_structure
-from expense_tracker.statements.parsers.registry import get_statement_parser_registry
-from expense_tracker.statements.validator import StatementValidator
+from mymonee.statements.extractor import load_pdf_structure
+from mymonee.statements.parsers.registry import get_statement_parser_registry
+from mymonee.statements.validator import StatementValidator
 
 
 def main() -> None:

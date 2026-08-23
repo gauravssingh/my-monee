@@ -1,6 +1,6 @@
 ---
 description: Gmail OAuth and sync pitfalls
-globs: src/expense_tracker/ingestion/gmail/**/*.py,src/expense_tracker/api/routes/gmail.py,web/src/pages/SettingsPage.tsx
+globs: src/mymonee/ingestion/gmail/**/*.py,src/mymonee/api/routes/gmail.py,web/src/pages/SettingsPage.tsx
 alwaysApply: false
 ---
 

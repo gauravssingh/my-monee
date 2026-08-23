@@ -22,7 +22,7 @@ FAILED tests/test_phase2.py::test_gmail_status_disconnected - assert True is ...
 - `tests/test_phase2.py:24-31` (`test_gmail_status_disconnected`) asserts `body["connected"] is False` with no keyring/`is_connected` mock → **fails** on this machine.
 - `tests/test_phase2.py:86-90` (`test_sync_requires_connection`) expects a 400 from `POST /api/gmail/sync`, but `gmail.py:192-193` only 400s `if not is_connected(settings)`. Since it's `True`, execution falls through to `run_ingestion_pipeline(...)` (`gmail.py:201-208`), which opens a real Gmail API client and **hangs on network I/O**.
 
-Contrast: `tests/test_email_viewer.py:36-39,67-70` correctly `monkeypatch.setattr("expense_tracker.api.routes.gmail.is_connected", ...)` — the fix pattern already exists elsewhere in the suite but wasn't applied to `test_phase2.py`. **This is a genuine test-isolation bug, not environment flakiness** — it reproduces on any machine that has ever connected Gmail, and CLAUDE.md/AGENTS.md's "Commands"/"Verification" sections tell agents to just run `pytest` with no warning that it can hang or make live calls against production credentials.
+Contrast: `tests/test_email_viewer.py:36-39,67-70` correctly `monkeypatch.setattr("mymonee.api.routes.gmail.is_connected", ...)` — the fix pattern already exists elsewhere in the suite but wasn't applied to `test_phase2.py`. **This is a genuine test-isolation bug, not environment flakiness** — it reproduces on any machine that has ever connected Gmail, and CLAUDE.md/AGENTS.md's "Commands"/"Verification" sections tell agents to just run `pytest` with no warning that it can hang or make live calls against production credentials.
 
 **Ruff (`ruff check src tests`):** 146 errors, 106 auto-fixable.
 
@@ -86,7 +86,7 @@ Contrast: `tests/test_email_viewer.py:36-39,67-70` correctly `monkeypatch.setatt
 
 - `scripts/run_server.sh:3` hardcodes `ROOT="/Users/gauravsingh/projects/expense-tracker"`, inconsistent with `scripts/run_dev.sh:3`, which correctly computes `ROOT="$(cd "$(dirname "$0")/.." && pwd)"`. Since `run_server.sh` is the one launchd actually invokes, this is arguably intentional for a personal single-user machine, but it means the script cannot be copied/reused and isn't self-relocating like its sibling.
 - The real `scripts/launchd/com.personal.expense-tracker.plist` hardcodes `/Users/gauravsingh/...` throughout, but it's internally consistent with `run_server.sh` (same `ROOT`, same log dir matching `run_server.sh`'s `mkdir -p "$LOG_DIR"`).
-- `scripts/launchd/com.personal.expense-tracker.plist.example` uses `/Users/YOU/...` placeholders but invokes `.venv/bin/python -m expense_tracker` **directly**, not via `run_server.sh`. A new user following the example verbatim would get a launchd job with no `mkdir -p` for the log dir first — if `~/Library/Logs/ExpenseTracker/` doesn't already exist, launchd's `StandardOutPath`/`StandardErrorPath` file creation can fail silently. The example has drifted from the wrapper-script pattern the real plist now uses.
+- `scripts/launchd/com.personal.expense-tracker.plist.example` uses `/Users/YOU/...` placeholders but invokes `.venv/bin/python -m mymonee` **directly**, not via `run_server.sh`. A new user following the example verbatim would get a launchd job with no `mkdir -p` for the log dir first — if `~/Library/Logs/ExpenseTracker/` doesn't already exist, launchd's `StandardOutPath`/`StandardErrorPath` file creation can fail silently. The example has drifted from the wrapper-script pattern the real plist now uses.
 
 **Error handling:**
 

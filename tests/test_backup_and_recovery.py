@@ -5,11 +5,11 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from expense_tracker.app import create_app
-from expense_tracker.config import Settings
-from expense_tracker.db.models import Transaction, utcnow
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.services.backup import (
+from mymonee.app import create_app
+from mymonee.config import Settings
+from mymonee.db.models import Transaction, utcnow
+from mymonee.db.session import get_session_factory
+from mymonee.services.backup import (
     create_backup_snapshot,
     delete_backup,
     export_full_json_bundle,

@@ -1,8 +1,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from expense_tracker.config import Settings
-from expense_tracker.services.ai import (
+from mymonee.config import Settings
+from mymonee.services.ai import (
     GeminiProvider,
     ExternalAIOptInRequired,
     MissingAPIKeyError,
@@ -51,7 +51,7 @@ def test_missing_api_key(mock_getenv, base_settings):
         GeminiProvider(base_settings)
 
 @patch("os.getenv", return_value="dummy_key")
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_successful_classification(mock_client_class, mock_getenv, base_settings, tx_context, categories_sample):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
@@ -75,7 +75,7 @@ def test_successful_classification(mock_client_class, mock_getenv, base_settings
     assert kwargs["config"].response_mime_type == "application/json"
 
 @patch("os.getenv", return_value="dummy_key")
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_malformed_model_output(mock_client_class, mock_getenv, base_settings, tx_context, categories_sample):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
@@ -89,7 +89,7 @@ def test_malformed_model_output(mock_client_class, mock_getenv, base_settings, t
         provider.classify_transaction(tx_context, categories_sample)
 
 @patch("os.getenv", return_value="dummy_key")
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_invalid_category_ids(mock_client_class, mock_getenv, base_settings, tx_context, categories_sample):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
@@ -104,7 +104,7 @@ def test_invalid_category_ids(mock_client_class, mock_getenv, base_settings, tx_
         provider.classify_transaction(tx_context, categories_sample)
 
 @patch("os.getenv", return_value="dummy_key")
-@patch("expense_tracker.services.ai.gemini_provider.genai.Client")
+@patch("mymonee.services.ai.gemini_provider.genai.Client")
 def test_gemini_api_errors(mock_client_class, mock_getenv, base_settings, tx_context, categories_sample):
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client

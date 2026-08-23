@@ -13,10 +13,10 @@ The `.cursor/rules/*.mdc` files (gmail-oauth, services, frontend, parsers, proje
 ### `ARCHITECTURE.md` §3's folder tree vs. the real tree
 
 **Documented but does not exist:**
-- `src/expense_tracker/engine/{dedupe.py,refunds.py,transfers.py}` — no such folder. Whatever dedupe/refund/transfer logic exists lives ad hoc inside `parsers/axis.py`'s `classify_axis_credit`, not in a dedicated engine layer, which also means it's bank-specific rather than the source-independent design the doc implies.
-- `src/expense_tracker/classification/{hierarchy.py,rules.py,historical.py,ai.py}` — the real `classification/` package contains only `enrichment.py`, which the doc never mentions. There is no rules engine, no historical-match layer, and no AI/ML hook — Phase 5's "Personal model" premise has no scaffolding yet.
-- `src/expense_tracker/services/stats.py` — doesn't exist.
-- `src/expense_tracker/scheduler/jobs.py` — doesn't exist. Consistent with this: `pyproject.toml` doesn't depend on `apscheduler`, and no code imports it, even though ARCHITECTURE.md §2's stack table lists APScheduler as chosen technology. The `SchedulerConfig` in `config.py` (`enabled`, `interval_minutes`) is a config surface with nothing behind it.
+- `src/mymonee/engine/{dedupe.py,refunds.py,transfers.py}` — no such folder. Whatever dedupe/refund/transfer logic exists lives ad hoc inside `parsers/axis.py`'s `classify_axis_credit`, not in a dedicated engine layer, which also means it's bank-specific rather than the source-independent design the doc implies.
+- `src/mymonee/classification/{hierarchy.py,rules.py,historical.py,ai.py}` — the real `classification/` package contains only `enrichment.py`, which the doc never mentions. There is no rules engine, no historical-match layer, and no AI/ML hook — Phase 5's "Personal model" premise has no scaffolding yet.
+- `src/mymonee/services/stats.py` — doesn't exist.
+- `src/mymonee/scheduler/jobs.py` — doesn't exist. Consistent with this: `pyproject.toml` doesn't depend on `apscheduler`, and no code imports it, even though ARCHITECTURE.md §2's stack table lists APScheduler as chosen technology. The `SchedulerConfig` in `config.py` (`enabled`, `interval_minutes`) is a config surface with nothing behind it.
 
 **Exists but undocumented in the §3 tree:**
 - `api/routes/categories.py`, `api/routes/gmail.py` (doc lists only health/overview/transactions/system).
@@ -52,6 +52,6 @@ A reader who opened all three documents cold would get three different, mutually
 You don't need three roadmap documents. Suggested resolution, roughly in order of effort:
 
 1. Decide whether `docs/plans/MyMonee_Personal_Finance_Master_Plan.md` is an active target or a superseded exploration. If active, it needs to either replace or explicitly subordinate `ARCHITECTURE.md`'s roadmap and package layout; if superseded, move it somewhere clearly marked as historical (e.g. `docs/plans/archive/`) so it stops reading as current intent.
-2. Regenerate `ARCHITECTURE.md` §3's folder tree from the actual `src/expense_tracker` tree (it's short enough to hand-verify) and delete the aspirational `engine/`/`classification/hierarchy.py` etc. entries, or explicitly label them "planned, not yet started" instead of presenting them as existing structure.
+2. Regenerate `ARCHITECTURE.md` §3's folder tree from the actual `src/mymonee` tree (it's short enough to hand-verify) and delete the aspirational `engine/`/`classification/hierarchy.py` etc. entries, or explicitly label them "planned, not yet started" instead of presenting them as existing structure.
 3. Fix the two stale status lines called out above.
 4. `CLAUDE.md` is the accurate, current source of truth today — keep new agent-facing changes there first, and treat `ARCHITECTURE.md` updates as a periodic sync rather than the primary place changes land.

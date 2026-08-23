@@ -1,7 +1,7 @@
 # Expense Tracker — Design & Code Review
 
 **Date:** 2026-08-12
-**Scope:** Full repository — backend (`src/expense_tracker/`), frontend (`web/src/`), tests (`tests/`), tooling (`scripts/`, `pyproject.toml`), and documentation (`ARCHITECTURE.md`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/plans/`).
+**Scope:** Full repository — backend (`src/mymonee/`), frontend (`web/src/`), tests (`tests/`), tooling (`scripts/`, `pyproject.toml`), and documentation (`ARCHITECTURE.md`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `docs/plans/`).
 **Method:** Four independent deep-dive passes (backend/API/DB, ingestion/parsers/classification, frontend, testing/tooling/docs-consistency), each reading every file in scope in full. Several findings were confirmed by actually executing the relevant code against constructed inputs rather than by inspection alone — those are marked accordingly in each report.
 
 This review is descriptive, not prescriptive: it reports what the code and docs currently do, with evidence, so you can decide what to fix and in what order. Nothing has been changed in the codebase as part of this review.

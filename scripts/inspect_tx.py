@@ -1,6 +1,6 @@
 import sys
-from expense_tracker.db.session import init_engine, get_session_factory
-from expense_tracker.db.models import Email, Transaction
+from mymonee.db.session import init_engine, get_session_factory
+from mymonee.db.models import Email, Transaction
 
 def run():
     init_engine()

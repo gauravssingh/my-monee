@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.logging_setup import RedactingFilter, setup_logging
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.logging_setup import RedactingFilter, setup_logging
 
 
 def test_redacting_filter_masks_credentials() -> None:
@@ -92,13 +92,13 @@ def test_setup_logging_configuration(tmp_path: Path) -> None:
     assert root.level == logging.DEBUG
     assert len(root.handlers) >= 2  # console + file
 
-    test_logger = logging.getLogger("expense_tracker.test_logger")
+    test_logger = logging.getLogger("mymonee.test_logger")
     test_logger.debug("Debug message for testing")
 
     # Verify file was written
     assert log_file.exists()
     content = log_file.read_text(encoding="utf-8")
-    assert "expense_tracker.test_logger" in content
+    assert "mymonee.test_logger" in content
     assert "Debug message for testing" in content
 
 

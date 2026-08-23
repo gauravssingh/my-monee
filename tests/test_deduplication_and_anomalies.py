@@ -6,16 +6,16 @@ from datetime import timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from expense_tracker.app import create_app
-from expense_tracker.config import Settings
-from expense_tracker.db.models import (
+from mymonee.app import create_app
+from mymonee.config import Settings
+from mymonee.db.models import (
     Category,
     RecurringTransaction,
     Transaction,
     utcnow,
 )
-from expense_tracker.services.anomalies import detect_spending_anomalies
-from expense_tracker.services.deduplication import (
+from mymonee.services.anomalies import detect_spending_anomalies
+from mymonee.services.deduplication import (
     find_duplicate_candidates,
     merge_duplicate_transactions,
     unmark_duplicate_transaction,

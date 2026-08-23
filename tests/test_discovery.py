@@ -1,5 +1,5 @@
-from expense_tracker.ingestion.discovery import load_discovery_rules
-from expense_tracker.ingestion.gmail.client import GmailMessage
+from mymonee.ingestion.discovery import load_discovery_rules
+from mymonee.ingestion.gmail.client import GmailMessage
 from datetime import datetime, timezone
 
 

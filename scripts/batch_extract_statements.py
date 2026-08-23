@@ -14,11 +14,11 @@ sys.path.insert(0, str(repo_root / "src"))
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from expense_tracker.config import get_settings
-from expense_tracker.db.models import CreditCardStatement
-from expense_tracker.db.session import get_session_factory, init_db
-from expense_tracker.statements.reconciliation import reconcile_statement_in_db
-from expense_tracker.statements.service import extract_and_validate_statement
+from mymonee.config import get_settings
+from mymonee.db.models import CreditCardStatement
+from mymonee.db.session import get_session_factory, init_db
+from mymonee.statements.reconciliation import reconcile_statement_in_db
+from mymonee.statements.service import extract_and_validate_statement
 
 
 def main() -> None:

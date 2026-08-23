@@ -10,9 +10,9 @@ SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Generate auth token
 sys.path.insert(0, "/Users/gauravsingh/projects/expense-tracker/src")
-from expense_tracker.config import load_settings
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.services.auth import _get_or_create_secret, create_session_token
+from mymonee.config import load_settings
+from mymonee.db.session import get_session_factory
+from mymonee.services.auth import _get_or_create_secret, create_session_token
 
 load_settings()
 SessionFactory = get_session_factory()

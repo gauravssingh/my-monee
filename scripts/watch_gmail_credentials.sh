@@ -14,8 +14,8 @@ while true; do
     echo "Credentials already present at $DEST"
     curl -s http://127.0.0.1:8477/api/gmail/status || true
     echo
-    echo "Next: python -m expense_tracker.connect_gmail"
-    echo "Then: python -m expense_tracker.sync_gmail --full-year"
+    echo "Next: python -m mymonee.connect_gmail"
+    echo "Then: python -m mymonee.sync_gmail --full-year"
     exit 0
   fi
 
@@ -26,8 +26,8 @@ while true; do
     echo
     echo "Installed. Run:"
     echo "  cd $ROOT && source .venv/bin/activate"
-    echo "  python -m expense_tracker.connect_gmail"
-    echo "  python -m expense_tracker.sync_gmail --full-year"
+    echo "  python -m mymonee.connect_gmail"
+    echo "  python -m mymonee.sync_gmail --full-year"
     exit 0
   fi
   sleep 2

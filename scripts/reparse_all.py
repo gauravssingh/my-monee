@@ -1,7 +1,7 @@
 import sys
-from expense_tracker.db.session import init_engine, get_session_factory
-from expense_tracker.config import get_settings
-from expense_tracker.ingestion.pipeline import run_ingestion_pipeline
+from mymonee.db.session import init_engine, get_session_factory
+from mymonee.config import get_settings
+from mymonee.ingestion.pipeline import run_ingestion_pipeline
 
 def run():
     init_engine()

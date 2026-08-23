@@ -5,15 +5,15 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from expense_tracker.app import create_app
-from expense_tracker.config import Settings
-from expense_tracker.db.models import Transaction, new_id
-from expense_tracker.statements.extractor import load_pdf_structure
-from expense_tracker.statements.parsers.axis_bank import AxisBankParser
-from expense_tracker.statements.parsers.axis_credit_card import AxisCreditCardParser
-from expense_tracker.statements.parsers.scapia import ScapiaParser
-from expense_tracker.statements.reconciliation import match_statement_transaction
-from expense_tracker.statements.validator import StatementValidator
+from mymonee.app import create_app
+from mymonee.config import Settings
+from mymonee.db.models import Transaction, new_id
+from mymonee.statements.extractor import load_pdf_structure
+from mymonee.statements.parsers.axis_bank import AxisBankParser
+from mymonee.statements.parsers.axis_credit_card import AxisCreditCardParser
+from mymonee.statements.parsers.scapia import ScapiaParser
+from mymonee.statements.reconciliation import match_statement_transaction
+from mymonee.statements.validator import StatementValidator
 
 
 def _create_text_pdf(text_pages: list[str]) -> bytes:

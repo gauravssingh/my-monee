@@ -93,7 +93,7 @@ In particular:
 Backend:
 
 ```text
-src/expense_tracker/
+src/mymonee/
 ```
 
 Frontend:
@@ -112,13 +112,13 @@ Do not introduce a second way of solving an existing problem unless the existing
 
 | Area                          | Location                                       |
 | ----------------------------- | ---------------------------------------------- |
-| HTTP API                      | `src/expense_tracker/api/routes/`              |
-| Sync pipeline                 | `src/expense_tracker/ingestion/`               |
-| Parsers                       | `src/expense_tracker/parsers/`                 |
+| HTTP API                      | `src/mymonee/api/routes/`              |
+| Sync pipeline                 | `src/mymonee/ingestion/`               |
+| Parsers                       | `src/mymonee/parsers/`                 |
 | Provider parser configuration | `config/providers/`                            |
-| Classification enrichment     | `src/expense_tracker/classification/`          |
-| Dashboard metrics             | `src/expense_tracker/services/dashboard.py`    |
-| Manual classification         | `src/expense_tracker/services/transactions.py` |
+| Classification enrichment     | `src/mymonee/classification/`          |
+| Dashboard metrics             | `src/mymonee/services/dashboard.py`    |
+| Manual classification         | `src/mymonee/services/transactions.py` |
 | React UI                      | `web/src/pages/`, `web/src/components/`        |
 | Tests                         | `tests/`                                       |
 | Maintenance scripts           | `scripts/`                                     |
@@ -304,7 +304,7 @@ After shipping backend or built-UI changes, restart the local/launchd server or 
 
 ```bash
 source .venv/bin/activate
-python -m expense_tracker
+python -m mymonee
 ```
 
 ---

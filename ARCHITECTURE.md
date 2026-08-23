@@ -132,9 +132,9 @@ expense-tracker/
 │   ├── local.example.yaml        # Safe per-Mac override template
 │   └── providers/                # Email discovery + parser rules (Phase 2+)
 │       └── .gitkeep
-├── src/expense_tracker/
+├── src/mymonee/
 │   ├── __init__.py
-│   ├── __main__.py               # python -m expense_tracker
+│   ├── __main__.py               # python -m mymonee
 │   ├── app.py                    # FastAPI factory
 │   ├── config.py
 │   ├── logging_setup.py
@@ -191,7 +191,7 @@ Application data at runtime lives under:
 
 ```text
 ~/Library/Application Support/ExpenseTracker/
-  ├── expense_tracker.db
+  ├── mymonee.db
   ├── config.local.yaml
   ├── logs/
   └── raw_emails/                 # Optional debug archive (opt-in)
@@ -325,7 +325,7 @@ Scheduler tick
 
 ## 7. Canonical Transaction Schema
 
-See §4 and `src/expense_tracker/db/models.py`. Domain enums live in `domain/enums.py` (`Direction`, `TransactionType`, `ClassificationSource`).
+See §4 and `src/mymonee/db/models.py`. Domain enums live in `domain/enums.py` (`Direction`, `TransactionType`, `ClassificationSource`).
 
 The API and UI always speak this model; parsers map provider-specific fields into it.
 
@@ -449,7 +449,7 @@ Current UI ships the Overview, sortable/searchable Transactions with inclusive F
 
 ## 14. macOS Background Execution Strategy
 
-**Phase 1:** Foreground `python -m expense_tracker` (API + UI).
+**Phase 1:** Foreground `python -m mymonee` (API + UI).
 
 **Current:** `launchd` LaunchAgent (`RunAtLoad`, `KeepAlive`) can start the app at login using the committed plist template. The installed per-Mac plist is intentionally Git-ignored.
 

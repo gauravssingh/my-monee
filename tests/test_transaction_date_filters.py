@@ -6,10 +6,10 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from expense_tracker.app import create_app
-from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
-from expense_tracker.db.models import Transaction, new_id
-from expense_tracker.db.session import get_session_factory
+from mymonee.app import create_app
+from mymonee.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
+from mymonee.db.models import Transaction, new_id
+from mymonee.db.session import get_session_factory
 
 
 def _settings(tmp_path: Path) -> Settings:

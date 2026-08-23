@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy.orm import Session
 
-from expense_tracker.config import Settings
-from expense_tracker.db.models import (
+from mymonee.config import Settings
+from mymonee.db.models import (
     Account,
     Category,
     ClassificationRule,
@@ -17,14 +17,14 @@ from expense_tracker.db.models import (
     TransactionLink,
     utcnow,
 )
-from expense_tracker.db.session import get_session_factory
-from expense_tracker.services.archive import (
+from mymonee.db.session import get_session_factory
+from mymonee.services.archive import (
     create_archive,
     restore_archive,
     verify_archive,
 )
-from expense_tracker.services.doctor import get_operational_status, run_diagnostics
-from expense_tracker.cli.main import (
+from mymonee.services.doctor import get_operational_status, run_diagnostics
+from mymonee.cli.main import (
     cmd_db_integrity,
     cmd_doctor,
     cmd_version,
