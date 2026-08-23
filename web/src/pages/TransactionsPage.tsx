@@ -15,6 +15,8 @@ import FlagIssueModal from "../components/FlagIssueModal";
 import MarkRecurringModal from "../components/MarkRecurringModal";
 import SortHeader from "../components/SortHeader";
 import TransactionDetailModal from "../components/TransactionDetailModal";
+import PageHeader from "../components/common/PageHeader";
+import AccountBadge from "../components/common/AccountBadge";
 import { getCategoryIcon } from "../utils/categoryIcons";
 import { formatDate, formatMoney } from "../format";
 
@@ -702,16 +704,14 @@ export default function TransactionsPage({ needsReview = false }: Props) {
   return (
     <section className="panel section" style={{ maxWidth: 1160, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ marginBottom: "16px" }}>
-        <h1 className="page-title" style={{ margin: 0, fontSize: "1.75rem", letterSpacing: "-0.02em" }}>
-          {needsReview ? "Needs Review" : "Classified Transactions"}
-        </h1>
-        <p className="lead" style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontSize: "0.86rem" }}>
-          {needsReview
+      <PageHeader
+        title={needsReview ? "Needs Review" : "Classified Transactions"}
+        subtitle={
+          needsReview
             ? "Review and batch-classify unclassified transactions to improve model memory."
-            : "Searchable, durable ledger of classified and verified financial movements."}
-        </p>
-      </div>
+            : "Searchable, durable ledger of classified and verified financial movements."
+        }
+      />
 
       {/* ───────────────────────────────────────────────────────────── */}
       {/* STICKY FILTER BAR                                             */}
@@ -1281,8 +1281,12 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                       </td>
 
                       {/* Account / Payment Method */}
-                      <td style={{ color: "var(--ink-muted)", fontSize: "0.82rem", whiteSpace: "nowrap" }}>
-                        {tx.account || "—"}
+                      <td style={{ color: "var(--ink)", fontSize: "0.82rem", whiteSpace: "nowrap" }}>
+                        {tx.account ? (
+                          <AccountBadge accountName={tx.account} logoSize={18} showIdentifiers={false} />
+                        ) : (
+                          <span style={{ color: "var(--ink-muted)" }}>—</span>
+                        )}
                       </td>
 
                       {/* Amount (Heavier weight for large amounts, strictly right-aligned) */}
@@ -1519,7 +1523,9 @@ export default function TransactionsPage({ needsReview = false }: Props) {
                         )}
                       </span>
 
-                      {tx.account && <span className="tx-card-tag" style={{ fontSize: "0.74rem" }}>{tx.account}</span>}
+                      {tx.account && (
+                        <AccountBadge accountName={tx.account} logoSize={16} showIdentifiers={false} />
+                      )}
                     </div>
 
                     {needsReview && (

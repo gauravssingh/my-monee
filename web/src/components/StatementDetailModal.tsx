@@ -6,6 +6,10 @@ import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { GmailLogo } from "./GmailLogo";
 import { DownloadIcon } from "./DownloadIcon";
 import { openInGmail } from "../utils/gmail";
+import Badge from "./common/Badge";
+import SegmentedControl from "./common/SegmentedControl";
+import AccountBadge from "./common/AccountBadge";
+import { IconCheck, IconAlertTriangle, IconLock, IconSparkles } from "./common/Icons";
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -57,28 +61,30 @@ function getStatementSubtitle(stmt: CreditCardStatement): string {
 
 function getStatusBadge(status: string, validationStatus?: string | null) {
   if (status === "VALIDATED" || validationStatus === "VALIDATED") {
-    return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600, fontSize: "0.74rem" }}>✓ Validated</span>;
+    return <Badge variant="success" icon={<IconCheck size={11} />}>Validated</Badge>;
   }
   if (status === "REVIEW_REQUIRED" || validationStatus === "REVIEW_REQUIRED") {
-    return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600, fontSize: "0.74rem" }}>⚠ Review Required</span>;
+    return <Badge variant="warn" icon={<IconAlertTriangle size={11} />}>Review Required</Badge>;
   }
   switch (status) {
     case "READY_FOR_EXTRACTION":
     case "UNLOCKED":
-      return <span className="badge" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--accent, #3b82f6)", fontWeight: 600, fontSize: "0.74rem" }}>⚡ Ready to Extract</span>;
+      return <Badge variant="info" icon={<IconSparkles size={11} />}>Ready to Extract</Badge>;
     case "PASSWORD_REQUIRED":
-      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600, fontSize: "0.74rem" }}>🔒 Needs Unlocking</span>;
+      return <Badge variant="warn" icon={<IconLock size={11} />}>Needs Unlocking</Badge>;
     case "PASSWORD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600, fontSize: "0.74rem" }}>⚠ Password Failed</span>;
+      return <Badge variant="danger" icon={<IconAlertTriangle size={11} />}>Password Failed</Badge>;
     case "EXTRACTION_FAILED":
     case "VALIDATION_FAILED":
     case "INVALID_PDF":
     case "DOWNLOAD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600, fontSize: "0.74rem" }}>✕ Failed</span>;
+      return <Badge variant="danger">Failed</Badge>;
     default:
-      return <span className="badge" style={{ fontSize: "0.74rem" }}>{status}</span>;
+      return <Badge variant="neutral">{status}</Badge>;
   }
 }
+
+type ReconFilter = "ALL" | "MATCHED" | "REVIEW" | "UNMATCHED";
 
 export function StatementDetailModal({
   open,
@@ -107,7 +113,7 @@ export function StatementDetailModal({
   const [importingBundle, setImportingBundle] = useState(false);
   const [scanningTxId, setScanningTxId] = useState<string | null>(null);
   const [activeStatement, setActiveStatement] = useState<CreditCardStatement | null>(statement);
-  const [reconFilter, setReconFilter] = useState<"ALL" | "MATCHED" | "REVIEW" | "UNMATCHED">("ALL");
+  const [reconFilter, setReconFilter] = useState<ReconFilter>("ALL");
   const [selectedReviewTx, setSelectedReviewTx] = useState<StatementTransaction | null>(null);
   const [showValDetails, setShowValDetails] = useState(false);
 
@@ -379,7 +385,12 @@ export function StatementDetailModal({
                 textOverflow: "ellipsis",
               }}
             >
-              {currentStmt.account_name || currentStmt.issuer}{currentStmt.card_last4 ? ` ••••${currentStmt.card_last4}` : ""}
+              <AccountBadge
+                accountName={currentStmt.account_name || currentStmt.issuer}
+                accountType={currentStmt.statement_type === "BANK_ACCOUNT" ? "BANK" : "CREDIT_CARD"}
+                cardLast4={currentStmt.card_last4}
+                logoSize={26}
+              />
             </h2>
             <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", marginTop: 3 }}>
               {getStatementSubtitle(currentStmt)}
@@ -473,7 +484,7 @@ export function StatementDetailModal({
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  color: "var(--accent, #6366f1)",
+                  color: "var(--accent)",
                   fontSize: "0.82rem",
                   fontWeight: 500,
                   marginLeft: "auto",
@@ -540,7 +551,7 @@ export function StatementDetailModal({
             {valDetails && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, borderTop: "1px solid var(--line)", paddingTop: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ color: primaryEquation?.is_balanced ? "var(--success, #10b981)" : "var(--warning, #f59e0b)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  <span style={{ color: primaryEquation?.is_balanced ? "var(--credit)" : "var(--warn)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
                     {primaryEquation?.is_balanced ? "✓ Exact match" : `⚠ Difference ₹${primaryEquation ? primaryEquation.difference.toFixed(2) : ""}`}
                   </span>
                   {primaryEquation && (
@@ -562,7 +573,7 @@ export function StatementDetailModal({
 
             {/* Expandable Validation Calculation Details */}
             {valDetails && showValDetails && (
-              <div style={{ background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--radius-sm)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, fontSize: "0.76rem", marginTop: 4 }}>
+              <div style={{ background: "var(--surface-muted)", borderRadius: "var(--radius-sm)", padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, fontSize: "0.76rem", marginTop: 4 }}>
                 {primaryEquation && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ink-muted)" }}>
@@ -574,7 +585,7 @@ export function StatementDetailModal({
                 {valDetails.messages && valDetails.messages.length > 0 && (
                   <div style={{ display: "flex", flexDirection: "column", gap: 2, borderTop: "1px solid var(--line)", paddingTop: 6 }}>
                     {valDetails.messages.map((msg, i) => (
-                      <div key={i} style={{ color: "var(--success, #10b981)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <div key={i} style={{ color: "var(--credit)", display: "flex", alignItems: "center", gap: 6 }}>
                         <span>✓</span>
                         <span>{msg.replace("✓ ", "")}</span>
                       </div>
@@ -587,8 +598,8 @@ export function StatementDetailModal({
 
           {/* Password Unlock Form (when locked) */}
           {isLocked && (
-            <section style={{ background: "rgba(245, 158, 11, 0.08)", border: "1px solid rgba(245, 158, 11, 0.3)", borderRadius: "var(--radius-md)", padding: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--warning, #f59e0b)", fontWeight: 600, fontSize: "0.92rem" }}>
+            <section style={{ background: "var(--warn-soft)", border: "1px solid rgba(138, 90, 18, 0.25)", borderRadius: "var(--radius-md)", padding: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--warn)", fontWeight: 600, fontSize: "0.92rem" }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 Password Unlock Required
               </div>
@@ -649,81 +660,24 @@ export function StatementDetailModal({
               <span style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-muted)", fontWeight: 700 }}>
                 TRANSACTIONS
               </span>
-              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: matchedCount === transactions.length && transactions.length > 0 ? "var(--success, #10b981)" : "var(--ink)" }}>
-                {transactions.length > 0 ? `${matchedCount} / ${transactions.length} ✓ MATCHED` : "0 Transactions"}
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: matchedCount === transactions.length && transactions.length > 0 ? "var(--credit)" : "var(--ink)" }}>
+                {transactions.length > 0 ? `${matchedCount} / ${transactions.length} MATCHED` : "0 Transactions"}
               </span>
             </div>
 
-            {/* Filter Pills */}
-            <div style={{ display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className={`pill-btn ${reconFilter === "ALL" ? "active" : ""}`}
-                onClick={() => setReconFilter("ALL")}
-                style={{
-                  border: reconFilter === "ALL" ? "1px solid var(--line-active, #4b5563)" : "1px solid var(--line)",
-                  background: reconFilter === "ALL" ? "var(--line)" : "transparent",
-                  color: reconFilter === "ALL" ? "var(--ink)" : "var(--ink-muted)",
-                  padding: "3px 12px",
-                  borderRadius: "var(--radius-full, 9999px)",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                All {transactions.length}
-              </button>
-              <button
-                type="button"
-                className={`pill-btn ${reconFilter === "MATCHED" ? "active" : ""}`}
-                onClick={() => setReconFilter("MATCHED")}
-                style={{
-                  border: reconFilter === "MATCHED" ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid var(--line)",
-                  background: reconFilter === "MATCHED" ? "rgba(16, 185, 129, 0.12)" : "transparent",
-                  color: reconFilter === "MATCHED" ? "var(--success, #10b981)" : "var(--ink-muted)",
-                  padding: "3px 12px",
-                  borderRadius: "var(--radius-full, 9999px)",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Matched {matchedCount}
-              </button>
-              <button
-                type="button"
-                className={`pill-btn ${reconFilter === "REVIEW" ? "active" : ""}`}
-                onClick={() => setReconFilter("REVIEW")}
-                style={{
-                  border: reconFilter === "REVIEW" ? "1px solid rgba(245, 158, 11, 0.4)" : "1px solid var(--line)",
-                  background: reconFilter === "REVIEW" ? "rgba(245, 158, 11, 0.12)" : "transparent",
-                  color: reconFilter === "REVIEW" ? "var(--warning, #f59e0b)" : "var(--ink-muted)",
-                  padding: "3px 12px",
-                  borderRadius: "var(--radius-full, 9999px)",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Review {reviewCount}
-              </button>
-              <button
-                type="button"
-                className={`pill-btn ${reconFilter === "UNMATCHED" ? "active" : ""}`}
-                onClick={() => setReconFilter("UNMATCHED")}
-                style={{
-                  border: reconFilter === "UNMATCHED" ? "1px solid var(--line-active, #4b5563)" : "1px solid var(--line)",
-                  background: reconFilter === "UNMATCHED" ? "var(--line)" : "transparent",
-                  color: reconFilter === "UNMATCHED" ? "var(--ink)" : "var(--ink-muted)",
-                  padding: "3px 12px",
-                  borderRadius: "var(--radius-full, 9999px)",
-                  fontSize: "0.76rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Unmatched {unmatchedCount}
-              </button>
+            {/* Filter Segmented Control */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <SegmentedControl<ReconFilter>
+                value={reconFilter}
+                onChange={setReconFilter}
+                size="sm"
+                options={[
+                  { value: "ALL", label: "All", count: transactions.length },
+                  { value: "MATCHED", label: "Matched", count: matchedCount },
+                  { value: "REVIEW", label: "Review", count: reviewCount },
+                  { value: "UNMATCHED", label: "Unmatched", count: unmatchedCount },
+                ]}
+              />
             </div>
 
             {/* EMI Bundles */}
@@ -760,7 +714,7 @@ export function StatementDetailModal({
                           className="btn quiet"
                           disabled={importingBundle}
                           onClick={() => handleImportEmiBundle(b.txs.map((t) => t.id))}
-                          style={{ fontSize: "0.74rem", padding: "2px 8px", color: "var(--accent, #6366f1)", fontWeight: 600 }}
+                          style={{ fontSize: "0.74rem", padding: "2px 8px", color: "var(--accent)", fontWeight: 600 }}
                         >
                           {importingBundle ? "Importing..." : "+ Import"}
                         </button>
@@ -808,7 +762,7 @@ export function StatementDetailModal({
                         }}
                         style={{
                           cursor: (isReview || isUnmatched) ? "pointer" : "default",
-                          background: isReview ? "rgba(245, 158, 11, 0.06)" : "transparent",
+                          background: isReview ? "var(--warn-soft)" : "transparent",
                           borderBottom: "1px solid var(--line)",
                         }}
                         title={isReview ? `Review candidate: ${tx.match_reason || "Click to verify correlation"}` : undefined}
@@ -821,37 +775,24 @@ export function StatementDetailModal({
                             {tx.description}
                           </div>
                           {rrn && isUnmatched && (
-                            <div style={{ fontSize: "0.7rem", color: "var(--accent, #6366f1)", marginTop: 3, display: "inline-block", background: "rgba(99, 102, 241, 0.08)", padding: "2px 6px", borderRadius: 4 }}>
+                            <div style={{ fontSize: "0.7rem", color: "var(--accent)", marginTop: 3, display: "inline-block", background: "var(--accent-soft)", padding: "2px 6px", borderRadius: "var(--radius-sm)" }}>
                               UPI RRN: {rrn}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600, fontSize: "0.92rem", color: tx.credit_amount ? "var(--success, #10b981)" : "var(--ink)", whiteSpace: "nowrap" }}>
+                        <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600, fontSize: "0.92rem", color: tx.credit_amount ? "var(--credit)" : "var(--ink)", whiteSpace: "nowrap" }}>
                           {tx.credit_amount ? `+₹${Math.round(tx.amount).toLocaleString("en-IN")}` : `₹${Math.round(tx.amount).toLocaleString("en-IN")}`}
                         </td>
                         <td style={{ padding: "12px 16px", textAlign: "center", whiteSpace: "nowrap" }} onClick={(e) => isUnmatched ? e.stopPropagation() : undefined}>
                           {isMatched && (
-                            <span style={{ color: "var(--success, #10b981)", fontWeight: 700, fontSize: "1.05rem" }} title="Matched in ledger">
-                              ✓
-                            </span>
+                            <Badge variant="credit" size="sm" icon={<IconCheck size={11} />}>
+                              Matched
+                            </Badge>
                           )}
                           {isReview && (
-                            <span
-                              style={{
-                                color: "var(--warning, #f59e0b)",
-                                fontWeight: 600,
-                                fontSize: "0.78rem",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 3,
-                                background: "rgba(245, 158, 11, 0.14)",
-                                padding: "3px 9px",
-                                borderRadius: "var(--radius-full, 9999px)",
-                              }}
-                              title={tx.match_reason ? `Click to review (${tx.match_reason})` : "Click to review correlation"}
-                            >
-                              ⚠ Review
-                            </span>
+                            <Badge variant="warn" size="sm" icon={<IconAlertTriangle size={11} />}>
+                              Review
+                            </Badge>
                           )}
                           {isUnmatched && (
                             <button
@@ -926,12 +867,12 @@ export function StatementDetailModal({
               {/* Header */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: isPossibleMatch ? "var(--warning, #f59e0b)" : "var(--ink-muted)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: isPossibleMatch ? "var(--warn)" : "var(--ink-muted)", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
                     <span>{isPossibleMatch ? "⚠ Possible Match Correlation" : "○ Unmatched Statement Item"}</span>
                     {selectedReviewTx.match_confidence != null && (
-                      <span className="badge" style={{ fontSize: "0.68rem", padding: "1px 6px", background: "rgba(245, 158, 11, 0.12)", color: "var(--warning, #f59e0b)" }}>
+                      <Badge variant="warn" size="sm">
                         {Math.round(selectedReviewTx.match_confidence * 100)}% Confidence
-                      </span>
+                      </Badge>
                     )}
                   </div>
                   <h3 style={{ margin: "4px 0 0", fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>
@@ -945,10 +886,10 @@ export function StatementDetailModal({
 
               {/* Match Reason Banner */}
               {selectedReviewTx.match_reason && (
-                <div style={{ background: isPossibleMatch ? "rgba(245, 158, 11, 0.08)" : "rgba(255, 255, 255, 0.03)", border: `1px solid ${isPossibleMatch ? "rgba(245, 158, 11, 0.25)" : "var(--line)"}`, borderRadius: "var(--radius-sm)", padding: "8px 12px", fontSize: "0.78rem", color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ background: isPossibleMatch ? "var(--warn-soft)" : "var(--surface-muted)", border: `1px solid ${isPossibleMatch ? "rgba(138, 90, 18, 0.25)" : "var(--line)"}`, borderRadius: "var(--radius-sm)", padding: "8px 12px", fontSize: "0.78rem", color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: "0.9rem" }}>{isPossibleMatch ? "💡" : "ℹ️"}</span>
                   <div>
-                    <span style={{ fontWeight: 600, color: isPossibleMatch ? "var(--warning, #f59e0b)" : "var(--ink-muted)" }}>Matching Evidence:</span>{" "}
+                    <span style={{ fontWeight: 600, color: isPossibleMatch ? "var(--warn)" : "var(--ink-muted)" }}>Matching Evidence:</span>{" "}
                     <span>{selectedReviewTx.match_reason}</span>
                   </div>
                 </div>
@@ -956,9 +897,9 @@ export function StatementDetailModal({
 
               {/* UPI RRN Discovery Banner */}
               {rrn && !isPossibleMatch && (!selectedReviewTx.match_status || selectedReviewTx.match_status === "UNMATCHED") && (
-                <div style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.25)", borderRadius: "var(--radius-sm)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ background: "var(--accent-soft)", border: "1px solid var(--line)", borderRadius: "var(--radius-sm)", padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: "0.84rem", color: "var(--accent, #6366f1)", display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={{ fontWeight: 600, fontSize: "0.84rem", color: "var(--accent)", display: "flex", alignItems: "center", gap: 6 }}>
                       <span>🔍 UPI Reference Detected: <strong>{rrn}</strong></span>
                     </div>
                     <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", marginTop: 2 }}>
@@ -995,22 +936,13 @@ export function StatementDetailModal({
                     <span style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--ink-muted)", fontWeight: 700 }}>
                       📄 Official PDF Statement
                     </span>
-                    <span
-                      className="badge"
-                      style={{
-                        fontSize: "0.68rem",
-                        padding: "2px 6px",
-                        fontWeight: 700,
-                        background: isStmtCredit ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.12)",
-                        color: isStmtCredit ? "var(--success, #10b981)" : "var(--danger, #ef4444)",
-                      }}
-                    >
+                    <Badge variant={isStmtCredit ? "credit" : "debit"} size="sm">
                       {isStmtCredit ? "↑ CREDIT (Inflow)" : "↓ DEBIT (Outflow)"}
-                    </span>
+                    </Badge>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: "1.25rem", fontWeight: 700, color: isStmtCredit ? "var(--success, #10b981)" : "var(--ink)" }}>
+                    <div style={{ fontSize: "1.25rem", fontWeight: 700, color: isStmtCredit ? "var(--credit)" : "var(--ink)" }}>
                       {isStmtCredit ? `+₹${selectedReviewTx.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : `₹${selectedReviewTx.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
                     </div>
                     <div style={{ fontSize: "0.85rem", fontWeight: 600, marginTop: 4, wordBreak: "break-word" }}>
@@ -1041,8 +973,8 @@ export function StatementDetailModal({
                 {/* Right Card: Candidate Ledger Alert */}
                 <div
                   style={{
-                    background: matchedTx ? "var(--surface)" : "rgba(255, 255, 255, 0.02)",
-                    border: `1px solid ${matchedTx ? "var(--line)" : "rgba(255, 255, 255, 0.06)"}`,
+                    background: matchedTx ? "var(--surface)" : "var(--surface-muted)",
+                    border: "1px solid var(--line)",
                     borderRadius: "var(--radius-md)",
                     padding: 14,
                     display: "flex",
@@ -1055,20 +987,11 @@ export function StatementDetailModal({
                       ✉️ Gmail Alert / Ledger
                     </span>
                     {matchedTx ? (
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: "0.68rem",
-                          padding: "2px 6px",
-                          fontWeight: 700,
-                          background: isMatchedCredit ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.12)",
-                          color: isMatchedCredit ? "var(--success, #10b981)" : "var(--danger, #ef4444)",
-                        }}
-                      >
+                      <Badge variant={isMatchedCredit ? "credit" : "debit"} size="sm">
                         {isMatchedCredit ? "↑ CREDIT (Inflow)" : "↓ DEBIT (Outflow)"}
-                      </span>
+                      </Badge>
                     ) : (
-                      <span className="badge" style={{ fontSize: "0.68rem", opacity: 0.7 }}>No Alert Found</span>
+                      <Badge variant="neutral" size="sm">No Alert Found</Badge>
                     )}
                   </div>
 

@@ -9,6 +9,9 @@ import {
 } from "../api";
 import EmailViewerModal from "../components/EmailViewerModal";
 import SortHeader from "../components/SortHeader";
+import PageHeader from "../components/common/PageHeader";
+import SegmentedControl from "../components/common/SegmentedControl";
+import Badge from "../components/common/Badge";
 import { formatDate, formatDateTime, formatIssueType, formatMoney } from "../format";
 
 type IssueSortBy = "created_at" | "issue_type" | "merchant" | "amount" | "details" | "source";
@@ -240,14 +243,10 @@ export default function DataIssuesPage() {
   return (
     <section className="panel section" style={{ maxWidth: 1160, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ marginBottom: "16px" }}>
-        <h1 className="page-title" style={{ margin: 0, fontSize: "1.75rem", letterSpacing: "-0.02em" }}>
-          Data Issues
-        </h1>
-        <p className="lead" style={{ margin: "2px 0 0", color: "var(--ink-muted)", fontSize: "0.86rem" }}>
-          Audit flagged extraction problems and parser discrepancies. Clear or reprocess shared root causes in bulk.
-        </p>
-      </div>
+      <PageHeader
+        title="Data Issues"
+        subtitle="Audit flagged extraction problems and parser discrepancies. Clear or reprocess shared root causes in bulk."
+      />
 
       {/* ───────────────────────────────────────────────────────────── */}
       {/* STICKY FILTER BAR                                             */}
@@ -278,25 +277,16 @@ export default function DataIssuesPage() {
 
           <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
             {/* Status Segmented Control */}
-            <div className="segmented" role="group" aria-label="Status filter">
-              {(
-                [
-                  ["open", "Open"],
-                  ["resolved", "Resolved"],
-                  ["dismissed", "Dismissed"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`segmented-btn${status === value ? " active" : ""}`}
-                  aria-pressed={status === value}
-                  onClick={() => setStatus(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl<DataIssueStatus>
+              value={status}
+              onChange={setStatus}
+              size="sm"
+              options={[
+                { value: "open", label: "Open" },
+                { value: "resolved", label: "Resolved" },
+                { value: "dismissed", label: "Dismissed" },
+              ]}
+            />
 
             {/* Page Size Selector */}
             <select
@@ -530,9 +520,9 @@ export default function DataIssuesPage() {
 
                       {/* Issue Type Badge */}
                       <td style={{ whiteSpace: "nowrap" }}>
-                        <span className="badge review" style={{ fontSize: "0.78rem", padding: "3px 8px" }}>
+                        <Badge variant="warn" size="sm">
                           {formatIssueType(issue.issue_type)}
-                        </span>
+                        </Badge>
                       </td>
 
                       {/* Transaction Merchant & Description */}
@@ -678,9 +668,9 @@ export default function DataIssuesPage() {
                       </div>
                     </div>
 
-                    <span className="badge review" style={{ fontSize: "0.75rem" }}>
+                    <Badge variant="warn" size="sm">
                       {formatIssueType(issue.issue_type)}
-                    </span>
+                    </Badge>
                   </div>
 
                   <div className="tx-card-body" style={{ marginTop: 6 }}>

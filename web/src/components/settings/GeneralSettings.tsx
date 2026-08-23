@@ -1,20 +1,46 @@
 import { SystemStatus } from "../../api";
+import { useTheme, type Theme } from "../../hooks/useTheme";
+import SegmentedControl from "../common/SegmentedControl";
 
 interface GeneralSettingsProps {
   status: SystemStatus;
 }
 
 export default function GeneralSettings({ status }: GeneralSettingsProps) {
+  const { theme, setTheme } = useTheme();
+
   return (
     <div className="settings-section-container">
       <div className="settings-section-header">
         <h2>General Preferences</h2>
         <p className="lead">
-          Core localization, accounting currency, and application display preferences.
+          Core localization, visual theme, accounting currency, and application display preferences.
         </p>
       </div>
 
       <div className="settings-card">
+        {/* Appearance / Theme Selector */}
+        <div className="settings-row">
+          <div className="settings-row-info">
+            <div className="settings-row-label">Appearance & Theme</div>
+            <div className="settings-row-desc">
+              Select your visual preference or automatically sync with macOS system mode.
+            </div>
+          </div>
+          <div className="settings-row-value">
+            <SegmentedControl<Theme>
+              value={theme}
+              onChange={setTheme}
+              size="sm"
+              options={[
+                { value: "system", label: "💻 System" },
+                { value: "light", label: "☀️ Light" },
+                { value: "dark", label: "🌙 Dark" },
+              ]}
+            />
+          </div>
+        </div>
+
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">Base Currency</div>

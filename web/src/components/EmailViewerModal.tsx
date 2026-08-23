@@ -157,7 +157,6 @@ export default function EmailViewerModal({
             type="button"
             className="btn primary"
             onClick={onClose}
-            style={{ padding: "8px 20px", fontSize: "0.88rem", fontWeight: 600 }}
           >
             Done
           </button>

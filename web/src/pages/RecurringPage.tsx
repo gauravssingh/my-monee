@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, type Subscription, type Bill } from "../api";
 import { formatDate, formatMoney } from "../format";
+import PageHeader from "../components/common/PageHeader";
+import SegmentedControl from "../components/common/SegmentedControl";
 
 export default function RecurringPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -34,12 +36,10 @@ export default function RecurringPage() {
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">Recurring & Subscriptions</h1>
-          <p className="lead">Automatically detected fixed subscriptions and variable bills based on transaction history.</p>
-        </div>
-      </header>
+      <PageHeader
+        title="Recurring & Subscriptions"
+        subtitle="Automatically detected fixed subscriptions and variable bills based on transaction history."
+      />
       
       <section className="metrics" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <article className="metric">
@@ -60,38 +60,18 @@ export default function RecurringPage() {
 
       {/* Mobile Tab Filter */}
       <div className="mobile-recurring-tabs" style={{ display: "none", marginBottom: 16 }}>
-        <div className="segmented" style={{ width: "100%" }}>
-          <button
-            type="button"
-            className={`segmented-btn${mobileTab === "all" ? " active" : ""}`}
-            onClick={() => setMobileTab("all")}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`segmented-btn${mobileTab === "subscriptions" ? " active" : ""}`}
-            onClick={() => setMobileTab("subscriptions")}
-          >
-            Subscriptions ({subscriptions.length})
-          </button>
-          <button
-            type="button"
-            className={`segmented-btn${mobileTab === "bills" ? " active" : ""}`}
-            onClick={() => setMobileTab("bills")}
-          >
-            Bills ({bills.length})
-          </button>
-          {detected.length > 0 && (
-            <button
-              type="button"
-              className={`segmented-btn${mobileTab === "detected" ? " active" : ""}`}
-              onClick={() => setMobileTab("detected")}
-            >
-              Detected ({detected.length})
-            </button>
-          )}
-        </div>
+        <SegmentedControl<"all" | "subscriptions" | "bills" | "detected">
+          value={mobileTab}
+          onChange={setMobileTab}
+          size="sm"
+          style={{ width: "100%" }}
+          options={[
+            { value: "all", label: "All" },
+            { value: "subscriptions", label: "Subscriptions", count: subscriptions.length },
+            { value: "bills", label: "Bills", count: bills.length },
+            ...(detected.length > 0 ? [{ value: "detected" as const, label: "Detected", count: detected.length }] : []),
+          ]}
+        />
       </div>
 
       <div className="grid-2">

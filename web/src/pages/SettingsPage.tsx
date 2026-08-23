@@ -9,6 +9,7 @@ import GeneralSettings from "../components/settings/GeneralSettings";
 import GmailSettings from "../components/settings/GmailSettings";
 import SettingsNav, { SETTINGS_TAB_IDS, type SettingsTabId } from "../components/settings/SettingsNav";
 import SystemSettings from "../components/settings/SystemSettings";
+import PageHeader from "../components/common/PageHeader";
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -49,10 +50,10 @@ export default function SettingsPage() {
   if (error && !status) {
     return (
       <div className="settings-page-wrapper">
-        <header className="settings-intro">
-          <h1 className="settings-title">Settings</h1>
-          <p className="error">Could not load settings: {error}</p>
-        </header>
+        <PageHeader
+          title="Settings"
+          subtitle={<span className="error">Could not load settings: {error}</span>}
+        />
       </div>
     );
   }
@@ -60,10 +61,10 @@ export default function SettingsPage() {
   if (!status || !gmail) {
     return (
       <div className="settings-page-wrapper">
-        <header className="settings-intro">
-          <h1 className="settings-title">Settings</h1>
-          <p className="empty">Loading settings…</p>
-        </header>
+        <PageHeader
+          title="Settings"
+          subtitle={<span className="empty">Loading settings…</span>}
+        />
       </div>
     );
   }
@@ -71,12 +72,10 @@ export default function SettingsPage() {
   return (
     <div className="settings-page-wrapper" style={{ animation: "rise 0.3s ease both" }}>
       {/* Page Header */}
-      <header className="settings-intro">
-        <h1 className="settings-title">Settings</h1>
-        <p className="lead">
-          Manage local ledger storage, Gmail integration, category taxonomy, and AI configuration.
-        </p>
-      </header>
+      <PageHeader
+        title="Settings"
+        subtitle="Manage local ledger storage, Gmail integration, category taxonomy, and AI configuration."
+      />
 
       {/* Settings Tabbed Navigation */}
       <SettingsNav activeTab={activeTab} onTabChange={handleTabChange} />

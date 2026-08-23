@@ -8,6 +8,10 @@ import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { StatementDetailModal } from "../components/StatementDetailModal";
 import { PasswordProfileModal } from "../components/PasswordProfileModal";
 import { UploadStatementModal } from "../components/UploadStatementModal";
+import Badge from "../components/common/Badge";
+import PageHeader from "../components/common/PageHeader";
+import AccountBadge from "../components/common/AccountBadge";
+import { IconCheck, IconAlertTriangle, IconLock } from "../components/common/Icons";
 
 
 function AccountModal({
@@ -362,22 +366,17 @@ function formatMaskedNumber(val: string | null | undefined): string {
   return val.replace(/[*X]+/g, "••••");
 }
 
-function cleanAccountName(name: string): string {
-  if (!name) return "";
-  return name.replace(/\s*\([*X\d]+\)\s*$/, "").trim() || name;
-}
-
 function getStatusBadge(status: string) {
   switch (status) {
     case "READY_FOR_EXTRACTION":
     case "UNLOCKED":
-      return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600 }}>✓ Ready</span>;
+      return <Badge variant="credit" icon={<IconCheck size={11} />}>Ready</Badge>;
     case "PASSWORD_REQUIRED":
-      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>🔒 Locked</span>;
+      return <Badge variant="warn" icon={<IconLock size={11} />}>Locked</Badge>;
     case "PASSWORD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>⚠ Review</span>;
+      return <Badge variant="danger" icon={<IconAlertTriangle size={11} />}>Review</Badge>;
     default:
-      return <span className="badge">{status}</span>;
+      return <Badge variant="neutral">{status}</Badge>;
   }
 }
 
@@ -506,19 +505,13 @@ function CreditCardAccountItem({
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </div>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: "0.95rem", display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span>{cleanAccountName(account.name)}</span>
-              {maskedCard && (
-                <span style={{ color: "var(--ink-muted)", fontWeight: 400, fontSize: "0.84rem", fontFamily: "var(--font-mono, monospace)" }}>
-                  {maskedCard}
-                </span>
-              )}
-            </div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", marginTop: 2 }}>
-              {formatAccountType(account.account_type)}
-            </div>
-          </div>
+          <AccountBadge
+            accountName={account.name}
+            accountType={account.account_type}
+            cardLast4={account.card_last4}
+            accountNumberMasked={account.account_number_masked}
+            logoSize={28}
+          />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -946,65 +939,67 @@ export default function AccountsPage() {
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <h1>Accounts</h1>
-          <p className="lead">
+      <PageHeader
+        title="Accounts"
+        subtitle={
+          <>
             Manage your bank accounts, credit cards, and wallets.
             <span style={{ opacity: 0.4, margin: "0 6px" }}>·</span>
             <span style={{ color: "var(--ink-muted)" }}>
               {assets.length} {assets.length === 1 ? "asset account" : "asset accounts"} · {liabilities.length} credit {liabilities.length === 1 ? "card" : "cards"}
             </span>
-          </p>
-        </div>
-        <div className="page-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Link
-            to="/statements"
-            className="btn quiet"
-            style={{
-              height: 38,
-              minHeight: 38,
-              padding: "0 14px",
-              borderRadius: 8,
-              fontSize: "14px",
-              fontWeight: 600,
-              border: "1px solid var(--line)",
-              background: "var(--surface)",
-              color: "var(--ink-muted)",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              textDecoration: "none",
-              boxSizing: "border-box",
-            }}
-          >
-            <span>Statements Vault</span>
-            <span>→</span>
-          </Link>
-          <button 
-            className="btn primary"
-            type="button"
-            style={{
-              height: 38,
-              minHeight: 38,
-              padding: "0 14px",
-              borderRadius: 8,
-              fontSize: "14px",
-              fontWeight: 600,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxSizing: "border-box",
-            }}
-            onClick={() => {
-              setEditingAccount(null);
-              setModalOpen(true);
-            }}
-          >
-            Add Account
-          </button>
-        </div>
-      </header>
+          </>
+        }
+        actions={
+          <>
+            <Link
+              to="/statements"
+              className="btn quiet"
+              style={{
+                height: 38,
+                minHeight: 38,
+                padding: "0 14px",
+                borderRadius: "var(--radius-md)",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                color: "var(--ink-muted)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                textDecoration: "none",
+                boxSizing: "border-box",
+              }}
+            >
+              <span>Statements Vault</span>
+              <span>→</span>
+            </Link>
+            <button
+              className="btn primary"
+              type="button"
+              style={{
+                height: 38,
+                minHeight: 38,
+                padding: "0 14px",
+                borderRadius: "var(--radius-md)",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxSizing: "border-box",
+              }}
+              onClick={() => {
+                setEditingAccount(null);
+                setModalOpen(true);
+              }}
+            >
+              Add Account
+            </button>
+          </>
+        }
+      />
 
       {/* Assets Section */}
       <div className="section table-wrap">
@@ -1045,10 +1040,17 @@ export default function AccountsPage() {
                     <td style={{ fontWeight: 600 }}>
                       <Link
                         to={`/transactions?account=${encodeURIComponent(a.name)}`}
-                        style={{ textDecoration: "none", color: "var(--ink)", display: "inline-flex", alignItems: "center", gap: 4 }}
+                        style={{ textDecoration: "none", color: "inherit", display: "inline-flex", alignItems: "center", gap: 4 }}
                         title={`View transactions for ${a.name}`}
                       >
-                        <span>{cleanAccountName(a.name)}</span>
+                        <AccountBadge
+                          accountName={a.name}
+                          accountType={a.account_type}
+                          accountNumberMasked={a.account_number_masked}
+                          cardLast4={a.card_last4}
+                          logoSize={22}
+                          showIdentifiers={false}
+                        />
                         <span style={{ fontSize: "0.75rem", opacity: 0.5 }}>↗</span>
                       </Link>
                     </td>
@@ -1110,9 +1112,16 @@ export default function AccountsPage() {
                       to={`/transactions?account=${encodeURIComponent(a.name)}`}
                       style={{ textDecoration: "none", color: "inherit" }}
                     >
-                      <div className="tx-card-merchant">{cleanAccountName(a.name)}</div>
+                      <AccountBadge
+                        accountName={a.name}
+                        accountType={a.account_type}
+                        accountNumberMasked={a.account_number_masked}
+                        cardLast4={a.card_last4}
+                        logoSize={24}
+                        showIdentifiers={false}
+                      />
                     </Link>
-                    <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", marginTop: 2, display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
+                    <div style={{ color: "var(--ink-muted)", fontSize: "0.78rem", marginTop: 4, display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
                       {maskedNum && <span style={{ fontFamily: "var(--font-mono, monospace)" }}>{maskedNum}</span>}
                       {upiList.map(u => <span key={u}>{u}</span>)}
                       {!maskedNum && upiList.length === 0 && <span>No identifiers</span>}

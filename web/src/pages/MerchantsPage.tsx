@@ -3,6 +3,7 @@ import { api, type Merchant } from "../api";
 import { formatMoney } from "../format";
 import MerchantDetailsModal from "../components/MerchantDetailsModal";
 import SortHeader from "../components/SortHeader";
+import PageHeader from "../components/common/PageHeader";
 import { useToast } from "../hooks/useToast";
 
 type SortField = "lifetime" | "30day" | "merchant" | "txcount";
@@ -117,16 +118,16 @@ export default function MerchantsPage() {
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">Merchants</h1>
-          <p className="lead">
+      <PageHeader
+        title="Merchants"
+        subtitle={
+          <>
             Manage normalized counterparties, aliases, and automated categorization rules.
             <span style={{ opacity: 0.4, margin: "0 6px" }}>·</span>
             <span style={{ color: "var(--ink-muted)" }}>{merchants.length} registered merchants</span>
-          </p>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       {/* Summary KPI Cards */}
       <section className="metrics" style={{ marginBottom: 24, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>

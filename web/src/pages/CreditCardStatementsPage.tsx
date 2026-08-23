@@ -5,6 +5,10 @@ import { StatementDetailModal } from "../components/StatementDetailModal";
 import { UploadStatementModal } from "../components/UploadStatementModal";
 import { PasswordProfileModal } from "../components/PasswordProfileModal";
 import { DownloadIcon } from "../components/DownloadIcon";
+import Badge from "../components/common/Badge";
+import PageHeader from "../components/common/PageHeader";
+import AccountBadge from "../components/common/AccountBadge";
+import { IconCheck, IconAlertTriangle, IconLock, IconSparkles } from "../components/common/Icons";
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
@@ -26,27 +30,27 @@ function formatPeriod(startStr: string | null | undefined, endStr: string | null
 
 function getStatusBadge(status: string, validationStatus?: string | null) {
   if (status === "VALIDATED" || validationStatus === "VALIDATED") {
-    return <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)", fontWeight: 600 }}>✓ Extracted</span>;
+    return <Badge variant="credit" icon={<IconCheck size={11} />}>Extracted</Badge>;
   }
   if (status === "REVIEW_REQUIRED" || validationStatus === "REVIEW_REQUIRED") {
-    return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>⚠ Needs Review</span>;
+    return <Badge variant="warn" icon={<IconAlertTriangle size={11} />}>Needs Review</Badge>;
   }
   switch (status) {
     case "READY_FOR_EXTRACTION":
     case "UNLOCKED":
-      return <span className="badge" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--accent, #3b82f6)", fontWeight: 600 }}>⚡ Ready to Extract</span>;
+      return <Badge variant="info" icon={<IconSparkles size={11} />}>Ready to Extract</Badge>;
     case "PASSWORD_REQUIRED":
-      return <span className="badge" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--warning, #f59e0b)", fontWeight: 600 }}>🔒 Needs Unlocking</span>;
+      return <Badge variant="warn" icon={<IconLock size={11} />}>Needs Unlocking</Badge>;
     case "PASSWORD_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>⚠ Password Failed</span>;
+      return <Badge variant="danger" icon={<IconAlertTriangle size={11} />}>Password Failed</Badge>;
     case "INVALID_PDF":
     case "DOWNLOAD_FAILED":
     case "UNLOCK_FAILED":
     case "VALIDATION_FAILED":
     case "EXTRACTION_FAILED":
-      return <span className="badge" style={{ background: "rgba(239, 68, 68, 0.15)", color: "var(--danger, #ef4444)", fontWeight: 600 }}>✕ Failed</span>;
+      return <Badge variant="danger">Failed</Badge>;
     default:
-      return <span className="badge">{status}</span>;
+      return <Badge variant="neutral">{status}</Badge>;
   }
 }
 
@@ -193,50 +197,50 @@ export default function CreditCardStatementsPage() {
 
   return (
     <>
-      <header className="page-header">
-        <div>
-          <h1>Statements Vault</h1>
-          <p className="lead">Discover, unlock, and manage immutable bank and credit card statement PDFs.</p>
-        </div>
-        <div className="page-actions" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-          <button
-            type="button"
-            className="btn quiet"
-            onClick={() => {
-              setPasswordProfileAccount(accounts[0] || null);
-              setPasswordProfileModalOpen(true);
-            }}
-          >
-            ⚙ Password Profiles
-          </button>
-          <button
-            type="button"
-            className="btn quiet"
-            onClick={handleDiscover}
-            disabled={discovering}
-          >
-            {discovering ? "Scanning Gmail..." : "Discover from Gmail"}
-          </button>
-          {readyCount > 0 && (
+      <PageHeader
+        title="Statements Vault"
+        subtitle="Discover, unlock, and manage immutable bank and credit card statement PDFs."
+        actions={
+          <>
             <button
               type="button"
               className="btn quiet"
-              onClick={handleBatchExtract}
-              disabled={batchExtracting}
-              title="Run deterministic parser and validation on all ready statements"
+              onClick={() => {
+                setPasswordProfileAccount(accounts[0] || null);
+                setPasswordProfileModalOpen(true);
+              }}
             >
-              {batchExtracting ? "Extracting..." : `⚡ Batch Extract (${readyCount})`}
+              ⚙ Password Profiles
             </button>
-          )}
-          <button
-            type="button"
-            className="btn primary"
-            onClick={() => setUploadModalOpen(true)}
-          >
-            Upload Statement
-          </button>
-        </div>
-      </header>
+            <button
+              type="button"
+              className="btn quiet"
+              onClick={handleDiscover}
+              disabled={discovering}
+            >
+              {discovering ? "Scanning Gmail..." : "Discover from Gmail"}
+            </button>
+            {readyCount > 0 && (
+              <button
+                type="button"
+                className="btn quiet"
+                onClick={handleBatchExtract}
+                disabled={batchExtracting}
+                title="Run deterministic parser and validation on all ready statements"
+              >
+                {batchExtracting ? "Extracting..." : `⚡ Batch Extract (${readyCount})`}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => setUploadModalOpen(true)}
+            >
+              Upload Statement
+            </button>
+          </>
+        }
+      />
 
       {/* Summary Stat Cards (Interactive Clickable Filters) */}
       <div
@@ -251,7 +255,7 @@ export default function CreditCardStatementsPage() {
           onClick={() => setSelectedStatus("all")}
           style={{
             background: "var(--surface)",
-            border: selectedStatus === "all" ? "2px solid var(--accent, #6366f1)" : "1px solid var(--line)",
+            border: selectedStatus === "all" ? "2px solid var(--accent)" : "1px solid var(--line)",
             borderRadius: "var(--radius-md)",
             padding: "14px 18px",
             cursor: "pointer",
@@ -267,7 +271,7 @@ export default function CreditCardStatementsPage() {
           onClick={() => setSelectedStatus(selectedStatus === "EXTRACTED" ? "all" : "EXTRACTED")}
           style={{
             background: "var(--surface)",
-            border: selectedStatus === "EXTRACTED" ? "2px solid var(--success, #10b981)" : "1px solid var(--line)",
+            border: selectedStatus === "EXTRACTED" ? "2px solid var(--credit)" : "1px solid var(--line)",
             borderRadius: "var(--radius-md)",
             padding: "14px 18px",
             cursor: "pointer",
@@ -276,14 +280,14 @@ export default function CreditCardStatementsPage() {
           title="Click to filter statements that are successfully extracted & validated"
         >
           <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Extracted & Validated</div>
-          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: "var(--success, #10b981)" }}>{extractedCount}</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: "var(--credit)" }}>{extractedCount}</div>
         </div>
 
         <div
           onClick={() => setSelectedStatus(selectedStatus === "READY" ? "all" : "READY")}
           style={{
             background: "var(--surface)",
-            border: selectedStatus === "READY" ? "2px solid var(--accent, #3b82f6)" : "1px solid var(--line)",
+            border: selectedStatus === "READY" ? "2px solid var(--info)" : "1px solid var(--line)",
             borderRadius: "var(--radius-md)",
             padding: "14px 18px",
             cursor: "pointer",
@@ -292,14 +296,14 @@ export default function CreditCardStatementsPage() {
           title="Click to filter statements unlocked and ready to extract"
         >
           <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Ready to Extract</div>
-          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: readyCount > 0 ? "var(--accent, #3b82f6)" : "inherit" }}>{readyCount}</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: readyCount > 0 ? "var(--info)" : "inherit" }}>{readyCount}</div>
         </div>
 
         <div
           onClick={() => setSelectedStatus(selectedStatus === "LOCKED" ? "all" : "LOCKED")}
           style={{
             background: "var(--surface)",
-            border: selectedStatus === "LOCKED" ? "2px solid var(--warning, #f59e0b)" : "1px solid var(--line)",
+            border: selectedStatus === "LOCKED" ? "2px solid var(--warn)" : "1px solid var(--line)",
             borderRadius: "var(--radius-md)",
             padding: "14px 18px",
             cursor: "pointer",
@@ -308,7 +312,7 @@ export default function CreditCardStatementsPage() {
           title="Click to filter statements that require password unlocking"
         >
           <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Needs Unlocking</div>
-          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: lockedCount > 0 ? "var(--warning, #f59e0b)" : "inherit" }}>{lockedCount}</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: lockedCount > 0 ? "var(--warn)" : "inherit" }}>{lockedCount}</div>
         </div>
 
         {reviewCount > 0 && (
@@ -316,7 +320,7 @@ export default function CreditCardStatementsPage() {
             onClick={() => setSelectedStatus(selectedStatus === "REVIEW" ? "all" : "REVIEW")}
             style={{
               background: "var(--surface)",
-              border: selectedStatus === "REVIEW" ? "2px solid var(--danger, #ef4444)" : "1px solid var(--line)",
+              border: selectedStatus === "REVIEW" ? "2px solid var(--danger)" : "1px solid var(--line)",
               borderRadius: "var(--radius-md)",
               padding: "14px 18px",
               cursor: "pointer",
@@ -325,7 +329,7 @@ export default function CreditCardStatementsPage() {
             title="Click to filter statements needing review or with extraction errors"
           >
             <div style={{ fontSize: "0.72rem", textTransform: "uppercase", color: "var(--ink-muted)", fontWeight: 600 }}>Needs Review / Failed</div>
-            <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: "var(--danger, #ef4444)" }}>{reviewCount}</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 700, marginTop: 4, color: "var(--danger)" }}>{reviewCount}</div>
           </div>
         )}
       </div>
@@ -466,27 +470,14 @@ export default function CreditCardStatementsPage() {
                       }}
                     >
                       <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontWeight: 600 }}>
-                            {stmt.account_name || stmt.issuer}
-                          </span>
-                          <span
-                            className="badge"
-                            style={{
-                              fontSize: "0.68rem",
-                              padding: "2px 6px",
-                              background: stmt.statement_type === "BANK_ACCOUNT" ? "rgba(59, 130, 246, 0.12)" : "rgba(139, 92, 246, 0.12)",
-                              color: stmt.statement_type === "BANK_ACCOUNT" ? "var(--accent)" : "#8b5cf6",
-                              border: "none",
-                            }}
-                          >
-                            {stmt.statement_type === "BANK_ACCOUNT" ? "Bank" : "Card"}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2 }}>
-                          {stmt.statement_type === "BANK_ACCOUNT"
-                            ? (stmt.card_last4 ? `A/C ending ${stmt.card_last4}` : stmt.original_filename)
-                            : (stmt.card_last4 ? `Card ending ${stmt.card_last4}` : stmt.original_filename)}
+                        <AccountBadge
+                          accountName={stmt.account_name || stmt.issuer}
+                          accountType={stmt.statement_type === "BANK_ACCOUNT" ? "BANK" : "CREDIT_CARD"}
+                          cardLast4={stmt.card_last4}
+                          logoSize={22}
+                        />
+                        <div style={{ fontSize: "0.74rem", color: "var(--ink-muted)", marginTop: 2, paddingLeft: 30 }}>
+                          {stmt.original_filename}
                         </div>
                       </td>
                       <td style={{ fontSize: "0.9rem", fontWeight: 600 }}>
@@ -557,26 +548,14 @@ export default function CreditCardStatementsPage() {
                 >
                   <div className="tx-card-header">
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="tx-card-merchant">{stmt.account_name || stmt.issuer}</span>
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: "0.65rem",
-                            padding: "1px 5px",
-                            background: stmt.statement_type === "BANK_ACCOUNT" ? "rgba(59, 130, 246, 0.12)" : "rgba(139, 92, 246, 0.12)",
-                            color: stmt.statement_type === "BANK_ACCOUNT" ? "var(--accent)" : "#8b5cf6",
-                            border: "none",
-                          }}
-                        >
-                          {stmt.statement_type === "BANK_ACCOUNT" ? "Bank" : "Card"}
-                        </span>
-                      </div>
-                      <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", marginTop: 2 }}>
-                        {stmt.statement_type === "BANK_ACCOUNT"
-                          ? (stmt.card_last4 ? `A/C ending ${stmt.card_last4}` : stmt.original_filename)
-                          : (stmt.card_last4 ? `Card ending ${stmt.card_last4}` : stmt.original_filename)}
-                        {stmt.statement_period_start ? ` · ${formatPeriod(stmt.statement_period_start, stmt.statement_period_end)}` : ""}
+                      <AccountBadge
+                        accountName={stmt.account_name || stmt.issuer}
+                        accountType={stmt.statement_type === "BANK_ACCOUNT" ? "BANK" : "CREDIT_CARD"}
+                        cardLast4={stmt.card_last4}
+                        logoSize={22}
+                      />
+                      <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", marginTop: 2, paddingLeft: 30 }}>
+                        {stmt.statement_period_start ? formatPeriod(stmt.statement_period_start, stmt.statement_period_end) : stmt.original_filename}
                       </div>
                     </div>
                     <div>{getStatusBadge(stmt.status)}</div>

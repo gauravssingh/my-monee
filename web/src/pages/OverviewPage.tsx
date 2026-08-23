@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, type Overview, type FinancialTrends } from "../api";
 import FinancialTrendModal, { type TrendMetricType } from "../components/FinancialTrendModal";
 import MonthStrip from "../components/MonthStrip";
+import AccountBadge from "../components/common/AccountBadge";
 import { formatMoney, formatCompactMoney, formatLakhOrK, formatDate } from "../format";
 
 
@@ -557,7 +558,7 @@ export default function OverviewPage() {
                       justifyContent: "flex-end",
                       height: "100%",
                       position: "relative",
-                      zIndex: 1,
+                      zIndex: isHovered ? 40 : 1,
                       cursor: hasSpend ? "pointer" : "default",
                     }}
                   >
@@ -567,23 +568,28 @@ export default function OverviewPage() {
                         style={{
                           position: "absolute",
                           bottom: `calc(${Math.max(6, heightPct)}% + 8px)`,
-                          background: "var(--ink)",
-                          color: "#fff",
-                          padding: "5px 9px",
-                          borderRadius: "var(--radius-sm)",
+                          background: "var(--surface)",
+                          backgroundColor: "var(--surface)",
+                          color: "var(--ink)",
+                          border: "1px solid var(--line)",
+                          padding: "6px 12px",
+                          borderRadius: "var(--radius-md)",
                           fontSize: "0.74rem",
                           fontVariantNumeric: "tabular-nums",
                           whiteSpace: "nowrap",
                           pointerEvents: "none",
-                          zIndex: 20,
-                          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+                          zIndex: 50,
+                          opacity: 1,
+                          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.28)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ fontWeight: 600 }}>{formatDate(d.dateStr)}</div>
-                        <div style={{ fontSize: "0.85rem", marginTop: 2 }}>{formatMoney(d.spent, overview.currency)}</div>
+                        <div style={{ fontWeight: 600, color: "var(--ink)" }}>{formatDate(d.dateStr)}</div>
+                        <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--accent)", marginTop: 2 }}>
+                          {formatMoney(d.spent, overview.currency)}
+                        </div>
                         {d.count > 0 && (
-                          <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.7)", marginTop: 1 }}>
+                          <div style={{ fontSize: "0.72rem", color: "var(--ink-muted)", marginTop: 2 }}>
                             {d.count} {d.count === 1 ? "transaction" : "transactions"} · click to view
                           </div>
                         )}
@@ -596,7 +602,7 @@ export default function OverviewPage() {
                         height: hasSpend ? `${Math.max(4, heightPct)}%` : "0%",
                         background: isHovered ? "var(--ink)" : "var(--accent)",
                         borderRadius: "2px 2px 0 0",
-                        opacity: hasSpend ? (isHovered ? 1 : 0.85) : 0.15,
+                        opacity: hasSpend ? (isHovered ? 1 : 0.8) : 0.15,
                         transition: "height 0.2s ease, opacity 0.15s ease, background 0.15s ease",
                       }}
                     />
@@ -774,11 +780,11 @@ export default function OverviewPage() {
                     <div>
                       <div style={{ fontWeight: 600, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "6px" }}>
                         {isUnknown ? (
-                          <span style={{ color: "var(--warning, #f59e0b)", fontSize: "0.82rem", fontWeight: 600 }}>
+                          <span style={{ color: "var(--warn)", fontSize: "0.82rem", fontWeight: 600 }}>
                             ⚠ Unknown / Unlinked
                           </span>
                         ) : (
-                          <span>{a.account}</span>
+                          <AccountBadge accountName={a.account} logoSize={20} />
                         )}
                       </div>
                       <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 1 }}>

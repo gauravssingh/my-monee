@@ -418,7 +418,7 @@ export default function ClassifyPanel({
             type="button"
             onClick={onClose}
             disabled={saving}
-            style={{ padding: "12px 18px" }}
+            style={{ height: 38, padding: "0 16px" }}
           >
             Cancel
           </button>
@@ -427,7 +427,7 @@ export default function ClassifyPanel({
             type="button"
             disabled={saving || !categoryId}
             onClick={() => onSave(categoryId, subcategoryId || null)}
-            style={{ flex: 1, padding: "12px 18px", fontSize: "0.95rem", fontWeight: 600 }}
+            style={{ flex: 1, height: 38, padding: "0 18px", fontSize: "0.88rem", fontWeight: 600 }}
           >
             {saving
               ? "Saving…"

@@ -4,6 +4,7 @@ import { formatDate, formatMoney, formatSource } from "../format";
 import { useBackdropClose, useModalChrome } from "../hooks/useModalChrome";
 import { getCategoryIcon } from "../utils/categoryIcons";
 import { openInGmail } from "../utils/gmail";
+import AccountBadge from "./common/AccountBadge";
 
 type Props = {
   open: boolean;
@@ -195,7 +196,11 @@ export default function TransactionDetailModal({
               Account
             </div>
             <div style={{ fontWeight: 600, fontSize: "14px", lineHeight: 1.4 }}>
-              {transaction.account || <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>Unknown / Unlinked</span>}
+              {transaction.account ? (
+                <AccountBadge accountName={transaction.account} logoSize={20} />
+              ) : (
+                <span style={{ color: "var(--ink-muted)", fontWeight: 400 }}>Unknown / Unlinked</span>
+              )}
             </div>
           </div>
 
