@@ -123,7 +123,11 @@ The primary backup format of MyMonee is **not just a database dump or a JSON exp
 The unified `mymonee` CLI executes directly against the local SQLite database without requiring the Web UI or HTTP server to be running:
 
 ```bash
-# 1. Operational State
+# 1. Launch the Server & Dashboard
+$ mymonee serve
+Starting MyMonee Server on http://127.0.0.1:8477…
+
+# 2. Operational State
 $ mymonee status
 MyMonee v0.8.0
 
@@ -135,7 +139,7 @@ MyMonee v0.8.0
   Statements      228
   Last Backup     today at 16:42 (Verified ✓)
 
-# 2. Deep Health Diagnostics (Doctor)
+# 3. Deep Health Diagnostics (Doctor)
 $ mymonee doctor
 MyMonee Doctor
 ────────────────────────────────────────────
@@ -153,15 +157,15 @@ Backup
 
 Result: HEALTHY
 
-# 3. Create & Verify Portable .mmb Archives
+# 4. Create & Verify Portable .mmb Archives
 $ mymonee backup create --note "Pre-migration snapshot"
 $ mymonee backup verify mymonee_20260823_164218.mmb
 ✓ Archive verification PASSED (1,300 files, 1,485 transactions)
 
-# 4. Safe Disaster Recovery (with pre-restore safety snapshot)
+# 5. Safe Disaster Recovery (with pre-restore safety snapshot)
 $ mymonee backup restore mymonee_20260823_164218.mmb
 
-# 5. Database Maintenance & Reconciliation
+# 6. Database Maintenance & Reconciliation
 $ mymonee db integrity
 $ mymonee db vacuum
 $ mymonee reconcile
