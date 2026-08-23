@@ -1,11 +1,11 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from expense_tracker.api.deps import db_session
-from expense_tracker.db.models import Account, Institution
+from expense_tracker.db.models import Account
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 

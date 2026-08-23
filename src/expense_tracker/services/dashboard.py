@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -15,7 +15,6 @@ from sqlalchemy.orm import joinedload
 IST = ZoneInfo("Asia/Kolkata")
 
 from expense_tracker.db.models import (
-    Account,
     Category,
     DataIssueFlag,
     Email,

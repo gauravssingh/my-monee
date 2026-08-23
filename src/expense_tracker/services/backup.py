@@ -4,33 +4,25 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import shutil
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from expense_tracker.config import Settings, get_settings
 from expense_tracker.db.models import (
     Account,
-    AppSetting,
     Category,
     ClassificationRule,
     CreditCardStatement,
     DataIssueFlag,
     Email,
-    IncomeSource,
-    Institution,
     Merchant,
-    Posting,
     RecurringTransaction,
-    Subcategory,
     Transaction,
-    TransactionLink,
     utcnow,
 )
 from expense_tracker.db.session import get_engine, get_session_factory

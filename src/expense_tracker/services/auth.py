@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import secrets
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from expense_tracker.db.models import AppSetting, utcnow

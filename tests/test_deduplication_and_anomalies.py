@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-import pytest
+from datetime import timedelta
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 

@@ -8,7 +8,7 @@ import sys
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-from expense_tracker.config import get_settings, reload_settings
+from expense_tracker.config import reload_settings
 from expense_tracker.ingestion.gmail.oauth import GmailAuthError, save_credentials
 from expense_tracker.logging_setup import setup_logging
 

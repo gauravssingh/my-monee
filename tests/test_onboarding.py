@@ -11,19 +11,11 @@ from expense_tracker.app import create_app
 from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
 from expense_tracker.db.models import (
     Account,
-    Category,
-    IncomeSource,
     Institution,
     RecurringTransaction,
     Transaction,
 )
 from expense_tracker.db.session import get_session_factory
-from expense_tracker.services.onboarding import (
-    complete_onboarding,
-    discover_onboarding_entities,
-    get_onboarding_status,
-    reset_onboarding,
-)
 
 
 def _settings(tmp_path: Path) -> Settings:

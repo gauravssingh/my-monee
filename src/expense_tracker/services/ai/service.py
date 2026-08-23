@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import desc, select
@@ -16,9 +15,6 @@ from expense_tracker.db.models import AIOperation, Category, Subcategory, Transa
 from expense_tracker.services.ai.base import (
     AIProvider,
     AIProviderError,
-    ExternalAIOptInRequired,
-    InvalidClassificationError,
-    MissingAPIKeyError,
     require_external_ai_permission,
 )
 from expense_tracker.services.ai.gemini_provider import GeminiProvider, PROMPT_VERSION

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from expense_tracker.classification.enrichment import resolve_category_ids
@@ -16,7 +14,6 @@ from expense_tracker.db.models import (
     StatementTransaction,
     Transaction,
     new_id,
-    utcnow,
 )
 
 logger = logging.getLogger(__name__)

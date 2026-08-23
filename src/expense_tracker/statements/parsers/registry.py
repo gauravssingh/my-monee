@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Sequence
 
-from expense_tracker.statements.extractor import PDFDocumentStructure, load_pdf_structure
+from expense_tracker.statements.extractor import load_pdf_structure
 from expense_tracker.statements.parsers.axis_bank import AxisBankParser
 from expense_tracker.statements.parsers.axis_credit_card import AxisCreditCardParser
 from expense_tracker.statements.parsers.base import BaseStatementParser, ParsedStatementResult

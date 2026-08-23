@@ -7,7 +7,7 @@ import logging
 
 import uvicorn
 
-from expense_tracker.config import get_settings, reload_settings
+from expense_tracker.config import reload_settings
 from expense_tracker.logging_setup import setup_logging
 
 

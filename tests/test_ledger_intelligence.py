@@ -9,30 +9,20 @@ from sqlalchemy import select
 
 from expense_tracker.app import create_app
 from expense_tracker.classification.enrichment import apply_parsed_enrichment
-from expense_tracker.classification.rules import (
-    apply_classification_rule_to_transaction,
-    find_matching_rule,
-    upsert_user_classification_rule,
-)
 from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
 from expense_tracker.db.models import (
     Account,
     Category,
-    ClassificationRule,
     Institution,
     Subcategory,
     Transaction,
-    TransactionLink,
-    utcnow,
 )
-from expense_tracker.db.session import get_session_factory, init_db
+from expense_tracker.db.session import get_session_factory
 from expense_tracker.parsers.base import ParsedTransaction
 from expense_tracker.services.reconciliation import (
-    pair_cross_account_transfers,
     pair_refunds,
     run_full_reconciliation,
 )
-from expense_tracker.services.transactions import classify_transaction
 
 
 def _settings(tmp_path: Path) -> Settings:
@@ -192,8 +182,7 @@ def test_refund_pairing_engine(tmp_path: Path) -> None:
 
 def test_cross_account_transfer_matching(tmp_path: Path) -> None:
     settings = _settings(tmp_path)
-    app = create_app(settings)
-    client = TestClient(app)
+    _ = create_app(settings)
     session_factory = get_session_factory()
 
     with session_factory() as session:

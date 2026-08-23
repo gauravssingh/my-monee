@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +23,7 @@ from expense_tracker.db.models import (
     new_id,
     utcnow,
 )
-from expense_tracker.ingestion.gmail.client import GmailMessage, MessageSource
+from expense_tracker.ingestion.gmail.client import MessageSource
 from expense_tracker.statements.discovery import (
     DiscoveredStatementCandidate,
     discover_statement_candidates,

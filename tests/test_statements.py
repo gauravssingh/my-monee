@@ -482,7 +482,7 @@ def test_ingestion_encrypted_statement_manual_unlock(tmp_path: Path):
 
 def test_statement_transaction_match_api(tmp_path: Path):
     """Test confirming and rejecting statement transaction matches."""
-    from expense_tracker.db.models import CreditCardStatement, StatementTransaction, Transaction
+    from expense_tracker.db.models import CreditCardStatement, StatementTransaction
     from expense_tracker.db.session import get_session_factory
 
     settings = Settings(
@@ -554,7 +554,7 @@ def test_statement_transaction_match_api(tmp_path: Path):
 
 def test_emi_detection_and_ledger_import(tmp_path: Path):
     """Test parsing, grouping, and importing EMI line items (Principal, Interest, GST)."""
-    from expense_tracker.db.models import CreditCardStatement, StatementTransaction, Transaction
+    from expense_tracker.db.models import CreditCardStatement, StatementTransaction
     from expense_tracker.db.session import get_session_factory
     from expense_tracker.statements.emi import parse_emi_details, categorize_statement_line_item
 
@@ -669,8 +669,7 @@ def test_emi_detection_and_ledger_import(tmp_path: Path):
 
 def test_upi_rrn_exact_reconciliation_matching(tmp_path: Path):
     """Test 12-digit UPI RRN deterministic matching between statement and ledger alerts."""
-    from expense_tracker.db.models import CreditCardStatement, StatementTransaction, Transaction
-    from expense_tracker.db.session import get_session_factory
+    from expense_tracker.db.models import StatementTransaction, Transaction
     from expense_tracker.statements.reconciliation import extract_upi_rrn, match_statement_transaction
 
     # 1. Verify RRN Extraction

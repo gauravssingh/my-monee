@@ -10,9 +10,6 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from expense_tracker.db.models import (
-    Account,
-    FinancialEvent,
-    Posting,
     Transaction,
     TransactionLink,
     utcnow,

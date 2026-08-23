@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from pathlib import Path
 import pytest
 from sqlalchemy.orm import Session
@@ -13,7 +13,6 @@ from expense_tracker.db.models import (
     Account,
     Category,
     ClassificationRule,
-    CreditCardStatement,
     Transaction,
     TransactionLink,
     utcnow,
@@ -21,18 +20,13 @@ from expense_tracker.db.models import (
 from expense_tracker.db.session import get_session_factory
 from expense_tracker.services.archive import (
     create_archive,
-    create_snapshot,
-    list_archives,
     restore_archive,
     verify_archive,
 )
 from expense_tracker.services.doctor import get_operational_status, run_diagnostics
 from expense_tracker.cli.main import (
-    cmd_backup_create,
-    cmd_backup_verify,
     cmd_db_integrity,
     cmd_doctor,
-    cmd_status,
     cmd_version,
 )
 

@@ -12,13 +12,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from expense_tracker.db.models import (
-    Account,
     Transaction,
     TransactionLink,
-    new_id,
     utcnow,
 )
-from expense_tracker.merchants.normalize import normalize_merchant
 
 logger = logging.getLogger(__name__)
 

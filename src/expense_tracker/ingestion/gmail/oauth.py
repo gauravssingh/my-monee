@@ -65,10 +65,8 @@ def _dict_to_credentials(data: dict[str, Any], scopes: list[str]) -> Credentials
 
 def save_credentials(creds: Credentials, settings: Settings | None = None) -> None:
     payload = json.dumps(_token_to_dict(creds))
-    saved_keyring = False
     try:
         keyring.set_password(KEYRING_SERVICE, KEYRING_ACCOUNT, payload)
-        saved_keyring = True
         logger.info("Stored Gmail OAuth credentials in macOS Keychain (MyMonee)")
     except Exception as e:
         logger.info("Keyring unavailable (%s), storing token in data directory", e)

@@ -1,20 +1,16 @@
 """Comprehensive test suite for Statement Parsers, Arithmetic Validator, and Reconciliation Engine."""
 
-import io
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pypdf
-import pytest
 from fastapi.testclient import TestClient
 
 from expense_tracker.app import create_app
 from expense_tracker.config import Settings
-from expense_tracker.db.models import Account, Transaction, new_id
+from expense_tracker.db.models import Transaction, new_id
 from expense_tracker.statements.extractor import load_pdf_structure
 from expense_tracker.statements.parsers.axis_bank import AxisBankParser
 from expense_tracker.statements.parsers.axis_credit_card import AxisCreditCardParser
-from expense_tracker.statements.parsers.registry import get_statement_parser_registry
 from expense_tracker.statements.parsers.scapia import ScapiaParser
 from expense_tracker.statements.reconciliation import match_statement_transaction
 from expense_tracker.statements.validator import StatementValidator

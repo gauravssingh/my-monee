@@ -21,7 +21,6 @@ from expense_tracker.db.models import (
     PasswordProfile,
     StatementProcessingEvent,
     StatementTransaction,
-    new_id,
     utcnow,
 )
 from expense_tracker.ingestion.gmail.client import GmailApiSource
@@ -31,7 +30,6 @@ from expense_tracker.statements.service import (
     discover_statements_from_source,
     find_matching_account,
     ingest_candidate,
-    process_statement_bytes,
     unlock_statement_manually,
     upsert_password_profile,
 )

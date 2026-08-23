@@ -11,13 +11,12 @@ from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Set
 from expense_tracker.db.models import AIOperation, Category, ClassificationCorrection, Subcategory, Transaction
 from expense_tracker.db.session import get_session_factory, init_db
 from expense_tracker.services.ai.base import (
-    AIProviderError,
     ExternalAIOptInRequired,
     MissingAPIKeyError,
     require_external_ai_permission,
 )
 from expense_tracker.services.ai.gemini_provider import GeminiProvider
-from expense_tracker.services.ai.schemas import ClassificationResult, TransactionContext
+from expense_tracker.services.ai.schemas import ClassificationResult
 from expense_tracker.services.ai.service import get_ai_suggestion
 from expense_tracker.services.transactions import classify_transaction
 

@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
 from expense_tracker.app import create_app
 from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
 from expense_tracker.db.models import (
     Account,
     Category,
-    CreditCardStatement,
     Transaction,
     utcnow,
 )
@@ -31,8 +27,7 @@ def test_fresh_installation_filesystem_contract(tmp_path: Path):
     )
 
     # 1. Initialize application on empty directory
-    app = create_app(fresh_settings)
-    client = TestClient(app)
+    _ = create_app(fresh_settings)
 
     # 2. Verify explicit filesystem contract directories exist
     resolved = fresh_settings.resolved_data_dir()

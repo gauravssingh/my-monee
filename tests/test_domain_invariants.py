@@ -15,12 +15,9 @@ from expense_tracker.db.models import (
     Merchant,
     MerchantAlias,
     Posting,
-    Subcategory,
-    Transaction,
 )
 from expense_tracker.services.ledger import (
     calculate_ledger_balances,
-    derive_account_balance,
     verify_event_double_entry,
 )
 

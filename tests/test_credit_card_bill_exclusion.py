@@ -8,7 +8,7 @@ from sqlalchemy import select
 from expense_tracker.config import AppConfig, DatabaseConfig, LoggingConfig, Settings
 from expense_tracker.db.models import Category, Subcategory, Transaction, new_id
 from expense_tracker.db.session import get_session_factory, init_db
-from expense_tracker.services.dashboard import get_overview, _valid_spending_filters
+from expense_tracker.services.dashboard import get_overview
 
 
 def _settings(tmp_path: Path) -> Settings:

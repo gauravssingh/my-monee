@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
 from expense_tracker.config import Settings, get_settings
 from expense_tracker.db.session import get_session_factory

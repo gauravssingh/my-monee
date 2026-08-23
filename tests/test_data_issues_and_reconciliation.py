@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
-from pathlib import Path
 
-import pytest
 from sqlalchemy.orm import Session
 
-from expense_tracker.config import Settings
 from expense_tracker.db.models import (
-    Account,
     CreditCardStatement,
-    DataIssueFlag,
-    Institution,
     StatementTransaction,
     Transaction,
 )
@@ -25,8 +19,6 @@ from expense_tracker.services.data_issues import (
     summarize_data_issues,
 )
 from expense_tracker.statements.reconciliation import (
-    compute_similarity,
-    extract_upi_rrn,
     match_statement_transaction,
     reconcile_statement_in_db,
 )

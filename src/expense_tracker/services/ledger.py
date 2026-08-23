@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from expense_tracker.db.models import Account, FinancialEvent, Posting, Transaction
+from expense_tracker.db.models import Account, Posting
 
 
 @dataclass(frozen=True)

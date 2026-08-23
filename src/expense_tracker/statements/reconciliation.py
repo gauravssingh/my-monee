@@ -279,7 +279,7 @@ def scan_gmail_for_upi_rrn(
         return {"success": True, "found": False, "rrn": rrn, "message": f"No Gmail notification emails found containing UPI reference {rrn}"}
 
     bootstrap_parsers()
-    rules = load_discovery_rules()
+    _ = load_discovery_rules()
     result = PipelineResult(run_id="scan_upi_rrn", status="running")
 
     created_tx: Transaction | None = None
@@ -288,7 +288,7 @@ def scan_gmail_for_upi_rrn(
             msg = gmail.get_message(mid)
             if msg.is_excluded_recipient():
                 continue
-            email_row = _upsert_email(session, msg)
+            _upsert_email(session, msg)
             session.flush()
 
             ctx = _to_email_context(msg)
