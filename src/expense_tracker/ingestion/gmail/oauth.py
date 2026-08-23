@@ -18,7 +18,8 @@ from expense_tracker.config import Settings
 
 logger = logging.getLogger(__name__)
 
-KEYRING_SERVICE = "ExpenseTracker"
+KEYRING_SERVICE = "MyMonee"
+LEGACY_KEYRING_SERVICE = "ExpenseTracker"
 KEYRING_ACCOUNT = "gmail-oauth"
 STATE_ACCOUNT = "gmail-oauth-state"
 
@@ -68,7 +69,7 @@ def save_credentials(creds: Credentials, settings: Settings | None = None) -> No
     try:
         keyring.set_password(KEYRING_SERVICE, KEYRING_ACCOUNT, payload)
         saved_keyring = True
-        logger.info("Stored Gmail OAuth credentials in macOS Keychain")
+        logger.info("Stored Gmail OAuth credentials in macOS Keychain (MyMonee)")
     except Exception as e:
         logger.info("Keyring unavailable (%s), storing token in data directory", e)
 
@@ -89,11 +90,20 @@ def save_credentials(creds: Credentials, settings: Settings | None = None) -> No
 
 def load_credentials(settings: Settings) -> Credentials | None:
     raw = None
+    # 1. Primary MyMonee Keychain
     try:
         raw = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
     except Exception:
         pass
 
+    # 2. Legacy ExpenseTracker Keychain fallback
+    if not raw:
+        try:
+            raw = keyring.get_password(LEGACY_KEYRING_SERVICE, KEYRING_ACCOUNT)
+        except Exception:
+            pass
+
+    # 3. File fallback
     if not raw:
         token_path = settings.resolved_data_dir() / "gmail_token.json"
         if token_path.exists():

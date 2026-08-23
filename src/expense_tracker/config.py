@@ -26,7 +26,12 @@ def default_data_dir() -> Path:
 
     # 3. macOS Application Support vs Linux XDG default
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "ExpenseTracker"
+        # Check existing MyMonee or legacy ExpenseTracker
+        primary = Path.home() / "Library" / "Application Support" / "MyMonee"
+        legacy = Path.home() / "Library" / "Application Support" / "ExpenseTracker"
+        if not primary.exists() and legacy.exists():
+            return legacy
+        return primary
     return Path.home() / ".local" / "share" / "mymonee"
 
 
@@ -58,7 +63,7 @@ class AppConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
-    filename: str = "expense_tracker.db"
+    filename: str = "mymonee.db"
     echo: bool = False
 
 
@@ -155,12 +160,19 @@ class Settings(BaseSettings):
         nested_path = self.resolved_data_dir() / "db" / self.database.filename
         if nested_path.exists():
             return nested_path
+        # Legacy fallback if expense_tracker.db exists
+        legacy_flat = self.resolved_data_dir() / "expense_tracker.db"
+        if legacy_flat.exists():
+            return legacy_flat
+        legacy_nested = self.resolved_data_dir() / "db" / "expense_tracker.db"
+        if legacy_nested.exists():
+            return legacy_nested
         return flat_path
 
     def log_path(self) -> Path:
         if self.logging.file:
             return Path(self.logging.file)
-        return self.resolved_data_dir() / "logs" / "expense_tracker.log"
+        return self.resolved_data_dir() / "logs" / "mymonee.log"
 
     def gmail_credentials_path(self) -> Path:
         if self.gmail.credentials_file:

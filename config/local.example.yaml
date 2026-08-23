@@ -1,19 +1,19 @@
-# Per-Mac settings. Copy this file to:
-# ~/Library/Application Support/ExpenseTracker/config.local.yaml
+# Per-Host settings. Copy this file to:
+# ~/Library/Application Support/MyMonee/config.local.yaml (or /config/config.local.yaml)
 #
 # This file is intentionally safe to commit. Do not put OAuth JSON, tokens, or passwords here.
 
 app: {}
-  # data_dir: ~/Library/Application Support/ExpenseTracker
+  # data_dir: ~/Library/Application Support/MyMonee
   # port: 8477
 
 database: {}
-  # filename: expense_tracker.db
+  # filename: mymonee.db
   # echo: false
 
 gmail: {}
   # Keep OAuth client JSON outside the repository. By default it is stored in data_dir.
-  # credentials_file: ~/Library/Application Support/ExpenseTracker/gmail_credentials.json
+  # credentials_file: ~/Library/Application Support/MyMonee/gmail_credentials.json
   # sync_after_date: "2026/01/01"
 
 scheduler: {}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MyMonee macOS 24/7 Background LaunchAgent.
+  Copy to ~/Library/LaunchAgents/com.personal.mymonee.plist
+  and update ProgramArguments paths to match your local installation.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.personal.mymonee</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Users/YOU/projects/my-monee/.venv/bin/python</string>
+      <string>-m</string>
+      <string>expense_tracker</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/YOU/projects/my-monee</string>
+    <key>StandardOutPath</key>
+    <string>/Users/YOU/Library/Logs/MyMonee/stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/YOU/Library/Logs/MyMonee/stderr.log</string>
+  </dict>
+</plist>
