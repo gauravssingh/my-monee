@@ -2,77 +2,108 @@
 
 # 💰 MyMonee
 
-**Local-First, Privacy-First Personal Finance Intelligence & Double-Entry Ledger**
+**Local-First, Portable & Self-Hosted Personal Finance Intelligence**
+
+*One unified financial engine. Multiple deployment shells: Native macOS daemon · Headless Docker on NAS / Home Server / Raspberry Pi · Standalone CLI.*
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/Docker-Multi--Platform%20Ready-2496ED.svg)](https://www.docker.com/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Durable%20Ledger-003B57.svg)](https://www.sqlite.org/)
-[![Docker](https://img.shields.io/badge/Docker-Single%20Container-2496ED.svg)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-*Turn chaotic financial notification emails and encrypted PDF statements into a clean, normalized, double-entry ledger — with zero cloud lock-in and zero data tracking.*
+*Turn chaotic financial notification emails and encrypted PDF statements into a clean, normalized, double-entry ledger — with zero cloud lock-in, zero telemetry, and 100% data ownership.*
 
 </div>
 
 ---
 
-## 📖 Overview
+## 🌐 The Self-Hosted & Portable Vision
 
-**MyMonee** is a privacy-first, automated personal expense tracker and double-entry financial ledger. It runs as **one core engine across multiple deployment shells** — native macOS (launchd background daemon), lightweight Docker container (NAS, Raspberry Pi, home server), or a standalone headless CLI.
+Most modern personal finance tools force you into proprietary cloud databases, sell your transaction data to advertisers, or lock you into closed platforms.
+
+**MyMonee is architected differently.** It is built around a single foundational philosophy:
+
+> **"One core application/runtime, multiple deployment shells."**  
+> Your financial data belongs exclusively to you in a standard SQLite file and portable `.mmb` disaster recovery archives that you can run on a Mac, migrate to a Home Server / NAS, or host headlessly on a Raspberry Pi without changing code.
 
 ```text
-                     EXTERNAL FINANCIAL EVIDENCE
-                                  │
-                  ┌───────────────┴───────────────┐
-                  ▼                               ▼
-         Gmail Ingestion Engine         PDF/CSV Statement Vault
-         (Real-time push alerts)       (Encrypted monthly bills)
-                  │                               │
-                  └───────────────┬───────────────┘
-                                  ▼
-                    Discovery & Extraction Layer
-               (Axis Bank, Scapia, PhonePe, UPI 12-digit RRNs)
-                                  │
-                                  ▼
-                   Reconciliation & Matching Engine
-             (Refund Pairing · Transfer Linking · Deduplication)
-                                  │
-                                  ▼
-                  Canonical Double-Entry SQLite Ledger
-                  (WAL Mode · Deterministic Rule Engine)
-                                  │
-          ┌───────────────────────┼───────────────────────┐
-          ▼                       ▼                       ▼
-    Web Dashboard            Unified CLI            .MMB Archive
- (FastAPI + React 18)   (mymonee doctor/status)  (Portable Disaster Backup)
+                               MyMonee Core Engine
+                                        │
+             ┌──────────────────────────┼──────────────────────────┐
+             ▼                          ▼                          ▼
+       macOS Desktop              Linux / Docker              Headless CLI
+   (Native launchd Daemon)     (Home Server / NAS / RPi)   (Automated Maintenance)
+             │                          │                          │
+             └──────────────────────────┼──────────────────────────┘
+                                        │
+                         Unified Application Services
+                                        │
+             ┌──────────────────────────┼──────────────────────────┐
+             ▼                          ▼                          ▼
+      SQLite WAL Ledger        Statement & Evidence Vault      .MMB Archive
+    (Canonical Accounting)      (Encrypted PDF/CSV Bills)   (Disaster Portability)
 ```
+
+---
+
+## 🏛️ Self-Hosted Architecture & Contracts
+
+### 1. 📂 Explicit Filesystem Contract
+Whether running on native macOS or inside a Docker volume mount, MyMonee enforces an organized, predictable storage hierarchy:
+
+```text
+/data
+├── db/                # Durable SQLite database (expense_tracker.db)
+├── statements/        # Ingested & decrypted PDF/CSV bank/card statements
+├── evidence/          # Audit receipts, transaction crops, and parsed proof
+├── attachments/       # Raw transaction proof attachments
+├── backups/           # Point-in-time snapshots and versioned .mmb archives
+├── exports/           # Exported JSON/CSV datasets
+├── tmp/               # Secure temporary staging directories
+└── logs/              # Application runtime log files
+
+/config
+├── config.yaml        # Application settings and user preferences
+└── providers/         # Provider extraction rules and heuristics
+```
+
+### 2. 📦 The `.mmb v1` Portable Recovery Contract
+The primary backup format of MyMonee is **not just a database dump or a JSON export**. It is a versioned, verifiable, and cryptographic `.mmb` (tar.gz) archive containing the complete financial truth:
+
+* **`manifest.json`**: Archive metadata, app version (`0.8.0`), schema version (`2026_08_ledger_v2`), and ledger metrics.
+* **`database.sqlite`**: Online consistent snapshot taken via SQLite's native backup API.
+* **`statements/`**: All raw PDF/CSV statement documents.
+* **`checksums.sha256`**: Per-file cryptographic hash manifest.
+
+**Zero Credential Exposure**: `.mmb` archives strictly exclude OAuth refresh tokens, API keys, and passwords. You can safely store `.mmb` files in external cold storage, Synology NAS, Google Drive, or S3.
+
+### 3. 🛡️ Architectural Boundaries (Who Owns What)
+* **MyMonee Owns**: Application runtime, double-entry accounting math, SQLite schemas & migrations, parsing heuristics, `.mmb` archive format, and CLI diagnostics.
+* **User Owns**: Infrastructure (Mac/NAS/Server), reverse proxy (Caddy/Traefik/Nginx), TLS certificates, secrets/tokens, and backup storage destination.
 
 ---
 
 ## ✨ Key Features
 
-### 🔒 1. Local-First & Zero Cloud Dependency
-* **100% On-Device**: All transaction data, parsed emails, and PDF statements live strictly in your durable local SQLite ledger.
-* **Portable Secret Management**: Uses native macOS Keychain when running on Darwin, with automatic secure local fallback (`chmod 0o600`) when running in Docker or Linux.
-* **External AI Off by Default**: External AI suggestions (Google Gemini) are strictly opt-in, disabled by default, and never receive raw email HTML, passwords, or account identifiers.
+### 🔒 1. Local-First & Privacy by Design
+* **Zero Telemetry**: No tracking, phone-home analytics, or external database calls.
+* **Platform-Agnostic Secret Storage**: Uses native macOS Keychain when running on Darwin, with automatic secure owner-restricted file token fallback (`chmod 0o600`) when running on Linux / Docker.
+* **External AI Off by Default**: External AI parsing (Google Gemini) is strictly opt-in, disabled by default, and never receives raw email HTML or account numbers.
 
-### 📬 2. Intelligent Notification Email Ingestion
-* **Incremental & Idempotent**: Uses the Gmail API with read-only scopes (`gmail.readonly`) to stream alerts in real-time.
-* **Built-in Parser Registry**:
-  * **Axis Bank Alerts**: Parses UPI narrations, 12-digit RRNs, debit/credit swipes, and automated salary credits (`/Sala` pay-period attribution).
-  * **Federal Bank / Scapia**: Real-time card swipes, fuel surcharge waivers, and international transactions.
-  * **PhonePe Receipt Parser**: Extracts clean merchant names, utility providers (Gas, DTH, Mobile), Fastag tolls, and E-Challans while ignoring non-transactional AutoPay reminders.
-  * **Fuzzy Deduplication Engine**: Cross-provider matching detecting when both a Bank debit email and a UPI receipt arrive for the same event ($\pm 120$ seconds).
+### 📬 2. Multi-Source Ingestion & Intelligent Parsing
+* **Incremental Gmail Stream**: Incremental push synchronization via read-only Gmail API scopes (`gmail.readonly`).
+* **Deterministic Parsers**: Specialized parser plugins for Axis Bank, Scapia, Federal Bank, PhonePe, and utility billers.
+* **Fuzzy Cross-Provider Deduplication**: Detects near-duplicate transactions when both a payment gateway receipt (e.g. PhonePe) and a bank debit SMS arrive for the same purchase within $\pm 120$ seconds.
 
-### 📄 3. Statement Vault & Dual-Source Reconciliation
-* **Encrypted PDF Statement Processing**: Automatically unlocks password-protected bank & card PDFs using encrypted password profiles.
-* **Mathematical Balance Validation**: Validates `Opening Balance + Debits - Credits = Total Due`.
-* **Deterministic 12-Digit UPI RRN Matching**: Reconciles individual email alerts with monthly bank statement line items with 100% confidence.
-* **Cross-Account Transfer & Refund Pairing**: Automatically links credit card bill payments and pairs refund credits to original debit transactions without inflating income.
+### 📄 3. Statement Vault & 12-Digit UPI Reconciliation
+* **Encrypted Statement Vault**: Automated decryption of password-protected PDF bank and card statements using local encrypted profile templates.
+* **12-Digit UPI RRN Matching**: Reconciles notification alerts against statement billing lines using exact Retrieval Reference Numbers (RRN) with 100% confidence.
+* **Transfer & Refund Linking**: Automatically pairs credit card payments and refund credits to original purchases without inflating income.
 
-### 🧙 4. 5-Step Financial Calibration & Onboarding Wizard
+### 🧙 4. 5-Step Financial Calibration Wizard
 * **Interactive Setup Flow**:
   1. **Welcome & Sources**: Detects existing data sources and Gmail connectivity.
   2. **Accounts & Cards Calibration**: Detects bank accounts and credit cards from past alerts.
@@ -80,24 +111,19 @@
   4. **Fixed Obligations & Subscriptions**: Identifies recurring commitments (Rent, EMIs, Utilities, Subscriptions).
   5. **Ledger Intelligence Launch**: Calibrates the starting net worth and transitions to the dashboard.
 
-### 🚨 5. Spending Surge & Anomaly Detection Signals
-* **Subscription Price Surges**: Flags when a recurring subscription (e.g. Netflix, AWS) increases above its baseline.
-* **Same-Day Repeated Charges**: Detects accidental multiple card charges to the exact same merchant on the same day.
-* **Category Spending Spikes**: Statistical outlier detection flagging expenses $> 4\times$ historical category averages.
-
-### 📦 6. Portable `.mmb v1` Archive & Disaster Recovery
-* **Complete Recovery Artifact**: Packages SQLite snapshot, raw PDF statements, attachments, checksums, and manifest into a single `.mmb` archive.
-* **Transactional Restore**: Before restoring, the engine automatically creates a pre-restore safety snapshot so data is never destroyed on failure.
-* **Database Health & Optimization**: One-click `PRAGMA integrity_check`, `foreign_key_check`, WAL checkpointing, and `VACUUM`.
+### 🚨 5. Spending Signals & Anomaly Detection
+* **Subscription Price Surges**: Detects unexpected price hikes on recurring commitments (e.g. Netflix, AWS price increases).
+* **Same-Day Double Charges**: Flags accidental multiple card swipes to the same merchant on the same calendar day.
+* **Outlier Spikes**: Flags discretionary expenses $> 4\times$ the historical category average.
 
 ---
 
-## 💻 Unified Command-Line Interface (`mymonee`)
+## 💻 Headless Management via CLI (`mymonee`)
 
-MyMonee includes a full headless CLI that executes directly against the local SQLite database without requiring the HTTP server to be running:
+The unified `mymonee` CLI executes directly against the local SQLite database without requiring the Web UI or HTTP server to be running:
 
 ```bash
-# 1. Operational State Overview
+# 1. Operational State
 $ mymonee status
 MyMonee v0.8.0
 
@@ -109,7 +135,7 @@ MyMonee v0.8.0
   Statements      228
   Last Backup     today at 16:42 (Verified ✓)
 
-# 2. Deep System & Storage Diagnostics
+# 2. Deep Health Diagnostics (Doctor)
 $ mymonee doctor
 MyMonee Doctor
 ────────────────────────────────────────────
@@ -127,12 +153,12 @@ Backup
 
 Result: HEALTHY
 
-# 3. Create & Verify .mmb Backup Archives
-$ mymonee backup create --note "Pre-upgrade snapshot"
+# 3. Create & Verify Portable .mmb Archives
+$ mymonee backup create --note "Pre-migration snapshot"
 $ mymonee backup verify mymonee_20260823_164218.mmb
 ✓ Archive verification PASSED (1,300 files, 1,485 transactions)
 
-# 4. Safe Disaster Recovery
+# 4. Safe Disaster Recovery (with pre-restore safety snapshot)
 $ mymonee backup restore mymonee_20260823_164218.mmb
 
 # 5. Database Maintenance & Reconciliation
@@ -144,44 +170,11 @@ $ mymonee data export --output ledger_export.json
 
 ---
 
-## 🚀 Deployment Options
+## 🚀 Deployment Guides
 
-### Option A: Native macOS Installation (Recommended for Mac Users)
+### Option 1: Docker Compose (Recommended for Self-Hosting & NAS)
 
-1. **Clone & Set Up Python Environment**:
-   ```bash
-   git clone https://github.com/gauravssingh/my-monee.git
-   cd my-monee
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -e ".[dev]"
-   ```
-
-2. **Build the Frontend**:
-   ```bash
-   cd web
-   npm install
-   npm run build
-   cd ..
-   ```
-
-3. **Run Application**:
-   ```bash
-   python -m expense_tracker
-   ```
-   Open **`http://localhost:8477`** in your browser.
-
-4. **Keep Running 24/7 with macOS `launchd`**:
-   ```bash
-   cp scripts/launchd/com.personal.expense-tracker.plist.example ~/Library/LaunchAgents/com.personal.expense-tracker.plist
-   launchctl load -w ~/Library/LaunchAgents/com.personal.expense-tracker.plist
-   ```
-
----
-
-### Option B: Docker Compose (NAS / Raspberry Pi / Linux Self-Hosting)
-
-Run MyMonee in a lightweight, single-container non-root setup:
+Ideal for Synology, TrueNAS, Raspberry Pi, or local Linux home servers:
 
 ```yaml
 # docker-compose.yml
@@ -207,54 +200,68 @@ services:
     stop_grace_period: 30s
 ```
 
-Launch:
 ```bash
 docker compose up -d
 ```
+Access the dashboard at **`http://<your-server-ip>:8477`**.
 
 ---
 
-## 📁 Filesystem Contract
+### Option 2: Native macOS Installation (Daemon via `launchd`)
 
-MyMonee organizes user data into a clean, explicit directory hierarchy:
+Ideal for running 24/7 on a Mac mini or MacBook:
 
-```text
-/data
-├── db/                # Primary SQLite database (expense_tracker.db)
-├── statements/        # Ingested PDF/CSV bank & card statements
-├── evidence/          # Audit receipts & statement crops
-├── attachments/       # Raw transaction proof attachments
-├── backups/           # .mmb archives and point-in-time snapshots
-├── exports/           # Exported JSON/CSV datasets
-├── tmp/               # Secure temporary staging directories
-└── logs/              # Application runtime log files
+1. **Set Up Python Environment**:
+   ```bash
+   git clone https://github.com/gauravssingh/my-monee.git
+   cd my-monee
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e ".[dev]"
+   ```
 
-/config
-├── config.yaml        # Main configuration file
-└── providers/         # Provider extraction configurations
-```
+2. **Build Web Frontend**:
+   ```bash
+   cd web
+   npm install
+   npm run build
+   cd ..
+   ```
+
+3. **Run Application**:
+   ```bash
+   python -m expense_tracker
+   ```
+   Open **`http://localhost:8477`** in your browser.
+
+4. **Background Service (`launchd`)**:
+   ```bash
+   cp scripts/launchd/com.personal.expense-tracker.plist.example ~/Library/LaunchAgents/com.personal.expense-tracker.plist
+   launchctl load -w ~/Library/LaunchAgents/com.personal.expense-tracker.plist
+   ```
 
 ---
 
-## 🧪 Automated Testing & Quality Standards
+## 🧪 Portability & Quality Verification
 
-* **Comprehensive Test Suite**: **136 passing tests** across domain invariants, accounting math, statement parsers, deduplication, `.mmb` roundtrips, and cross-runtime portability:
+* **Cross-Runtime Test Matrix**: Verified roundtrip compatibility across macOS and Linux/Docker environments.
+* **136 Automated Tests**:
   ```bash
   source .venv/bin/activate
   pytest
   ```
 * **Container Health Probes**:
   - `GET /health` / `GET /health/live`: Fast liveness check.
-  - `GET /health/ready`: Readiness probe verifying SQLite connectivity and schema integrity without leaking sensitive information.
+  - `GET /health/ready`: Readiness probe verifying SQLite connectivity and schema readiness without exposing sensitive user information.
 
 ---
 
-## 🛡️ Privacy & Security Principles
+## 🛡️ Security Baseline
 
-* **No Telemetry**: Zero analytics, trackers, or phone-home network calls.
-* **Granular OAuth Scopes**: Only `https://www.googleapis.com/auth/gmail.readonly` is requested.
-* **Zero Credentials in Backups**: `.mmb` archives strictly contain financial truth and evidence, never reusable tokens or API keys.
-* **Full Auditability**: Every classified transaction, ledger posting, and duplicate resolution maintains an explicit reasoning trail.
+* **Non-Root Execution**: Container runs strictly under non-root user `mymonee` (UID 1000).
+* **Minimal Attack Surface**: Single-container architecture with zero external database dependencies (no Redis, Postgres, or RabbitMQ).
+* **Granular OAuth Scopes**: Only `https://www.googleapis.com/auth/gmail.readonly` is ever requested.
+* **Audit Trail**: Every classified transaction, ledger posting, and duplicate resolution maintains an explicit reasoning trail.
 
 ---
 
