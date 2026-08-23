@@ -11,8 +11,23 @@ from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 
+import os
+import sys
+
 def default_data_dir() -> Path:
-    return Path.home() / "Library" / "Application Support" / "ExpenseTracker"
+    # 1. Environment variable override
+    env_dir = os.getenv("MYMONEE_DATA_DIR")
+    if env_dir:
+        return Path(env_dir).expanduser()
+
+    # 2. Linux Docker container mount check
+    if Path("/data").is_dir():
+        return Path("/data")
+
+    # 3. macOS Application Support vs Linux XDG default
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "ExpenseTracker"
+    return Path.home() / ".local" / "share" / "mymonee"
 
 
 def repo_root() -> Path:
@@ -122,11 +137,25 @@ class Settings(BaseSettings):
     def resolved_data_dir(self) -> Path:
         path = self.app.data_dir or default_data_dir()
         path.mkdir(parents=True, exist_ok=True)
+        (path / "db").mkdir(exist_ok=True)
+        (path / "statements").mkdir(exist_ok=True)
+        (path / "evidence").mkdir(exist_ok=True)
+        (path / "attachments").mkdir(exist_ok=True)
+        (path / "backups").mkdir(exist_ok=True)
+        (path / "exports").mkdir(exist_ok=True)
+        (path / "tmp").mkdir(exist_ok=True)
         (path / "logs").mkdir(exist_ok=True)
         return path
 
     def database_path(self) -> Path:
-        return self.resolved_data_dir() / self.database.filename
+        # Check standard flat or db/ nested path
+        flat_path = self.resolved_data_dir() / self.database.filename
+        if flat_path.exists():
+            return flat_path
+        nested_path = self.resolved_data_dir() / "db" / self.database.filename
+        if nested_path.exists():
+            return nested_path
+        return flat_path
 
     def log_path(self) -> Path:
         if self.logging.file:

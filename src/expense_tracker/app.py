@@ -38,9 +38,12 @@ from expense_tracker.logging_setup import setup_logging
 from expense_tracker.parsers.bootstrap import bootstrap_parsers
 from expense_tracker.services.auth import is_auth_configured, verify_session_token
 
+from contextlib import asynccontextmanager
+from expense_tracker.scheduler.worker import get_scheduler
+
 logger = logging.getLogger(__name__)
 
-_AUTH_EXEMPT_PATHS = {"/api/health"}
+_AUTH_EXEMPT_PATHS = {"/api/health", "/health", "/health/live", "/health/ready"}
 _AUTH_EXEMPT_PREFIXES = ("/api/auth/",)
 
 _ALLOWED_ORIGINS = [
@@ -68,10 +71,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     init_db(settings)
     bootstrap_parsers()
 
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        # Startup
+        scheduler = None
+        if settings.scheduler.enabled:
+            scheduler = get_scheduler(settings)
+            await scheduler.start()
+        yield
+        # Graceful Shutdown on SIGTERM
+        if scheduler:
+            await scheduler.stop()
+        from expense_tracker.db.session import get_engine
+        try:
+            get_engine().dispose()
+        except Exception:
+            pass
+
     app = FastAPI(
         title=settings.app.name,
-        version="0.2.0",
+        version="0.8.0",
         description="Local-first personal expense tracker",
+        lifespan=lifespan,
     )
     app.state.settings = settings
 

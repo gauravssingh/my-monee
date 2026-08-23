@@ -62,37 +62,73 @@ def _dict_to_credentials(data: dict[str, Any], scopes: list[str]) -> Credentials
     )
 
 
-def save_credentials(creds: Credentials) -> None:
+def save_credentials(creds: Credentials, settings: Settings | None = None) -> None:
     payload = json.dumps(_token_to_dict(creds))
-    keyring.set_password(KEYRING_SERVICE, KEYRING_ACCOUNT, payload)
-    logger.info("Stored Gmail OAuth credentials in macOS Keychain")
+    saved_keyring = False
+    try:
+        keyring.set_password(KEYRING_SERVICE, KEYRING_ACCOUNT, payload)
+        saved_keyring = True
+        logger.info("Stored Gmail OAuth credentials in macOS Keychain")
+    except Exception as e:
+        logger.info("Keyring unavailable (%s), storing token in data directory", e)
+
+    # In Linux/Docker or fallback, store to data_dir/gmail_token.json
+    try:
+        from expense_tracker.config import get_settings
+        s = settings or get_settings()
+        token_path = s.resolved_data_dir() / "gmail_token.json"
+        token_path.write_text(payload, encoding="utf-8")
+        # Secure file permissions (read/write only for owner)
+        try:
+            token_path.chmod(0o600)
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning("Could not persist token file fallback: %s", e)
 
 
 def load_credentials(settings: Settings) -> Credentials | None:
+    raw = None
     try:
         raw = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-    except keyring.errors.KeyringError:
-        logger.exception("Unable to read Gmail OAuth credentials from macOS Keychain")
-        return None
+    except Exception:
+        pass
+
+    if not raw:
+        token_path = settings.resolved_data_dir() / "gmail_token.json"
+        if token_path.exists():
+            try:
+                raw = token_path.read_text(encoding="utf-8")
+            except Exception as e:
+                logger.warning("Could not read gmail_token.json: %s", e)
+
     if not raw:
         return None
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
-        logger.warning("Invalid Gmail token payload in Keychain; clearing")
-        clear_credentials()
+        logger.warning("Invalid Gmail token payload; clearing")
+        clear_credentials(settings)
         return None
     return _dict_to_credentials(data, settings.gmail.scopes)
 
 
-def clear_credentials() -> None:
+def clear_credentials(settings: Settings | None = None) -> None:
     try:
         keyring.delete_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-    except keyring.errors.PasswordDeleteError:
+    except Exception:
         pass
     try:
         keyring.delete_password(KEYRING_SERVICE, STATE_ACCOUNT)
-    except keyring.errors.PasswordDeleteError:
+    except Exception:
+        pass
+
+    try:
+        from expense_tracker.config import get_settings
+        s = settings or get_settings()
+        token_path = s.resolved_data_dir() / "gmail_token.json"
+        token_path.unlink(missing_ok=True)
+    except Exception:
         pass
 
 

@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  mymonee:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mymonee:latest
+    container_name: mymonee
+    restart: unless-stopped
+
+    ports:
+      - "8477:8477"
+
+    environment:
+      MYMONEE_DATA_DIR: /data
+      MYMONEE_CONFIG_DIR: /config
+      MYMONEE_APP_HOST: "0.0.0.0"
+      MYMONEE_APP_PORT: 8477
+      MYMONEE_SCHEDULER_ENABLED: "true"
+
+    volumes:
+      - ./data:/data
+      - ./config:/config:ro
+
+    stop_grace_period: 30s
