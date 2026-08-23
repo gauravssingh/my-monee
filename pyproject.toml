@@ -37,6 +37,7 @@ dev = [
 
 [project.scripts]
 expense-tracker = "expense_tracker.__main__:main"
+mymonee = "expense_tracker.cli.main:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/expense_tracker"]

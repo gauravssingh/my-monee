@@ -1028,6 +1028,53 @@ export const api = {
     request<{ success: boolean; deleted: string }>(`/api/system/backups/${encodeURIComponent(filename)}`, {
       method: "DELETE",
     }),
+  getDuplicateCandidates: (lookbackDays = 90) =>
+    request<
+      Array<{
+        primary_id: string;
+        duplicate_id: string;
+        confidence: number;
+        reason: string;
+        amount: number;
+        currency: string;
+        primary_merchant?: string | null;
+        duplicate_merchant?: string | null;
+        primary_date: string;
+        duplicate_date: string;
+        primary_source: string;
+        duplicate_source: string;
+        time_diff_seconds: number;
+      }>
+    >(`/api/intelligence/duplicates?lookback_days=${lookbackDays}`),
+  mergeDuplicate: (primaryId: string, duplicateId: string) =>
+    request<{ success: boolean; primary_id: string; duplicate_id: string }>("/api/intelligence/duplicates/merge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ primary_id: primaryId, duplicate_id: duplicateId }),
+    }),
+  unmarkDuplicate: (transactionId: string) =>
+    request<{ success: boolean; transaction_id: string }>("/api/intelligence/duplicates/unmark", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction_id: transactionId }),
+    }),
+  getSpendingAnomalies: (lookbackDays = 60) =>
+    request<
+      Array<{
+        id: string;
+        anomaly_type: string;
+        severity: "high" | "medium" | "low";
+        title: string;
+        description: string;
+        amount: number;
+        currency: string;
+        transaction_id?: string | null;
+        date: string;
+        merchant?: string | null;
+        category?: string | null;
+        metadata: Record<string, any>;
+      }>
+    >(`/api/intelligence/anomalies?lookback_days=${lookbackDays}`),
 };
 
 

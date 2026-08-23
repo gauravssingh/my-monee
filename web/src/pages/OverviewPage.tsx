@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, type Overview, type FinancialTrends } from "../api";
 import FinancialTrendModal, { type TrendMetricType } from "../components/FinancialTrendModal";
 import MonthStrip from "../components/MonthStrip";
+import LedgerIntelligencePanel from "../components/LedgerIntelligencePanel";
 import AccountBadge from "../components/common/AccountBadge";
 import { formatMoney, formatCompactMoney, formatLakhOrK, formatDate } from "../format";
 
@@ -297,6 +298,13 @@ export default function OverviewPage() {
           </Link>
         </div>
       )}
+
+      {/* Ledger Intelligence & Anomaly Signals Panel */}
+      <LedgerIntelligencePanel
+        onTransactionClick={(txId) => {
+          navigate(`/transactions?search=${encodeURIComponent(txId)}`);
+        }}
+      />
 
       {/* Primary Financial Flow KPI Strip (Clean, Clickable for 6M trend, No TREND ↗ label) */}
       <section className="metrics" aria-label="Monthly financial flow" style={{ marginBottom: "12px" }}>
