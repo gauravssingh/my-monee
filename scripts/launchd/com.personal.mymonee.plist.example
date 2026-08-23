@@ -17,7 +17,7 @@
     <array>
       <string>/Users/YOU/projects/my-monee/.venv/bin/python</string>
       <string>-m</string>
-      <string>expense_tracker</string>
+      <string>mymonee</string>
     </array>
     <key>WorkingDirectory</key>
     <string>/Users/YOU/projects/my-monee</string>

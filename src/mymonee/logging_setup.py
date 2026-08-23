@@ -88,7 +88,7 @@ class RedactingFilter(logging.Filter):
 
 def setup_logging(settings: Settings | None = None) -> None:
     """Configure structured logging for CLI, background jobs, and web server."""
-    env_level = os.getenv("LOG_LEVEL") or os.getenv("EXPENSE_TRACKER_LOG_LEVEL")
+    env_level = os.getenv("LOG_LEVEL") or os.getenv("MYMONEE_LOG_LEVEL") or os.getenv("EXPENSE_TRACKER_LOG_LEVEL")
     if env_level:
         level_str = env_level.upper()
     elif settings and getattr(settings, "logging", None) and getattr(settings.logging, "level", None):

@@ -2,7 +2,7 @@
 # Open the SQLite database interactive shell or execute queries passed as arguments.
 set -euo pipefail
 
-DB_PATH="${EXPENSE_TRACKER_DB_PATH:-$HOME/Library/Application Support/ExpenseTracker/mymonee.db}"
+DB_PATH="${MYMONEE_DB_PATH:-${EXPENSE_TRACKER_DB_PATH:-$HOME/Library/Application Support/ExpenseTracker/mymonee.db}}"
 
 if [[ ! -f "$DB_PATH" ]]; then
   echo "Error: SQLite database not found at '$DB_PATH'" >&2
