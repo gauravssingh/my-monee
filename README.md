@@ -7,7 +7,9 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18-61DAFB.svg)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6.svg)](https://www.typescriptlang.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-Durable%20Ledger-003B57.svg)](https://www.sqlite.org/)
+[![Playwright](https://img.shields.io/badge/Playwright-Visual%20Audit-45ba4b.svg)](https://playwright.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 *Turn chaotic financial notification emails and encrypted PDF statements into a clean, normalized, double-entry ledger — with zero cloud lock-in and zero data tracking.*
@@ -40,12 +42,12 @@ Gmail Alerts & PDF Statements
              │
              ▼
  ┌───────────────────────┐
- │ Durable SQLite Ledger │ ──► Double-Entry Postings & Pay-Period Attribution
+ │ Canonical Ledger      │ ──► Double-Entry Postings & Normal Balance Tracking
  └───────────┬───────────┘
              │
              ▼
  ┌───────────────────────┐
- │  FastAPI + React UI   │ ──► Desktop Dashboard & iOS Safari Gmail Deep Linking
+ │  FastAPI + React UI   │ ──► Responsive Dashboard & iOS Safari Gmail Deep Linking
  └───────────────────────┘
 ```
 
@@ -63,7 +65,7 @@ Gmail Alerts & PDF Statements
 * **Built-in Parser Registry**:
   * **Axis Bank Alerts**: Parses UPI narrations, 12-digit RRNs, debit/credit swipes, and automated salary credits (`/Sala` pay-period attribution).
   * **Federal Bank / Scapia**: Real-time card swipes, fuel surcharge waivers, and international transactions.
-  * **PhonePe Receipt Parser**: Extracts clean merchant names, utility providers (Gas, DTH, Mobile), Fastag tolls, and E-Challans while ignoring non-transactional AutoPay reminders and invoices.
+  * **PhonePe Receipt Parser**: Extracts clean merchant names, utility providers (Gas, DTH, Mobile), Fastag tolls, and E-Challans while ignoring non-transactional AutoPay reminders.
   * **Cross-Source Gateway Deduplication**: Prevents double-counting between payment gateway receipts (Razorpay, PhonePe) and bank debit alerts.
 
 ### 📄 3. Statement Vault & 12-Digit UPI Reconciliation
@@ -72,10 +74,19 @@ Gmail Alerts & PDF Statements
 * **Deterministic 12-Digit UPI RRN Matching**: Reconciles individual email alerts with monthly bank statement line items with 100% confidence.
 * **EMI Auto-Grouping**: Detects principal, interest, and GST components of installment loans.
 
-### 📊 4. Responsive Dashboard & Mobile iOS Deep Linking
-* **Modern Web UI**: React 18, TypeScript, and Vite serving live metrics at `http://localhost:8477`.
-* **iOS Safari & Gmail App Integration**: Universal link handler allows you to tap any transaction on your iPhone to jump directly into the native **Gmail iOS app**.
-* **Financial Analytics**: MoM Income Trends, Category Breakdown, Merchant Directory, and interactive **Needs Review** queue.
+### 💳 4. Double-Entry Canonical Ledger Engine
+* **Formal Accounting Postings**: Enforces double-entry normal balance semantics (Assets: Debit normal; Liabilities: Credit normal).
+* **Opening Balance Baselines**: Seamlessly integrates account baselines with transactional inflows and outflows for true net worth calculation.
+* **Source Evidence Immutability**: Raw ingestion payloads and audit logs remain tamper-proof while downstream interpretations are updated.
+
+### 📱 5. Responsive React Dashboard & Complete Tooling Suite
+* **Overview & Analytics**: MoM Income Trends, Category Breakdown bars, spend distributions, and pay-period salary attribution.
+* **Transactions & Needs Review**: Progressive inline category picker, quick-classification modals, and raw source email viewer.
+* **Accounts Management**: Comprehensive Asset & Liability registers, compact Add/Edit modal dialogs, and mobile bottom sheet forms.
+* **Paginated Merchants Directory**: Configurable page sizes (25, 50, 100, 250), 30-day velocity metrics, and alias management.
+* **Recurring Commitments & Bills**: Tracks fixed subscriptions (broadband, loans) and variable recurring bills (maintenance, utilities) with projected commitment KPIs.
+* **Data Issues Diagnostics**: Audit false-positive extractions, bulk resolve non-transactions, and refine parser discovery rules.
+* **Mobile iOS Deep Linking**: Universal link handler allows you to tap any transaction to open the original message directly in the native **Gmail iOS app**.
 
 ---
 
@@ -155,38 +166,20 @@ To keep MyMonee continuously running 24/7 on a Mac mini or MacBook:
 
 ---
 
-## 🤖 Optional AI Assistant (Google Gemini)
+## 🧪 Testing & Verification
 
-MyMonee includes an optional, privacy-respecting AI assistant to suggest categories for unclassified transactions in the **Needs Review** queue.
-
-1. **Opt-in via Configuration**:
-   Edit `~/Library/Application Support/ExpenseTracker/config.local.yaml`:
-   ```yaml
-   privacy:
-     allow_external_ai: true
-
-   ai:
-     enabled: true
-     provider: gemini
-     model: gemini-2.5-flash
-   ```
-
-2. **Set API Key**:
-   ```bash
-   export GEMINI_API_KEY="your-gemini-api-key"
-   ```
-
-*Note: All AI requests are logged in the `ai_operations` audit table. Raw email bodies, full account numbers, and PII are strictly stripped prior to dispatch.*
-
----
-
-## 🧪 Testing
-
-Run the full automated test suite (backend unit tests, statement parsers, reconciliation engine):
-
+### Backend Unit & Domain Invariant Tests
+Run the full automated test suite (domain invariants, statement parsers, reconciliation engine):
 ```bash
 source .venv/bin/activate
 pytest
+```
+
+### Playwright Frontend Visual Audit
+Execute multi-viewport UI verification tests (desktop & mobile) across all application views:
+```bash
+source .venv/bin/activate
+python .agents/skills/playwright-frontend-testing/scripts/ui_test_runner.py --all
 ```
 
 ---
@@ -200,13 +193,17 @@ pytest
 │   ├── api/                 # FastAPI REST API endpoints & routes
 │   ├── classification/      # Deterministic taxonomy & merchant rules
 │   ├── db/                  # SQLite models, schemas, and migrations
+│   ├── domain/              # Enums, invariants, and financial models
 │   ├── ingestion/           # Gmail client, OAuth handler, and sync pipeline
 │   ├── merchants/           # Merchant normalization & alias registry
 │   ├── parsers/             # Bank, card, and PhonePe parser plugins
-│   ├── services/            # Dashboard analytics, ledger postings, accounts
+│   ├── services/            # Ledger postings, balance math, accounts, data issues
 │   └── statements/          # PDF OCR, statement vault, and reconciliation
-├── tests/                   # Pytest test suite (90+ tests)
+├── tests/                   # Pytest test suite (110+ tests)
 └── web/                     # React 18 + Vite + TypeScript dashboard UI
+    ├── src/components/      # Modals, badges, segmented controls, email viewer
+    ├── src/pages/           # Overview, Transactions, Accounts, Merchants, etc.
+    └── src/styles.css       # Unified design system & responsive layout styles
 ```
 
 ---
@@ -216,7 +213,7 @@ pytest
 * **No Telemetry**: Zero analytics, trackers, or phone-home pings.
 * **Granular OAuth Scopes**: Only `https://www.googleapis.com/auth/gmail.readonly` is ever requested.
 * **Encrypted Secrets**: Sensitive tokens are held strictly in the macOS Keychain (`ExpenseTracker`).
-* **Auditability**: Every classified transaction and duplicate resolution maintains an explicit reasoning trail.
+* **Auditability**: Every classified transaction, ledger posting, and duplicate resolution maintains an explicit reasoning trail.
 
 ---
 
