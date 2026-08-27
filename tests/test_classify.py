@@ -123,3 +123,41 @@ def test_direction_filter(tmp_path: Path) -> None:
     assert credit_only.status_code == 200
     assert all(item["direction"] == "credit" for item in credit_only.json()["items"])
     assert debit_id not in {item["id"] for item in credit_only.json()["items"]}
+
+
+def test_classify_persists_merchant_rule_and_backfills_past(tmp_path: Path) -> None:
+    client = TestClient(create_app(_settings(tmp_path)))
+
+    # Create 3 transactions from the same merchant (e.g., "Swiggy")
+    t1 = client.post("/api/transactions/sample").json()
+    t2 = client.post("/api/transactions/sample").json()
+    t3 = client.post("/api/transactions/sample").json()
+
+    cats = client.get("/api/categories").json()["items"]
+    food = next(c for c in cats if c["slug"] == "food")
+    delivery = next((s for s in food["subcategories"] if s["slug"] in ["delivery", "food-delivery", "restaurant", "cafe"]), None)
+    sub_id = delivery["id"] if delivery else None
+
+    # Classify t1 with create_rule=True and apply_to_past=True
+    res = client.patch(
+        f"/api/transactions/{t1['id']}/classify",
+        json={
+            "category_id": food["id"],
+            "subcategory_id": sub_id,
+            "create_rule": True,
+            "apply_to_past": True,
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["category"] == "Food"
+    assert body["user_verified"] is True
+    assert body["needs_review"] is False
+
+    # Check that past transactions for the same merchant were also backfilled & verified
+    all_txs = client.get("/api/transactions").json()["items"]
+    for tx in all_txs:
+        if tx["merchant_normalized"] == t1["merchant_normalized"]:
+            assert tx["category"] == "Food"
+            assert tx["user_verified"] is True
+            assert tx["needs_review"] is False

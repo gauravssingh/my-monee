@@ -34,7 +34,7 @@ function getHumanSummary(overview: Overview, date: { year: number; month: number
   const flowType = overview.summary.net_cash_flow >= 0 ? "positive cash flow" : "net deficit";
   const flowSign = overview.summary.net_cash_flow >= 0 ? "+" : "-";
 
-  return `You spent ${spentStr} this month${compositionText}${diffText}. Income was ${incomeStr}, leaving a ${flowType} of ${flowSign}${netAbsStr}.`;
+  return `Income was ${incomeStr}, with ${spentStr} spent this month${compositionText}${diffText}, leaving a ${flowType} of ${flowSign}${netAbsStr}.`;
 }
 
 export default function OverviewPage() {
@@ -203,12 +203,9 @@ export default function OverviewPage() {
               key={c.category_id}
               className="category-row"
               style={{ cursor: "pointer" }}
-              title={`View ${c.category} transactions`}
+              title={`View ${c.category} deep dive analytics`}
               onClick={() => {
-                const padM = String(date.month).padStart(2, "0");
-                const from = `${date.year}-${padM}-01`;
-                const to = `${date.year}-${padM}-${String(daysInMonth).padStart(2, "0")}`;
-                navigate(`/transactions?date_from=${from}&date_to=${to}&category_id=${encodeURIComponent(c.category_id)}&category=${encodeURIComponent(c.category)}`);
+                navigate(`/analytics/category/${encodeURIComponent(c.category_id)}?year=${date.year}&month=${date.month}&range=6m`);
               }}
             >
               <div className="category-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -311,27 +308,6 @@ export default function OverviewPage() {
         <button
           type="button"
           className="metric-button"
-          onClick={() => openTrend("spent")}
-          title="Click to view 6-month spending trend"
-          aria-label="Total Spent, click to view 6-month trend"
-        >
-          <div className="metric-label">Total Spent</div>
-          <div className="metric-value">{formatMoney(overview.summary.spent, overview.currency)}</div>
-          <div className="metric-hint">
-            {overview.month_comparison.spent_change_pct != null ? (
-              <span className={overview.month_comparison.spent_change_pct > 0 ? "metric-delta down" : "metric-delta up"}>
-                {overview.month_comparison.spent_change_pct > 0 ? "↑" : "↓"}{" "}
-                {Math.abs(overview.month_comparison.spent_change_pct).toFixed(1)}% vs last month
-              </span>
-            ) : (
-              "vs last month —"
-            )}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className="metric-button"
           onClick={() => openTrend("income")}
           title="Click to view 6-month income trend"
           aria-label="Income, click to view 6-month trend"
@@ -370,6 +346,27 @@ export default function OverviewPage() {
             {formatMoney(overview.summary.net_cash_flow, overview.currency)}
           </div>
           <div className="metric-hint">Income − spending</div>
+        </button>
+
+        <button
+          type="button"
+          className="metric-button"
+          onClick={() => openTrend("spent")}
+          title="Click to view 6-month spending trend"
+          aria-label="Total Spent, click to view 6-month trend"
+        >
+          <div className="metric-label">Total Spent</div>
+          <div className="metric-value">{formatMoney(overview.summary.spent, overview.currency)}</div>
+          <div className="metric-hint">
+            {overview.month_comparison.spent_change_pct != null ? (
+              <span className={overview.month_comparison.spent_change_pct > 0 ? "metric-delta down" : "metric-delta up"}>
+                {overview.month_comparison.spent_change_pct > 0 ? "↑" : "↓"}{" "}
+                {Math.abs(overview.month_comparison.spent_change_pct).toFixed(1)}% vs last month
+              </span>
+            ) : (
+              "vs last month —"
+            )}
+          </div>
         </button>
       </section>
 

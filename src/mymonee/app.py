@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from mymonee.api.routes import (
     accounts,
     ai,
+    analytics,
     auth,
     backup,
     categories,
@@ -130,6 +131,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(overview.router)
+    app.include_router(analytics.router)
     app.include_router(transactions.router)
     app.include_router(system.router)
     app.include_router(gmail.router)

@@ -526,6 +526,8 @@ export default function TransactionsPage({ needsReview = false }: Props) {
         });
       }
       if (applyToPast) {
+        setPanelOpen(false);
+        setPanelTargets([]);
         void load();
       } else if (needsReview) {
         applyRemoved(ids);

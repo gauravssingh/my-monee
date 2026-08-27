@@ -7,6 +7,7 @@ import TransactionsPage from "./pages/TransactionsPage";
 import MerchantsPage from "./pages/MerchantsPage";
 import RecurringPage from "./pages/RecurringPage";
 import AccountsPage from "./pages/AccountsPage";
+import CategoryAnalyticsPage from "./pages/CategoryAnalyticsPage";
 import CreditCardStatementsPage from "./pages/CreditCardStatementsPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import LockScreen from "./components/LockScreen";
@@ -161,6 +162,7 @@ export default function App() {
               <NavLink to="/recurring">Recurring and Subscriptions</NavLink>
             </div>
           </div>
+          <NavLink to="/categories">Categories</NavLink>
           <NavLink to="/accounts">Accounts</NavLink>
           <NavLink to="/merchants">Merchants</NavLink>
           <NavLink
@@ -238,6 +240,9 @@ export default function App() {
               <NavLink to="/" end onClick={() => setMobileMenuOpen(false)}>
                 Overview
               </NavLink>
+              <NavLink to="/categories" onClick={() => setMobileMenuOpen(false)}>
+                Categories Deep Dive
+              </NavLink>
               <div className="mobile-drawer-section-title">Transactions</div>
               <NavLink to="/transactions" className="mobile-drawer-sublink" onClick={() => setMobileMenuOpen(false)}>
                 Classified
@@ -282,6 +287,9 @@ export default function App() {
       <ErrorBoundary>
         <Routes>
           <Route path="/" element={<OverviewPage />} />
+          <Route path="/categories" element={<CategoryAnalyticsPage />} />
+          <Route path="/analytics/category/:categoryId?" element={<CategoryAnalyticsPage />} />
+          <Route path="/analytics" element={<Navigate to="/categories" replace />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
           <Route path="/merchants" element={<MerchantsPage />} />

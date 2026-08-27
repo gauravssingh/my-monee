@@ -240,6 +240,99 @@ export interface AISuggestion {
   operation_id: string;
 }
 
+export type CategoryAnalyticsPeriod = {
+  start: string;
+  end: string;
+  months: number;
+  year: number;
+  month: number;
+  range: string;
+};
+
+export type CategoryAnalyticsSummary = {
+  period_total_spend: number;
+  previous_period_spend: number;
+  period_change_pct: number | null;
+  current_month_spend: number;
+  previous_month_spend: number;
+  current_month_mom_change_pct: number | null;
+  transaction_count: number;
+  avg_ticket: number;
+  median_ticket: number;
+  share_of_living_spend: number;
+};
+
+export type CategoryTrendMonth = {
+  month: string;
+  year: number;
+  month_num: number;
+  total: number;
+  subcategories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    spend: number;
+    count: number;
+  }>;
+};
+
+export type CategorySubcategorySummary = {
+  id: string;
+  name: string;
+  slug: string;
+  spend: number;
+  share_of_category: number;
+  transaction_count: number;
+  avg_ticket: number;
+  current_month_spend: number;
+  previous_month_spend: number;
+  mom_change_pct: number | null;
+  rolling_3m_avg: number;
+};
+
+export type CategoryMerchantSummary = {
+  merchant_id: string | null;
+  name: string;
+  spend: number;
+  transaction_count: number;
+  share_of_category: number;
+  avg_ticket: number;
+};
+
+export type CategoryConcentration = {
+  top_1_share: number;
+  top_3_share: number;
+  top_5_share: number;
+};
+
+export type CategoryInsight = {
+  type: string;
+  severity: "info" | "positive" | "warning";
+  title: string;
+  message: string;
+};
+
+export type CategoryAnalytics = {
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    expense_type: string | null;
+  };
+  period: CategoryAnalyticsPeriod;
+  comparison: {
+    type: string;
+    start: string;
+    end: string;
+  };
+  summary: CategoryAnalyticsSummary;
+  trend: CategoryTrendMonth[];
+  subcategories: CategorySubcategorySummary[];
+  merchants: CategoryMerchantSummary[];
+  concentration: CategoryConcentration;
+  insights: CategoryInsight[];
+};
+
 export type Overview = {
   period: { year: number; month: number };
   currency: string;
@@ -539,6 +632,22 @@ export const api = {
     let url = `/api/overview/trends?months=${months}`;
     if (year != null && month != null) url += `&year=${year}&month=${month}`;
     return request<FinancialTrends>(url);
+  },
+  categoryAnalytics: (
+    categoryId: string,
+    params?: {
+      range?: string;
+      year?: number;
+      month?: number;
+    },
+    signal?: AbortSignal
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.range) qs.set("range", params.range);
+    if (params?.year != null) qs.set("year", String(params.year));
+    if (params?.month != null) qs.set("month", String(params.month));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<CategoryAnalytics>(`/api/analytics/category/${encodeURIComponent(categoryId)}${suffix}`, { signal });
   },
   transactions: (
     params?: {
