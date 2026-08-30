@@ -201,3 +201,36 @@ def test_get_or_create_account_matches_existing_identifiers(tmp_path: Path) -> N
         assert total_accounts == 2
 
 
+def test_merchant_entity_resolution_and_alias_uniqueness(tmp_path: Path) -> None:
+    from mymonee.db.models import Merchant, MerchantAlias
+    from mymonee.db.session import init_engine
+    from mymonee.ingestion.pipeline import _resolve_merchant_entity_id
+    from sqlalchemy.orm import Session
+
+    settings = _test_settings(tmp_path)
+    engine = init_engine(settings)
+    from mymonee.db.models import Base
+    Base.metadata.create_all(bind=engine)
+
+    with Session(engine) as session:
+        # First resolution creates merchant and alias
+        m_id1 = _resolve_merchant_entity_id(session, "Swiggy", "Swiggy")
+        session.commit()
+        assert m_id1 is not None
+
+        # Second resolution with variant raw name but same normalized name
+        m_id2 = _resolve_merchant_entity_id(session, "RAZ*Swiggy", "Swiggy")
+        session.commit()
+        assert m_id2 == m_id1
+
+        # Third resolution with lowercase normalized
+        m_id3 = _resolve_merchant_entity_id(session, "SWIGGY PVT", "swiggy")
+        session.commit()
+        assert m_id3 == m_id1
+
+        # Ensure no duplicate merchant entities created
+        all_merchants = session.query(Merchant).all()
+        assert len(all_merchants) == 1
+
+
+

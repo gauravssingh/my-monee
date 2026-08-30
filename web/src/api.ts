@@ -1026,6 +1026,67 @@ export const api = {
       `/api/statements/${statementId}/transactions/${transactionId}/scan-gmail`,
       { method: "POST" }
     ),
+  onboardingState: () =>
+    request<{
+      completed: boolean;
+      current_step: number;
+      auth_configured: boolean;
+      gmail_connected: boolean;
+      currency: string;
+      locale: string;
+      progress: Record<string, any>;
+      discovered: {
+        accounts: Array<{
+          id: string;
+          name: string;
+          account_type: string;
+          card_last4?: string | null;
+          account_number_masked?: string | null;
+          is_asset: boolean;
+          is_liability: boolean;
+          opening_balance?: number;
+          payment_account_id?: string | null;
+        }>;
+        income_sources: Array<{
+          name: string;
+          amount: number;
+          currency: string;
+          account?: string | null;
+          last_date?: string | null;
+          expected_day: number;
+        }>;
+        recurring: Array<{
+          id?: string | null;
+          name: string;
+          expected_amount: number;
+          frequency: string;
+          expected_day: number;
+          status: string;
+        }>;
+      };
+      metrics: {
+        accounts_configured: number;
+        transactions_ingested: number;
+        needs_review_count: number;
+      };
+    }>("/api/onboarding/state"),
+  onboardingFastScan: () =>
+    request<{
+      institutions: Array<{
+        name: string;
+        type: string;
+        icon: string;
+        status: string;
+        sample_subject?: string | null;
+      }>;
+      emails_scanned: number;
+    }>("/api/onboarding/fast-scan"),
+  saveOnboardingStep: (step: number, payload: any) =>
+    request<{ success: boolean; step: number; next_step: number }>(`/api/onboarding/step/${step}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payload }),
+    }),
   onboardingStatus: () =>
     request<{
       completed: boolean;
@@ -1070,6 +1131,12 @@ export const api = {
       success: boolean;
       completed: boolean;
       reconciliation: any;
+      calibration?: {
+        accounts_configured: number;
+        transactions_ingested: number;
+        recurring_configured: number;
+        needs_review_count: number;
+      };
     }>("/api/onboarding/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

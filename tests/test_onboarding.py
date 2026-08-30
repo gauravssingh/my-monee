@@ -134,3 +134,62 @@ def test_onboarding_discovery_and_completion_flow(tmp_path: Path) -> None:
     reset_resp = client.post("/api/onboarding/reset")
     assert reset_resp.status_code == 200
     assert reset_resp.json()["completed"] is False
+
+
+def test_onboarding_state_and_step_saving_flow(tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    app = create_app(settings)
+    client = TestClient(app)
+
+    # 1. State check
+    state_res = client.get("/api/onboarding/state")
+    assert state_res.status_code == 200
+    state_data = state_res.json()
+    assert "currency" in state_data
+    assert "locale" in state_data
+    assert "current_step" in state_data
+
+    # 2. Step 1 (Protect / Password)
+    step1_res = client.post("/api/onboarding/step/1", json={"payload": {"password": "testpassword123"}})
+    assert step1_res.status_code == 200
+    assert step1_res.json()["success"] is True
+
+    # 3. Step 2 (Regional settings)
+    step2_res = client.post("/api/onboarding/step/2", json={"payload": {"currency": "USD", "locale": "en-US"}})
+    assert step2_res.status_code == 200
+
+    # 4. Fast scan check
+    scan_res = client.get("/api/onboarding/fast-scan")
+    assert scan_res.status_code == 200
+    assert "institutions" in scan_res.json()
+
+    # 5. Step 5 (Configure Accounts & Relationships)
+    step5_res = client.post("/api/onboarding/step/5", json={"payload": {
+        "accounts": [
+            {
+                "name": "Chase Checking",
+                "account_type": "bank",
+                "currency": "USD",
+                "is_asset": True,
+                "is_liability": False,
+                "opening_balance": 5000,
+            },
+            {
+                "name": "Sapphire Reserve",
+                "account_type": "credit_card",
+                "currency": "USD",
+                "is_asset": False,
+                "is_liability": True,
+                "payment_account_id": "Chase Checking",
+                "auto_identify_bill_payments": True,
+            }
+        ]
+    }})
+    assert step5_res.status_code == 200
+
+    # Verify state reflects new accounts and settings
+    state_after = client.get("/api/onboarding/state").json()
+    assert state_after["currency"] == "USD"
+    assert state_after["locale"] == "en-US"
+    assert len(state_after["discovered"]["accounts"]) >= 2
+

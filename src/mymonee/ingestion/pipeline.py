@@ -156,12 +156,28 @@ def _resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | N
         if alias:
             return alias.merchant_id
 
-    # 2. Check if Merchant exists by normalized_key
-    merchant = session.scalar(select(Merchant).where(Merchant.normalized_key == norm_val).limit(1))
+    # 2. Check if an alias matches normalized name
+    alias = session.scalar(
+        select(MerchantAlias).where(
+            (MerchantAlias.alias_normalized == norm_val)
+            | (func.lower(MerchantAlias.alias_normalized) == norm_val.lower())
+        ).limit(1)
+    )
+    if alias:
+        return alias.merchant_id
+
+    # 3. Check if Merchant exists by normalized_key or display_name
+    merchant = session.scalar(
+        select(Merchant).where(
+            (Merchant.normalized_key == norm_val)
+            | (func.lower(Merchant.normalized_key) == norm_val.lower())
+            | (func.lower(Merchant.display_name) == raw_val.lower())
+        ).limit(1)
+    )
     if merchant:
         return merchant.id
 
-    # 3. Create new Merchant entity
+    # 4. Create new Merchant entity
     display_name = raw_val.upper() if len(raw_val) < 4 else raw_val.title()
     merchant = Merchant(
         display_name=display_name,
@@ -172,17 +188,25 @@ def _resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | N
     session.flush()
 
     if raw:
-        try:
-            alias = MerchantAlias(
-                merchant_id=merchant.id,
-                alias_raw=raw,
-                alias_normalized=norm_val,
-                source="ingestion",
-            )
-            session.add(alias)
-            session.flush()
-        except Exception:
-            pass
+        existing_alias = session.scalar(
+            select(MerchantAlias).where(
+                (MerchantAlias.alias_normalized == norm_val)
+                | (func.lower(MerchantAlias.alias_normalized) == norm_val.lower())
+            ).limit(1)
+        )
+        if not existing_alias:
+            try:
+                with session.begin_nested():
+                    alias = MerchantAlias(
+                        merchant_id=merchant.id,
+                        alias_raw=raw,
+                        alias_normalized=norm_val,
+                        source="ingestion",
+                    )
+                    session.add(alias)
+                    session.flush()
+            except Exception:
+                pass
 
     return merchant.id
 
@@ -651,16 +675,21 @@ def run_ingestion_pipeline(
                 extra={"parser": plugin.name, "provider": provider},
             )
         except Exception as exc:
+            session.rollback()
             result.parsing_errors += 1
-            _log_event(
-                session,
-                run.id,
-                event_type="message_error",
-                message=str(exc),
-                email_id=message_id,
-                level="error",
-            )
             logger.exception("Failed processing message %s", message_id)
+            try:
+                _log_event(
+                    session,
+                    run.id,
+                    event_type="message_error",
+                    message=str(exc),
+                    email_id=message_id,
+                    level="error",
+                )
+                session.flush()
+            except Exception:
+                logger.debug("Could not record message_error log event", exc_info=True)
             continue
 
     # Update sync watermark

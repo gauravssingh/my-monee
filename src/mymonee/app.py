@@ -45,7 +45,7 @@ from mymonee.scheduler.worker import get_scheduler
 logger = logging.getLogger(__name__)
 
 _AUTH_EXEMPT_PATHS = {"/api/health", "/health", "/health/live", "/health/ready"}
-_AUTH_EXEMPT_PREFIXES = ("/api/auth/",)
+_AUTH_EXEMPT_PREFIXES = ("/api/auth/", "/api/onboarding/")
 
 _ALLOWED_ORIGINS = [
     "http://127.0.0.1:8477",
