@@ -410,6 +410,9 @@ Run:
 ```
 Only after merging to `main`. This script verifies working tree cleanliness, synchronization with remote, compiles the frontend bundle, kickstarts the local macOS `launchd` daemon, and verifies the API health check.
 
+**Automated Continuous Deployment (CD)**:
+Pull requests merged into `main` automatically trigger local deployment via Hermes Webhook calling `./scripts/trigger_deploy.sh` (enforcing strict tree cleanliness and branch guardrails).
+
 ### Frontend Changes
 When `web/` is modified, always rebuild the bundle:
 ```bash

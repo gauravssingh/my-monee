@@ -246,6 +246,33 @@ Ideal for running 24/7 on a Mac mini or MacBook:
 
 ---
 
+### Option 3: Automated Continuous Deployment (Hermes Webhook + macOS launchd)
+
+For automated releases straight from GitHub PR merges into `main`:
+
+```text
+GitHub (PR Merged) ──► Tailscale Funnel (:443) ──► Hermes Gateway (:8644) ──► scripts/trigger_deploy.sh
+```
+
+- **Safety Guardrails**: Fast-forwards `main`, aborts on uncommitted or dirty working tree state (`git status --porcelain`).
+- **Release Steps**: Compiles React frontend (`npm run build`), kickstarts the launchd daemon, and verifies `/api/health`.
+- **Telegram Notification**: Automatically reports commit SHA and release health status to your configured Telegram chat.
+
+---
+
+## 🧠 External Brain: Hermes Agent MCP & Automation
+
+MyMonee seamlessly integrates with [Nous Research Hermes Agent](https://hermes-agent.nousresearch.com) as an external cognitive layer using the Model Context Protocol (MCP) over `stdio`:
+
+- **FastMCP Server**: Start via `mymonee mcp`.
+- **Read Capabilities**: Financial summaries, category spending, merchant history, cash flow trends, salary attribution, recurring expenses.
+- **Write Capabilities**: Interactive review of unclassified spends (`get_unclassified_spends`) and category classification (`classify_transaction`) using encrypted Fernet reversible public tokens (`txn_...`).
+- **Privacy Enforcement**: Fail-closed sanitizer scans and scrubs tokens, cards, emails, and credentials before responses exit.
+
+For full setup, Hermes configuration, and tool catalogs, see the [Hermes Integration Guide](docs/HERMES_INTEGRATION_GUIDE.md).
+
+---
+
 ## 🧪 Portability & Quality Verification
 
 * **Cross-Runtime Test Matrix**: Verified roundtrip compatibility across macOS and Linux/Docker environments.

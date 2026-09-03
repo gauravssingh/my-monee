@@ -628,3 +628,80 @@ unknown → ai → user verified → learned rule → high-confidence auto
 
 Optimize for **classification accuracy**, not AI usage volume.
 
+---
+
+## 19. External Brain & Model Context Protocol (MCP) Architecture
+
+MyMonee acts as the authoritative financial system of record, while [Nous Research Hermes Agent](https://hermes-agent.nousresearch.com) operates as the external cognitive layer over JSON-RPC 2.0 (`stdio`).
+
+```text
+┌─────────────────────────────────┐
+│          Hermes Agent           │
+│   (External Cognitive Plane)    │
+└────────────────┬────────────────┘
+                 │ stdio (JSON-RPC 2.0)
+                 ▼
+┌─────────────────────────────────┐
+│       MyMonee FastMCP Server    │
+│       (mymonee.mcp.server)      │
+│  - Privacy Filter (Fail-Closed) │
+│  - Schema Validation            │
+│  - Fernet Public Tokenization   │
+└────────────────┬────────────────┘
+                 │
+                 ▼
+┌─────────────────────────────────┐
+│     MyMonee Agent Service       │
+│     (mymonee.mcp.service)       │
+│  - Domain Invariant Checks      │
+│  - Category Slug Resolution     │
+│  - Read-Only Engine Isolation   │
+└─────────────────────────────────┘
+```
+
+### Core Invariants:
+1. **Fact Isolation**: Hermes gets structured aggregates and capability tools, not direct database access.
+2. **Read-Only SQLite Engine**: Query tools execute against SQLite with `mode=ro` and `PRAGMA query_only = ON`.
+3. **Reversible Fernet Public Tokens**: Transactions emit opaque IDs (`txn_...`) generated via encrypted HMAC-Fernet tokens. Internal database UUIDs and database structures remain unexposed.
+4. **Targeted Write Tools**: Modifying transactions (`classify_transaction`) requires public tokens and validates category/subcategory slugs against canonical taxonomy.
+5. **Fail-Closed Privacy Sanitizer**: Emitted DTOs undergo pattern scanning for PANs, JWTs, Bearer tokens, emails, and filesystem paths. Detected leaks abort with an internal error before leaving the process boundary.
+
+---
+
+## 20. Continuous Deployment & Webhook Control Plane
+
+Hermes acts as the automation and deployment supervisor for MyMonee via its native webhook platform.
+
+```text
+GitHub (PR Merged into main)
+         │
+         │ HTTPS POST /webhooks/mymonee-deploy
+         ▼
+Tailscale Funnel (Port 443 Ingress)
+         │
+         ▼
+Hermes Webhook Gateway (Port 8644)
+   ├── HMAC-SHA256 Validation (X-Hub-Signature-256)
+   └── Declarative Filters (action=closed, merged=true, base.ref=main)
+         │
+         ▼
+Hermes Agent (Restricted Toolset: terminal)
+         │
+         ▼
+scripts/trigger_deploy.sh
+   ├── Guardrail 1: Abort if not on branch 'main'
+   ├── Guardrail 2: Abort if working tree is dirty (git status --porcelain)
+   ├── Synchronize: git fetch origin main && git pull --ff-only origin main
+   ├── Compile: scripts/deploy_local.sh (npm run build in web/)
+   ├── Kickstart: launchctl kickstart -k gui/501/com.personal.my-monee
+   └── Health Check: verify http://127.0.0.1:8477/api/health
+         │
+         ▼
+Telegram Notification (Delivered to Chat ID 1117425083)
+```
+
+### Safety Principles:
+- **Zero Arbitrary Execution**: External webhook payloads are never passed to shell prompts or interpreted as commands. The agent executes a single, deterministic script.
+- **Working Tree Non-Interference**: Deployments reject dirty trees or feature branches without modifying, stashing, or overwriting developer checkouts.
+- **Direct Infrastructure**: Bypasses intermediate webhook microservices by leveraging native Hermes HMAC checking, event filtering, and Tailscale Funnel.
+

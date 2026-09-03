@@ -16,9 +16,13 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 cd web && npm install && npm run build && cd ..
 python -m mymonee          # API + UI
+mymonee mcp                # FastMCP server for Hermes Agent (stdio)
+mymonee agent unclassified # CLI review unclassified spends
 pytest                             # tests (fast unit & invariant tests)
 pytest -m hermes                   # live Hermes end-to-end evaluation
 ./scripts/qa_mcp_hermes.sh         # full MCP & Hermes integration QA suite
+./scripts/deploy_local.sh          # build frontend, restart launchd, health check
+./scripts/trigger_deploy.sh        # automated webhook CD trigger (PR merge to main)
 python .agents/skills/playwright-frontend-testing/scripts/ui_test_runner.py --all  # Playwright UI & visual tests
 ruff check src tests               # lint
 launchctl kickstart -k "gui/$(id -u)/com.personal.my-monee"  # restart launchd service
