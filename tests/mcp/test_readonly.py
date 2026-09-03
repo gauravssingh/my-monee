@@ -73,6 +73,8 @@ def test_automated_sql_statement_tracing_on_tool_execution():
             )
             for kw in MUTATION_KEYWORDS:
                 # Ensure statement does not begin with or contain mutation keywords as standalone command
-                assert not stmt.upper().startswith(kw + " "), f"Statement begins with mutation keyword {kw}: {stmt}"
+                assert not stmt.upper().startswith(kw + " "), (
+                    f"Statement begins with mutation keyword {kw}: {stmt}"
+                )
     finally:
         event.remove(engine, "before_cursor_execute", before_cursor_execute)

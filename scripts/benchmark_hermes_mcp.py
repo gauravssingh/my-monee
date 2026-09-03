@@ -48,9 +48,12 @@ def run_benchmark_case(case: dict[str, Any], verbose: bool = True) -> dict[str, 
         t0 = time.monotonic()
         cmd = [
             "hermes",
-            "-s", "mymonee",
-            "-z", query,
-            "--usage-file", str(usage_path),
+            "-s",
+            "mymonee",
+            "-z",
+            query,
+            "--usage-file",
+            str(usage_path),
         ]
         proc = subprocess.run(
             cmd,
@@ -84,7 +87,9 @@ def run_benchmark_case(case: dict[str, Any], verbose: bool = True) -> dict[str, 
         }
         if verbose:
             tag = "✓ PASS" if success else "✗ FAIL"
-            print(f"[{tag}] {name} ({res['duration_sec']}s, {res['tokens']} tokens, ${res['cost_usd']:.5f})")
+            print(
+                f"[{tag}] {name} ({res['duration_sec']}s, {res['tokens']} tokens, ${res['cost_usd']:.5f})"
+            )
             print(f"  Query:  {query}")
             print(f"  Answer: {output[:150]}...")
             print("-" * 60)
@@ -109,7 +114,7 @@ def main() -> None:
     total_cost = sum(r["cost_usd"] for r in results)
 
     print("\nSummary:")
-    print(f"  Passed: {passed}/{total} ({passed/total*100:.1f}%)")
+    print(f"  Passed: {passed}/{total} ({passed / total * 100:.1f}%)")
     print(f"  Avg Latency: {avg_duration:.2f}s")
     print(f"  Total Cost:  ${total_cost:.5f}")
     print("=" * 60)

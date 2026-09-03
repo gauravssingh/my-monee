@@ -20,7 +20,9 @@ def test_public_error_message_does_not_leak_internal_details():
         internal_detail="sqlite3.OperationalError: table /Users/gauravsingh/db.sqlite locked",
     )
     public_msg = err.to_public_message()
-    assert "Safe public description" not in public_msg  # Internal errors fail closed with generic message
+    assert (
+        "Safe public description" not in public_msg
+    )  # Internal errors fail closed with generic message
     assert "Unable to complete requested operation. [cid: test_cid_999]" == public_msg
     assert "/Users/gauravsingh" not in public_msg
     assert "sqlite3" not in public_msg

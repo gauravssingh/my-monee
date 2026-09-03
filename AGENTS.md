@@ -358,16 +358,66 @@ Never print credentials, OAuth tokens, access tokens, or sensitive transaction c
 
 ---
 
-## Git Rules
+## Git & Branching Workflow
 
-* Inspect `git status` before making significant changes.
-* Keep changes logically grouped.
-* Review the final diff before considering the task complete.
-* Do not commit automatically.
-* Do not push automatically.
-* Do not open PRs automatically.
+* Always work on short-lived feature or fix branches branched from `main`:
+  ```bash
+  git checkout -b feat/<topic>   # or fix/<topic>
+  ```
+* Do not commit directly to `main`. `main` represents the stable code running in your local daemon.
+* Use **Conventional Commits**:
+  - `feat(...)`: new capability, tool, or endpoint
+  - `fix(...)`: bug or calculation fix
+  - `test(...)`: new tests or benchmark cases
+  - `refactor(...)`: structural change without behavior modification
+  - `docs(...)`: documentation or developer memory updates
+* Inspect `git status` and review diffs before staging.
+* Do not commit or push automatically; only when the user explicitly requests or approves.
+* Open Pull Requests using `gh pr create` and merge to `main` via squash merge (`gh pr merge --squash --delete-branch`).
+* Deploy to live daemon using explicit release script: `./scripts/deploy_local.sh`.
 
-Only commit, push, or open PRs when the user explicitly asks.
+---
+
+## Quality Gates & Validation Tiers
+
+### Level 1 — Automatic Pre-Push (~4 seconds)
+Before pushing, the pre-push Git hook (`scripts/git-pre-push.sh`) automatically runs:
+- `ruff check` on modified Python files
+- `ruff format --check` on modified Python files
+- `pytest -q -m "not hermes"` (fast unit & invariant tests)
+
+Never bypass the pre-push hook (`--no-verify`) unless explicitly instructed by the user.
+
+**Legacy Formatting Rule**: Do not reformat legacy code merely to satisfy the workflow. Legacy files become compliant naturally when they are modified.
+
+### Level 2 — Feature-Level Validation
+Run:
+```bash
+./scripts/qa_mcp_hermes.sh
+```
+when changes affect:
+- MCP tools or server architecture
+- Hermes Agent integration or skills
+- Transaction classification or corrections learning
+- Ledger logic or database schema
+- Financial calculations (income, spending, transfers, refunds, salary)
+- Security or privacy boundaries (sanitizer, canaries, read-only pragma)
+
+### Level 3 — Release & Local Daemon Deployment
+Run:
+```bash
+./scripts/deploy_local.sh
+```
+Only after merging to `main`. This script verifies working tree cleanliness, synchronization with remote, compiles the frontend bundle, kickstarts the local macOS `launchd` daemon, and verifies the API health check.
+
+### Frontend Changes
+When `web/` is modified, always rebuild the bundle:
+```bash
+cd web && npm run build
+```
+
+### Completion Standard
+Do not declare a task complete while applicable quality checks are failing.
 
 ---
 

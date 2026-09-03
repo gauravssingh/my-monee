@@ -22,7 +22,9 @@ def test_server_tool_registration_matches_capabilities():
         )
         for tool in tools:
             assert tool.annotations is not None
-            assert tool.annotations.read_only_hint is True, f"{tool.name} does not declare read_only_hint=True"
+            assert tool.annotations.read_only_hint is True, (
+                f"{tool.name} does not declare read_only_hint=True"
+            )
 
     asyncio.run(_run())
 

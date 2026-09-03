@@ -34,11 +34,15 @@ CANARY_PATTERNS = [
 EMAIL_REGEX = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b")
 JWT_REGEX = re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")
 BEARER_REGEX = re.compile(r"Bearer\s+[A-Za-z0-9_\-\.]{15,}", re.IGNORECASE)
-FILE_PATH_REGEX = re.compile(r"(?:/Users/|/home/|/private/|/var/|[a-zA-Z]:\\)[^\s,;\"]+", re.IGNORECASE)
+FILE_PATH_REGEX = re.compile(
+    r"(?:/Users/|/home/|/private/|/var/|[a-zA-Z]:\\)[^\s,;\"]+", re.IGNORECASE
+)
 DB_NAME_REGEX = re.compile(r"\b\w+\.(?:sqlite|db|sqlite3|wal|shm)\b", re.IGNORECASE)
 TRACEBACK_REGEX = re.compile(r"Traceback \(most recent call last\):")
 UPI_VPA_REGEX = re.compile(r"\b[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}\b")
-BANK_REF_REGEX = re.compile(r"\b(?:UTR|Ref|Txn|IMPS|NEFT|RTGS)[:\s]*[A-Za-z0-9]{12,25}\b", re.IGNORECASE)
+BANK_REF_REGEX = re.compile(
+    r"\b(?:UTR|Ref|Txn|IMPS|NEFT|RTGS)[:\s]*[A-Za-z0-9]{12,25}\b", re.IGNORECASE
+)
 
 
 def mask_account(account: str | None) -> str | None:
@@ -70,7 +74,12 @@ def sanitize_merchant(raw: str | None, normalized: str | None) -> str:
         name = normalized.strip()
     elif raw and raw.strip():
         # Strip trailing location codes like "BLR", "MUMBAI", "NEW DELHI" if excessive
-        name = re.sub(r"\s+(?:BANGALORE|BLR|MUMBAI|DELHI|GURGAON|NOIDA)\s*$", "", raw.strip(), flags=re.IGNORECASE)
+        name = re.sub(
+            r"\s+(?:BANGALORE|BLR|MUMBAI|DELHI|GURGAON|NOIDA)\s*$",
+            "",
+            raw.strip(),
+            flags=re.IGNORECASE,
+        )
     else:
         name = "Unknown Merchant"
     # Never exceed 80 chars
@@ -112,33 +121,51 @@ def _check_string_for_leaks(value: str, field_path: str, cid: str) -> None:
     # 1. Canary checks
     for canary in CANARY_PATTERNS:
         if canary in value:
-            logger.error("Privacy canary detected: cid=%s, canary=%s, field=%s", cid, canary, field_path)
-            raise AgentServiceError(ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid)
+            logger.error(
+                "Privacy canary detected: cid=%s, canary=%s, field=%s", cid, canary, field_path
+            )
+            raise AgentServiceError(
+                ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid
+            )
 
     # 2. Pattern checks
     if EMAIL_REGEX.search(value):
         logger.error("Email pattern detected in DTO: cid=%s, field=%s", cid, field_path)
-        raise AgentServiceError(ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid)
+        raise AgentServiceError(
+            ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid
+        )
 
     if JWT_REGEX.search(value) or BEARER_REGEX.search(value):
         logger.error("Auth token pattern detected in DTO: cid=%s, field=%s", cid, field_path)
-        raise AgentServiceError(ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid)
+        raise AgentServiceError(
+            ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid
+        )
 
     if FILE_PATH_REGEX.search(value) or DB_NAME_REGEX.search(value):
-        logger.error("Filesystem/DB path pattern detected in DTO: cid=%s, field=%s", cid, field_path)
-        raise AgentServiceError(ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid)
+        logger.error(
+            "Filesystem/DB path pattern detected in DTO: cid=%s, field=%s", cid, field_path
+        )
+        raise AgentServiceError(
+            ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid
+        )
 
     if TRACEBACK_REGEX.search(value):
         logger.error("Stack trace pattern detected in DTO: cid=%s, field=%s", cid, field_path)
-        raise AgentServiceError(ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid)
+        raise AgentServiceError(
+            ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid
+        )
 
     # 3. Card number check (13 to 19 digits)
     potential_cards = re.findall(r"\b(?:\d[ -]*?){13,19}\b", value)
     for p in potential_cards:
         clean_num = re.sub(r"\D", "", p)
         if _is_luhn_valid(clean_num):
-            logger.error("Luhn-valid card number detected in DTO: cid=%s, field=%s", cid, field_path)
-            raise AgentServiceError(ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid)
+            logger.error(
+                "Luhn-valid card number detected in DTO: cid=%s, field=%s", cid, field_path
+            )
+            raise AgentServiceError(
+                ErrorCode.INTERNAL, "Unable to complete requested operation.", cid=cid
+            )
 
 
 def validate_agent_dto(dto: Any, cid: str | None = None, field_prefix: str = "root") -> None:
