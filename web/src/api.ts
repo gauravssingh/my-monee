@@ -556,6 +556,24 @@ export type CategoryTree = {
   }>;
 };
 
+export type ClassificationRuleItem = {
+  id: string;
+  name: string | null;
+  merchant_normalized: string | null;
+  merchant_entity_id: string | null;
+  upi_id: string | null;
+  category_id: string;
+  category_name: string;
+  subcategory_id: string | null;
+  subcategory_name: string | null;
+  priority: number;
+  is_active: boolean;
+  hit_count: number;
+  source: string;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type GmailMessageView = {
   id: string;
   thread_id: string | null;
@@ -865,6 +883,18 @@ export const api = {
     }),
   deleteSubcategory: (id: string) =>
     request<{ deleted: boolean }>(`/api/categories/subcategories/${id}`, { method: "DELETE" }),
+  rules: () => request<{ rules: ClassificationRuleItem[]; count: number }>("/api/rules"),
+  updateRule: (
+    id: string,
+    patch: { is_active?: boolean; priority?: number; category_id?: string; subcategory_id?: string | null }
+  ) =>
+    request<{ ok: boolean; id: string; is_active?: boolean }>(`/api/rules/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteRule: (id: string) =>
+    request<{ ok: boolean; deleted_id: string }>(`/api/rules/${id}`, { method: "DELETE" }),
   accounts: () => request<AccountsResponse>("/api/accounts"),
   createAccount: (data: Partial<Account>) =>
     request<{ id: string }>("/api/accounts", {

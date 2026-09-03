@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type Merchant } from "../api";
 import { formatMoney } from "../format";
 import MerchantDetailsModal from "../components/MerchantDetailsModal";
@@ -26,17 +26,17 @@ export default function MerchantsPage() {
   const [pageSize, setPageSize] = useState<number>(25);
   const [page, setPage] = useState<number>(1);
 
-  const fetchMerchants = () => {
+  const fetchMerchants = useCallback(() => {
     setLoading(true);
     api.getMerchants()
       .then((data) => setMerchants(data.items))
       .catch((err: Error) => showToast(err.message, "error"))
       .finally(() => setLoading(false));
-  };
+  }, [showToast]);
 
   useEffect(() => {
     fetchMerchants();
-  }, []);
+  }, [fetchMerchants]);
 
   useEffect(() => {
     setPage(1);

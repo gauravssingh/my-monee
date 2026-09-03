@@ -1,4 +1,4 @@
-import { useEffect, useState, useId, useRef } from "react";
+import { useCallback, useEffect, useState, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { api, type Account } from "../api";
 import { useToast } from "../hooks/useToast";
@@ -78,18 +78,7 @@ export function PasswordProfileModal({
     (accounts.length > 0 && selectedAccountId
       ? accounts.find((a) => a.id === selectedAccountId)
       : null) || account;
-
-  useEffect(() => {
-    if (open) {
-      const targetAcc = account || (accounts.length > 0 ? accounts[0] : null);
-      if (targetAcc) {
-        setSelectedAccountId(targetAcc.id);
-        loadProfileForAccount(targetAcc);
-      }
-    }
-  }, [open, account]);
-
-  const loadProfileForAccount = (acc: Account) => {
+  const loadProfileForAccount = useCallback((acc: Account) => {
     const isScapia = acc.name.toLowerCase().includes("scapia") || acc.name.toLowerCase().includes("federal");
     setIssuer(isScapia ? "SCAPIA" : (acc.name.split(" ")[0] || "AXIS"));
     setCardLast4(acc.card_last4 || "");
@@ -117,7 +106,17 @@ export function PasswordProfileModal({
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      const targetAcc = account || (accounts.length > 0 ? accounts[0] : null);
+      if (targetAcc) {
+        setSelectedAccountId(targetAcc.id);
+        loadProfileForAccount(targetAcc);
+      }
+    }
+  }, [open, account, accounts, loadProfileForAccount]);
 
   const handleAccountChange = (newAccId: string) => {
     setSelectedAccountId(newAccId);

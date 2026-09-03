@@ -1,17 +1,18 @@
-import { Component, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
+import { Component, lazy, Suspense, useEffect, useState, type ErrorInfo, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
-import DataIssuesPage from "./pages/DataIssuesPage";
-import OverviewPage from "./pages/OverviewPage";
-import SettingsPage from "./pages/SettingsPage";
-import TransactionsPage from "./pages/TransactionsPage";
-import MerchantsPage from "./pages/MerchantsPage";
-import RecurringPage from "./pages/RecurringPage";
-import AccountsPage from "./pages/AccountsPage";
-import CategoryAnalyticsPage from "./pages/CategoryAnalyticsPage";
-import CreditCardStatementsPage from "./pages/CreditCardStatementsPage";
-import OnboardingPage from "./pages/OnboardingPage";
 import LockScreen from "./components/LockScreen";
 import { api } from "./api";
+
+const OverviewPage = lazy(() => import("./pages/OverviewPage"));
+const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
+const CategoryAnalyticsPage = lazy(() => import("./pages/CategoryAnalyticsPage"));
+const RecurringPage = lazy(() => import("./pages/RecurringPage"));
+const MerchantsPage = lazy(() => import("./pages/MerchantsPage"));
+const DataIssuesPage = lazy(() => import("./pages/DataIssuesPage"));
+const AccountsPage = lazy(() => import("./pages/AccountsPage"));
+const CreditCardStatementsPage = lazy(() => import("./pages/CreditCardStatementsPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const OnboardingPage = lazy(() => import("./pages/OnboardingPage"));
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -285,23 +286,25 @@ export default function App() {
       )}
 
       <ErrorBoundary>
-        <Routes>
-          <Route path="/" element={<OverviewPage />} />
-          <Route path="/categories" element={<CategoryAnalyticsPage />} />
-          <Route path="/analytics/category/:categoryId?" element={<CategoryAnalyticsPage />} />
-          <Route path="/analytics" element={<Navigate to="/categories" replace />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
-          <Route path="/recurring" element={<RecurringPage />} />
-          <Route path="/merchants" element={<MerchantsPage />} />
-          <Route path="/review" element={<TransactionsPage needsReview />} />
-          <Route path="/data-issues" element={<DataIssuesPage />} />
-          <Route path="/issues" element={<Navigate to="/data-issues" replace />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/accounts" element={<AccountsPage />} />
-          <Route path="/statements" element={<CreditCardStatementsPage />} />
-          <Route path="/system" element={<Navigate to="/settings" replace />} />
-        </Routes>
+        <Suspense fallback={<div style={{ padding: "48px 24px", textAlign: "center", color: "var(--ink-muted)", fontSize: "0.9rem" }}>Loading view…</div>}>
+          <Routes>
+            <Route path="/" element={<OverviewPage />} />
+            <Route path="/categories" element={<CategoryAnalyticsPage />} />
+            <Route path="/analytics/category/:categoryId?" element={<CategoryAnalyticsPage />} />
+            <Route path="/analytics" element={<Navigate to="/categories" replace />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/recurring" element={<RecurringPage />} />
+            <Route path="/merchants" element={<MerchantsPage />} />
+            <Route path="/review" element={<TransactionsPage needsReview />} />
+            <Route path="/data-issues" element={<DataIssuesPage />} />
+            <Route path="/issues" element={<Navigate to="/data-issues" replace />} />
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/statements" element={<CreditCardStatementsPage />} />
+            <Route path="/system" element={<Navigate to="/settings" replace />} />
+          </Routes>
+        </Suspense>
       </ErrorBoundary>
     </div>
   );

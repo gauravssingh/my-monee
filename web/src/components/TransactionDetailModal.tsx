@@ -40,7 +40,7 @@ export default function TransactionDetailModal({
     api.getTransactionLinks(transaction.id)
       .then((data) => setLinks(data.links || []))
       .catch(() => setLinks([]));
-  }, [open, transaction?.id]);
+  }, [open, transaction]);
 
   if (!open || !transaction) return null;
 

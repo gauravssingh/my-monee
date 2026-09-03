@@ -377,7 +377,7 @@ The agent has full user authorization in this workspace to run:
 * **Python Runtime & Tests**: `.venv/bin/python`, `source .venv/bin/activate`, `pytest`.
 * **SQLite Operations**: `sqlite3`, `./scripts/db.sh`, `scripts/*.py`.
 * **Frontend Builds**: `npm run build`, `npm test` in `web/`.
-* **Daemon Management**: `launchctl kickstart -k "gui/$(id -u)/com.personal.expense-tracker"`.
+* **Daemon Management**: `launchctl kickstart -k "gui/$(id -u)/com.personal.my-monee"`.
 * **Git Operations**: `git status`, `git diff`, `git log`, and explicitly requested commits.
 
 ---

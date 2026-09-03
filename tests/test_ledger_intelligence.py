@@ -164,7 +164,7 @@ def test_refund_pairing_engine(tmp_path: Path) -> None:
         link = paired[0]
         assert link.from_transaction_id == ref_id
         assert link.to_transaction_id == orig_id
-        assert link.kind == "refund_of"
+        assert link.kind == "refund"
 
         # Verify refund properties
         ref_tx = session.get(Transaction, ref_id)
@@ -176,7 +176,7 @@ def test_refund_pairing_engine(tmp_path: Path) -> None:
     assert resp.status_code == 200
     links_data = resp.json()["links"]
     assert len(links_data) == 1
-    assert links_data[0]["kind"] == "refund_of"
+    assert links_data[0]["kind"] == "refund"
     assert links_data[0]["related_transaction"]["id"] == orig_id
 
 

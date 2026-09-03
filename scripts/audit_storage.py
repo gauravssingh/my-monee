@@ -8,8 +8,7 @@ from playwright.sync_api import sync_playwright
 SCREENSHOT_DIR = Path("/Users/gauravsingh/.gemini/antigravity-cli/brain/c50d7540-0f2c-465d-9ad7-dbd3a6a78129/screenshots/storage")
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Generate auth token
-sys.path.insert(0, "/Users/gauravsingh/projects/expense-tracker/src")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from mymonee.config import load_settings
 from mymonee.db.session import get_session_factory
 from mymonee.services.auth import _get_or_create_secret, create_session_token

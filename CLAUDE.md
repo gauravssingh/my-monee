@@ -19,7 +19,7 @@ python -m mymonee          # API + UI
 pytest                             # tests
 python .agents/skills/playwright-frontend-testing/scripts/ui_test_runner.py --all  # Playwright UI & visual tests
 ruff check src tests               # lint
-launchctl kickstart -k "gui/$(id -u)/com.personal.expense-tracker"  # restart launchd service
+launchctl kickstart -k "gui/$(id -u)/com.personal.my-monee"  # restart launchd service
 ```
 
 Dev frontend (HMR): `scripts/run_dev.sh` or Vite against the API.
@@ -104,7 +104,7 @@ Data lives under `~/Library/Application Support/ExpenseTracker/` (DB, logs, cred
 - Re-parse Axis credits: `python -m mymonee.reclassify_axis` (force_reparse)
 - Amounts like `INR .52` are valid — parsers must allow leading decimal
 - `UPILITE` is a real Axis channel token (include in patterns)
-- Do not commit credentials, Keychain material, `config.local.yaml`, SQLite data, or `scripts/launchd/com.personal.expense-tracker.plist`; use `config/local.example.yaml` and the launchd `.example` as templates
+- Do not commit credentials, Keychain material, `config.local.yaml`, SQLite data, or `scripts/launchd/com.personal.my-monee.plist`; use `config/local.example.yaml` and the launchd `.example` as templates
 - Sandbox may hit `readonly database` on the real SQLite path — use full permissions for DB writes
 
 ## Key files

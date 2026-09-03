@@ -4,6 +4,7 @@ import { api, type GmailStatus, type SystemStatus } from "../api";
 import { useToast } from "../hooks/useToast";
 import AISettings from "../components/settings/AISettings";
 import CategorySettings from "../components/settings/CategorySettings";
+import ClassificationRulesSettings from "../components/settings/ClassificationRulesSettings";
 import DataStorageSettings from "../components/settings/DataStorageSettings";
 import GeneralSettings from "../components/settings/GeneralSettings";
 import GmailSettings from "../components/settings/GmailSettings";
@@ -93,6 +94,7 @@ export default function SettingsPage() {
           />
         )}
         {activeTab === "categories" && <CategorySettings />}
+        {activeTab === "rules" && <ClassificationRulesSettings />}
         {activeTab === "ai" && <AISettings status={status} />}
         {activeTab === "data" && <DataStorageSettings status={status} onShowToast={showToast} />}
         {activeTab === "system" && <SystemSettings status={status} />}

@@ -78,7 +78,7 @@ def test_demo_ingestion_idempotent(tmp_path: Path) -> None:
     assert second.json()["transactions_extracted"] == 0
     assert second.json()["transactions_duplicated"] >= 3
 
-    overview = client.get("/api/overview").json()
+    overview = client.get("/api/overview?year=2026&month=8").json()
     assert overview["transaction_count"] >= 3
     assert overview["needs_review_count"] >= 3
 

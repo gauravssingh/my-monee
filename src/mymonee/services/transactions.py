@@ -24,6 +24,7 @@ from mymonee.db.models import (
 logger = logging.getLogger(__name__)
 from mymonee.domain.enums import DataIssueStatus, EmailParseStatus, TransactionType
 from mymonee.ingestion.gmail.links import gmail_web_url
+from mymonee.services.ledger import sync_transaction_postings
 
 
 def _as_float(value: Any) -> float | None:
@@ -376,6 +377,7 @@ def classify_transaction(
 
     tx.classification_signals = signals
     _apply_category_side_effects(tx, category, subcategory)
+    sync_transaction_postings(session, tx)
     tx.updated_at = utcnow()
     
     from mymonee.services.ai import track_user_classification_feedback
@@ -412,6 +414,7 @@ def classify_transaction(
                 ptx_signals.update(signals)
                 ptx.classification_signals = ptx_signals
                 _apply_category_side_effects(ptx, category, subcategory)
+                sync_transaction_postings(session, ptx)
                 ptx.updated_at = utcnow()
             logger.info("Backfilled %d historical transactions for merchant %s", len(past_txs), merchant_name)
 
@@ -510,6 +513,7 @@ def exclude_as_non_transaction(session: Session, transaction_id: str) -> Transac
     extra = dict(tx.extra_json or {})
     extra["not_a_transaction"] = True
     tx.extra_json = extra
+    sync_transaction_postings(session, tx)
     tx.updated_at = utcnow()
 
     if tx.source_email_id:

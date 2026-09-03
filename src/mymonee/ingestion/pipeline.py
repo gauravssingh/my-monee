@@ -554,128 +554,130 @@ def run_ingestion_pipeline(
 
     for message_id in message_ids:
         try:
-            existing = session.get(Email, message_id)
-            if (
-                existing
-                and existing.parse_status in {EmailParseStatus.PARSED, EmailParseStatus.SKIPPED}
-                and not force_reparse
-            ):
-                result.emails_skipped += 1
-                if existing.parse_status == EmailParseStatus.PARSED:
-                    tx_count = session.scalar(
-                        select(func.count()).select_from(Transaction).where(Transaction.source_email_id == existing.id)
-                    ) or 1
-                    result.transactions_duplicated += tx_count
-                logger.debug("Skipped already processed message %s", message_id)
-                continue
+            with session.begin_nested():
+                existing = session.get(Email, message_id)
+                if (
+                    existing
+                    and existing.parse_status in {EmailParseStatus.PARSED, EmailParseStatus.SKIPPED}
+                    and not force_reparse
+                ):
+                    result.emails_skipped += 1
+                    if existing.parse_status == EmailParseStatus.PARSED:
+                        tx_count = session.scalar(
+                            select(func.count()).select_from(Transaction).where(Transaction.source_email_id == existing.id)
+                        ) or 1
+                        result.transactions_duplicated += tx_count
+                    logger.debug("Skipped already processed message %s", message_id)
+                    continue
 
-            message = source.get_message(message_id)
-            if message.internal_date_ms is not None:
-                newest_internal = max(newest_internal or 0, message.internal_date_ms)
+                message = source.get_message(message_id)
+                if message.internal_date_ms is not None:
+                    newest_internal = max(newest_internal or 0, message.internal_date_ms)
 
-            is_financial, reason = rules.is_financial_candidate(message)
-            provider, provider_score = rules.detect_provider(message)
+                is_financial, reason = rules.is_financial_candidate(message)
+                provider, provider_score = rules.detect_provider(message)
 
-            if not is_financial:
+                if not is_financial:
+                    _upsert_email(
+                        session,
+                        message,
+                        provider_hint=provider,
+                        parse_status=EmailParseStatus.SKIPPED,
+                        parse_error=reason,
+                    )
+                    result.emails_processed += 1
+                    result.emails_skipped += 1
+                    logger.debug("Message %s skipped: not a financial candidate (%s)", message_id, reason)
+                    continue
+
+                ctx = _to_email_context(message)
+                plugin, score = registry.choose(ctx)
+                if plugin is None:
+                    _upsert_email(
+                        session,
+                        message,
+                        provider_hint=provider,
+                        parse_status=EmailParseStatus.SKIPPED,
+                        parse_error="no_parser",
+                    )
+                    result.emails_processed += 1
+                    result.transactions_rejected += 1
+                    logger.warning("No parser matched message %s (provider: %s, score: %.2f)", message_id, provider, provider_score)
+                    _log_event(
+                        session,
+                        run.id,
+                        event_type="no_parser",
+                        message=f"No parser for message {message_id}",
+                        email_id=message_id,
+                        level="warning",
+                        extra={"provider": provider, "provider_score": provider_score},
+                    )
+                    continue
+
+                try:
+                    parsed_list = plugin.parse(ctx)
+                except Exception as exc:
+                    result.parsing_errors += 1
+                    _upsert_email(
+                        session,
+                        message,
+                        provider_hint=provider,
+                        parse_status=EmailParseStatus.ERROR,
+                        parse_error=str(exc),
+                    )
+                    result.emails_processed += 1
+                    logger.warning("Parse error on message %s via %s: %s", message_id, plugin.name, exc)
+                    _log_event(
+                        session,
+                        run.id,
+                        event_type="parse_error",
+                        message=str(exc),
+                        email_id=message_id,
+                        level="error",
+                    )
+                    continue
+
+                if not parsed_list:
+                    _upsert_email(
+                        session,
+                        message,
+                        provider_hint=provider,
+                        parse_status=EmailParseStatus.SKIPPED,
+                        parse_error="parser_empty",
+                    )
+                    result.emails_processed += 1
+                    result.transactions_rejected += 1
+                    logger.debug("Parser %s returned 0 transactions for message %s", plugin.name, message_id)
+                    continue
+
                 _upsert_email(
                     session,
                     message,
                     provider_hint=provider,
-                    parse_status=EmailParseStatus.SKIPPED,
-                    parse_error=reason,
+                    parse_status=EmailParseStatus.PARSED,
                 )
+                for parsed in parsed_list:
+                    _persist_parsed(
+                        session,
+                        message=message,
+                        parsed=parsed,
+                        provider_hint=provider,
+                        result=result,
+                        force_update=force_reparse,
+                    )
                 result.emails_processed += 1
-                result.emails_skipped += 1
-                logger.debug("Message %s skipped: not a financial candidate (%s)", message_id, reason)
-                continue
-
-            ctx = _to_email_context(message)
-            plugin, score = registry.choose(ctx)
-            if plugin is None:
-                _upsert_email(
-                    session,
-                    message,
-                    provider_hint=provider,
-                    parse_status=EmailParseStatus.SKIPPED,
-                    parse_error="no_parser",
-                )
-                result.emails_processed += 1
-                result.transactions_rejected += 1
-                logger.warning("No parser matched message %s (provider: %s, score: %.2f)", message_id, provider, provider_score)
+                logger.debug("Parsed message %s into %d tx via %s (score=%.2f)", message_id, len(parsed_list), plugin.name, score)
                 _log_event(
                     session,
                     run.id,
-                    event_type="no_parser",
-                    message=f"No parser for message {message_id}",
+                    event_type="parsed",
+                    message=f"Parsed {len(parsed_list)} tx via {plugin.name} (score={score:.2f})",
                     email_id=message_id,
-                    level="warning",
-                    extra={"provider": provider, "provider_score": provider_score},
+                    extra={"parser": plugin.name, "provider": provider},
                 )
-                continue
-
-            try:
-                parsed_list = plugin.parse(ctx)
-            except Exception as exc:
-                result.parsing_errors += 1
-                _upsert_email(
-                    session,
-                    message,
-                    provider_hint=provider,
-                    parse_status=EmailParseStatus.ERROR,
-                    parse_error=str(exc),
-                )
-                result.emails_processed += 1
-                logger.warning("Parse error on message %s via %s: %s", message_id, plugin.name, exc)
-                _log_event(
-                    session,
-                    run.id,
-                    event_type="parse_error",
-                    message=str(exc),
-                    email_id=message_id,
-                    level="error",
-                )
-                continue
-
-            if not parsed_list:
-                _upsert_email(
-                    session,
-                    message,
-                    provider_hint=provider,
-                    parse_status=EmailParseStatus.SKIPPED,
-                    parse_error="parser_empty",
-                )
-                result.emails_processed += 1
-                result.transactions_rejected += 1
-                logger.debug("Parser %s returned 0 transactions for message %s", plugin.name, message_id)
-                continue
-
-            _upsert_email(
-                session,
-                message,
-                provider_hint=provider,
-                parse_status=EmailParseStatus.PARSED,
-            )
-            for parsed in parsed_list:
-                _persist_parsed(
-                    session,
-                    message=message,
-                    parsed=parsed,
-                    provider_hint=provider,
-                    result=result,
-                    force_update=force_reparse,
-                )
-            result.emails_processed += 1
-            logger.debug("Parsed message %s into %d tx via %s (score=%.2f)", message_id, len(parsed_list), plugin.name, score)
-            _log_event(
-                session,
-                run.id,
-                event_type="parsed",
-                message=f"Parsed {len(parsed_list)} tx via {plugin.name} (score={score:.2f})",
-                email_id=message_id,
-                extra={"parser": plugin.name, "provider": provider},
-            )
         except Exception as exc:
-            session.rollback()
+            # session.begin_nested() has rolled back only this message's savepoint.
+            # Outer session and previously flushed messages remain intact.
             result.parsing_errors += 1
             logger.exception("Failed processing message %s", message_id)
             try:

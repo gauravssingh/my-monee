@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 
-export type SettingsTabId = "general" | "gmail" | "categories" | "ai" | "data" | "system";
+export type SettingsTabId = "general" | "gmail" | "categories" | "rules" | "ai" | "data" | "system";
 
 interface SettingsNavProps {
   activeTab: SettingsTabId;
@@ -42,6 +42,17 @@ export const TABS: TabItem[] = [
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
         <path d="M2 17l10 5 10-5" />
         <path d="M2 12l10 5 10-5" />
+      </svg>
+    ),
+  },
+  {
+    id: "rules",
+    label: "Rules",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+        <path d="M8 7h8" />
+        <path d="M8 11h8" />
       </svg>
     ),
   },

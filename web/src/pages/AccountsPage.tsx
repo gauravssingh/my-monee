@@ -1,4 +1,4 @@
-import { useEffect, useState, useId, useRef } from "react";
+import { useCallback, useEffect, useState, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { api, type Account, type CreditCardStatement } from "../api";
@@ -517,7 +517,7 @@ function CreditCardAccountItem({
     return stmtSortDir === "asc" ? cmp : -cmp;
   });
 
-  const loadStatements = async () => {
+  const loadStatements = useCallback(async () => {
     setLoadingStatements(true);
     try {
       const res = await api.accountStatements(account.id);
@@ -527,13 +527,13 @@ function CreditCardAccountItem({
     } finally {
       setLoadingStatements(false);
     }
-  };
+  }, [account.id]);
 
   useEffect(() => {
     if (expanded && activeTab === "statements") {
       loadStatements();
     }
-  }, [expanded, activeTab]);
+  }, [expanded, activeTab, loadStatements]);
 
   const maskedCard = account.card_last4
     ? `•••• ${account.card_last4}`
@@ -969,7 +969,7 @@ export default function AccountsPage() {
 
   const { showToast } = useToast();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [accRes, sysRes] = await Promise.all([
@@ -985,11 +985,11 @@ export default function AccountsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleSave = async (data: Partial<Account>) => {
     try {

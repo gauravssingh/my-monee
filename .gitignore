@@ -38,3 +38,4 @@ config/*.local.yaml
 
 # Per-machine macOS service definition; commit the .example template instead
 scripts/launchd/com.personal.expense-tracker.plist
+scripts/launchd/com.personal.my-monee.plist

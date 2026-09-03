@@ -49,6 +49,7 @@ class LinkKind(StrEnum):
     EMI_COMPONENT = "emi_component"
     TRANSFER = "transfer"
     CC_PAYMENT = "cc_payment"
+    REIMBURSEMENT = "reimbursement"
 
 
 class IngestionRunStatus(StrEnum):

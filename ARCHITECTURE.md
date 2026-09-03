@@ -182,7 +182,7 @@ expense-tracker/
 │   ├── run_dev.sh
 │   ├── run_server.sh
 │   └── launchd/
-│       └── com.personal.expense-tracker.plist.example
+│       └── com.personal.my-monee.plist.example
 ├── tests/
 └── data/                         # Dev-only local data (gitignored)
 ```

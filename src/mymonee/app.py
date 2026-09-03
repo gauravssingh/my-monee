@@ -29,6 +29,7 @@ from mymonee.api.routes import (
     onboarding,
     overview,
     recurring,
+    rules,
     statements,
     system,
     transactions,
@@ -37,7 +38,7 @@ from mymonee.config import Settings, get_settings
 from mymonee.db.session import get_session_factory, init_db
 from mymonee.logging_setup import setup_logging
 from mymonee.parsers.bootstrap import bootstrap_parsers
-from mymonee.services.auth import is_auth_configured, verify_session_token
+from mymonee.services.auth import invalidate_auth_cache, is_auth_configured, verify_session_token
 
 from contextlib import asynccontextmanager
 from mymonee.scheduler.worker import get_scheduler
@@ -96,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    invalidate_auth_cache()
 
     @app.middleware("http")
     async def enforce_auth(request: Request, call_next):
@@ -103,20 +105,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if path.startswith("/api/") and path not in _AUTH_EXEMPT_PATHS and not path.startswith(
             _AUTH_EXEMPT_PREFIXES
         ):
-            db_session = get_session_factory()()
-            try:
-                if is_auth_configured(db_session):
-                    token = request.cookies.get(auth.COOKIE_NAME)
-                    if not token:
-                        authorization = request.headers.get("authorization")
-                        if authorization and authorization.startswith("Bearer "):
-                            token = authorization.removeprefix("Bearer ").strip()
-                    if not verify_session_token(db_session, token):
-                        return JSONResponse(
-                            status_code=401, content={"detail": "Authentication required"}
-                        )
-            finally:
-                db_session.close()
+            if is_auth_configured():
+                token = request.cookies.get(auth.COOKIE_NAME)
+                if not token:
+                    authorization = request.headers.get("authorization")
+                    if authorization and authorization.startswith("Bearer "):
+                        token = authorization.removeprefix("Bearer ").strip()
+                if not verify_session_token(None, token):
+                    return JSONResponse(
+                        status_code=401, content={"detail": "Authentication required"}
+                    )
         return await call_next(request)
 
     # Registered after enforce_auth so it wraps outermost — CORS preflight
@@ -136,6 +134,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(system.router)
     app.include_router(gmail.router)
     app.include_router(categories.router)
+    app.include_router(rules.router)
     app.include_router(data_issues.router)
     app.include_router(accounts.router)
     app.include_router(merchants.router)

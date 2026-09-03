@@ -146,7 +146,8 @@ class Budget(Base):
 import sys
 
 def main():
-    target_file = "/Users/gauravsingh/projects/expense-tracker/src/mymonee/db/models.py"
+    from pathlib import Path
+    target_file = Path(__file__).resolve().parents[1] / "src/mymonee/db/models.py"
     with open(target_file, "r") as f:
         content = f.read()
 

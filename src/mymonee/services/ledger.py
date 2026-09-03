@@ -8,7 +8,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mymonee.db.models import Account, Posting
+from mymonee.db.models import Account, Posting, Transaction
 
 
 @dataclass(frozen=True)
@@ -137,3 +137,59 @@ def verify_event_double_entry(session: Session, event_id: str) -> tuple[bool, De
 
     is_balanced = sum_debits == sum_credits
     return is_balanced, sum_debits, sum_credits
+
+
+def sync_transaction_postings(session: Session, tx: Transaction) -> None:
+    """Synchronize double-entry Postings for a transaction's FinancialEvent.
+
+    1. If tx has no financial_event_id, no-op.
+    2. Query existing category posting:
+       select(Posting).where(Posting.event_id == tx.financial_event_id, Posting.category_id.is_not(None))
+    3. If tx.category_id is set and tx.transaction_type != "not_a_transaction":
+       - If category posting exists: update category_id, amount, direction, and posting_type in-place.
+       - If no category posting exists: insert balancing Posting.
+    4. If tx.category_id is None or tx.transaction_type == "not_a_transaction":
+       - If category posting exists: delete it so stale/excluded postings do not corrupt the double-entry ledger.
+    5. Also ensure account posting (Posting.account_id.is_not(None)) amount stays synchronized with tx.amount.
+    """
+    if not tx.financial_event_id:
+        return
+
+    cat_posting = session.scalar(
+        select(Posting).where(
+            Posting.event_id == tx.financial_event_id,
+            Posting.category_id.is_not(None),
+        )
+    )
+
+    if tx.category_id and tx.transaction_type != "not_a_transaction":
+        cat_dir = "credit" if tx.direction == "debit" else "debit"
+        cat_type = "expense" if tx.direction == "debit" else ("transfer" if tx.transaction_type == "transfer" else "income")
+        if cat_posting:
+            cat_posting.category_id = tx.category_id
+            cat_posting.amount = tx.amount
+            cat_posting.direction = cat_dir
+            cat_posting.posting_type = cat_type
+        else:
+            session.add(
+                Posting(
+                    event_id=tx.financial_event_id,
+                    category_id=tx.category_id,
+                    amount=tx.amount,
+                    direction=cat_dir,
+                    posting_type=cat_type,
+                )
+            )
+    elif cat_posting:
+        session.delete(cat_posting)
+
+    # Keep account posting amount in sync
+    acc_posting = session.scalar(
+        select(Posting).where(
+            Posting.event_id == tx.financial_event_id,
+            Posting.account_id.is_not(None),
+        )
+    )
+    if acc_posting:
+        acc_posting.amount = tx.amount
+        acc_posting.direction = tx.direction

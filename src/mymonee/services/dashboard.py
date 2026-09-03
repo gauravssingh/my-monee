@@ -118,6 +118,7 @@ def _income_candidates_around(session: Session, year: int, month: int) -> list[T
     return list(
         session.scalars(
             select(Transaction)
+            .options(joinedload(Transaction.subcategory))
             .where(Transaction.transaction_date >= start)
             .where(Transaction.transaction_date <= end)
             .where(Transaction.is_duplicate.is_(False))

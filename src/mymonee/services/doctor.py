@@ -55,9 +55,14 @@ def get_operational_status(settings: Settings | None = None) -> dict[str, Any]:
     archives = list_archives(settings)
     latest_archive = archives[0] if archives else None
 
-    # Check gmail token
-    gmail_token_file = settings.resolved_data_dir() / "gmail_token.json"
-    gmail_connected = gmail_token_file.exists()
+    # Check gmail credentials (keychain + fallback file)
+    gmail_connected = False
+    try:
+        from mymonee.ingestion.gmail.oauth import load_credentials
+        gmail_connected = load_credentials(settings) is not None
+    except Exception as e:
+        logger.debug("Error checking gmail credentials: %s", e)
+        gmail_connected = (settings.resolved_data_dir() / "gmail_token.json").exists()
 
     return {
         "app_version": APP_VERSION,
@@ -189,8 +194,21 @@ def run_diagnostics(settings: Settings | None = None) -> dict[str, Any]:
     })
 
     # 4. Gmail Integration Checks
-    gmail_token = data_dir / "gmail_token.json"
-    if gmail_token.exists():
+    creds = None
+    try:
+        from mymonee.ingestion.gmail.oauth import load_credentials
+        creds = load_credentials(settings)
+    except Exception as e:
+        logger.debug("Error checking gmail credentials in diagnostics: %s", e)
+
+    if creds is not None:
+        checks.append({
+            "category": "Gmail",
+            "name": "OAuth Token",
+            "status": "PASS",
+            "detail": "OAuth credentials present (macOS Keychain / token)",
+        })
+    elif (data_dir / "gmail_token.json").exists():
         checks.append({
             "category": "Gmail",
             "name": "OAuth Token",

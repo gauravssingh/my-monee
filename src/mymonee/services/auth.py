@@ -15,6 +15,19 @@ from mymonee.db.models import AppSetting, utcnow
 
 ITERATIONS = 100_000
 TOKEN_MAX_AGE_SECONDS = 30 * 24 * 60 * 60  # 30 days
+_AUTH_CACHE_TTL_SECONDS = 60.0
+
+_cached_auth_configured: bool | None = None
+_cached_secret_key: str | None = None
+_cache_timestamp: float = 0.0
+
+
+def invalidate_auth_cache() -> None:
+    """Clear in-memory auth cache so subsequent checks reload from database."""
+    global _cached_auth_configured, _cached_secret_key, _cache_timestamp
+    _cached_auth_configured = None
+    _cached_secret_key = None
+    _cache_timestamp = 0.0
 
 
 def _get_setting(session: Session, key: str) -> Any | None:
@@ -41,9 +54,25 @@ def _get_or_create_secret(session: Session) -> str:
     return secret
 
 
-def is_auth_configured(session: Session) -> bool:
+def is_auth_configured(session: Session | None = None) -> bool:
+    """Check if a master PIN has been configured. Uses in-memory cache if fresh."""
+    global _cached_auth_configured, _cached_secret_key, _cache_timestamp
+    now = time.time()
+    if _cached_auth_configured is not None and (now - _cache_timestamp) < _AUTH_CACHE_TTL_SECONDS:
+        return _cached_auth_configured
+
+    if session is None:
+        from mymonee.db.session import get_session_factory
+        with get_session_factory()() as db_session:
+            return is_auth_configured(db_session)
+
     pin_hash = _get_setting(session, "auth_pin_hash")
-    return bool(pin_hash)
+    is_conf = bool(pin_hash)
+    _cached_auth_configured = is_conf
+    if is_conf and _cached_secret_key is None:
+        _cached_secret_key = _get_or_create_secret(session)
+    _cache_timestamp = now
+    return is_conf
 
 
 def set_master_pin(session: Session, pin: str) -> str:
@@ -58,6 +87,12 @@ def set_master_pin(session: Session, pin: str) -> str:
     _set_setting(session, "auth_salt", salt.hex())
 
     secret = _get_or_create_secret(session)
+
+    global _cached_auth_configured, _cached_secret_key, _cache_timestamp
+    _cached_auth_configured = True
+    _cached_secret_key = secret
+    _cache_timestamp = time.time()
+
     return create_session_token(secret)
 
 
@@ -100,7 +135,7 @@ def create_session_token(secret_key: str) -> str:
     return f"{payload}:{sig}"
 
 
-def verify_session_token(session: Session, token: str | None) -> bool:
+def verify_session_token(session: Session | None = None, token: str | None = None) -> bool:
     if not token or ":" not in token:
         return False
 
@@ -114,7 +149,18 @@ def verify_session_token(session: Session, token: str | None) -> bool:
         if now - ts > TOKEN_MAX_AGE_SECONDS or ts > now + 300:
             return False
 
-        secret = _get_or_create_secret(session)
+        global _cached_secret_key, _cache_timestamp
+        secret = _cached_secret_key
+        if secret is None:
+            if session is None:
+                from mymonee.db.session import get_session_factory
+                with get_session_factory()() as db_session:
+                    secret = _get_or_create_secret(db_session)
+            else:
+                secret = _get_or_create_secret(session)
+            _cached_secret_key = secret
+            _cache_timestamp = now
+
         payload = f"session:{ts}"
         expected_sig = hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
         return hmac.compare_digest(parts[2], expected_sig)

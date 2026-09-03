@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, type Account, type CreditCardStatement } from "../api";
 import { useToast } from "../hooks/useToast";
 import { StatementDetailModal } from "../components/StatementDetailModal";
@@ -79,7 +79,7 @@ export default function CreditCardStatementsPage() {
 
   const { showToast } = useToast();
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [stmtsRes, accsRes] = await Promise.all([
@@ -93,11 +93,11 @@ export default function CreditCardStatementsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleSort = (field: "account" | "period" | "date" | "received") => {
     if (sortField === field) {

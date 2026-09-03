@@ -153,6 +153,10 @@ class Settings(BaseSettings):
         return path
 
     def database_path(self) -> Path:
+        env_override = os.getenv("MYMONEE_DB_PATH") or os.getenv("EXPENSE_TRACKER_DB_PATH")
+        if env_override:
+            return Path(env_override).expanduser()
+
         data_dir = self.resolved_data_dir()
         configured = data_dir / self.database.filename
         legacy = data_dir / "expense_tracker.db"

@@ -14,7 +14,7 @@ from mymonee.db.models import (
     TransactionLink,
     utcnow,
 )
-from mymonee.domain.enums import TransactionType
+from mymonee.domain.enums import LinkKind, TransactionType
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def pair_refunds(
     """
     # Fetch existing refund links to avoid duplicates
     existing_links = session.scalars(
-        select(TransactionLink).where(TransactionLink.kind == "refund_of")
+        select(TransactionLink).where(TransactionLink.kind.in_([LinkKind.REFUND.value, "refund_of"]))
     ).all()
     paired_refund_ids = {link.from_transaction_id for link in existing_links}
 
@@ -97,7 +97,7 @@ def pair_refunds(
             link = TransactionLink(
                 from_transaction_id=ref.id,
                 to_transaction_id=best_match.id,
-                kind="refund_of",
+                kind=LinkKind.REFUND.value,
                 confidence=1.0 if abs(float(best_match.amount) - ref_amt) < 0.05 else 0.85,
                 notes=f"Paired refund of ₹{ref_amt:,.2f} with original purchase ₹{float(best_match.amount):,.2f} on {best_match.transaction_date.strftime('%Y-%m-%d')}",
             )
@@ -130,7 +130,7 @@ def pair_cross_account_transfers(
     neither double-counts as an expense.
     """
     existing_links = session.scalars(
-        select(TransactionLink).where(TransactionLink.kind == "transfer_to")
+        select(TransactionLink).where(TransactionLink.kind.in_([LinkKind.TRANSFER.value, "transfer_to"]))
     ).all()
     paired_tx_ids = {link.from_transaction_id for link in existing_links} | {
         link.to_transaction_id for link in existing_links
@@ -187,7 +187,7 @@ def pair_cross_account_transfers(
             link = TransactionLink(
                 from_transaction_id=deb.id,
                 to_transaction_id=best_credit.id,
-                kind="transfer_to",
+                kind=LinkKind.TRANSFER.value,
                 confidence=0.95,
                 notes=f"Matched transfer of ₹{deb_amt:,.2f} between bank debit and credit receipt",
             )
