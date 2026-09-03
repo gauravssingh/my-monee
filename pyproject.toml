@@ -26,6 +26,7 @@ dependencies = [
   "pypdf>=5.0.0",
   "pymupdf>=1.24.0",
   "python-multipart>=0.0.18",
+  "mcp>=1.2.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -49,3 +50,7 @@ target-version = "py312"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "hermes: Live end-to-end integration tests using Hermes Agent CLI and MCP",
+]
+addopts = "-m 'not hermes'"
