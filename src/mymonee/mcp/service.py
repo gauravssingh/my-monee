@@ -40,6 +40,7 @@ from mymonee.mcp.models import (
     CategorySpendingResponse,
     CategorySummaryItem,
     CategoryTaxonomyItem,
+    ClassifyTransactionResult,
     FinancialSummary,
     IncomeResponse,
     IncomeSummaryItem,
@@ -52,6 +53,9 @@ from mymonee.mcp.models import (
     SubcategoryTaxonomyItem,
     TopMerchantSummaryItem,
     TransactionItem,
+    UnclassifiedSpendsResult,
+    UnclassifiedTransactionItem,
+    from_public_id,
     money_from_decimal,
     to_public_id,
 )
@@ -808,5 +812,237 @@ class AgentService:
             tool="get_agent_capabilities",
             principal=self.principal,
             duration_ms=0.5,
+        )
+        return result
+
+    # -------------------------------------------------------------------------
+    # 10. get_unclassified_spends
+    # -------------------------------------------------------------------------
+    def get_unclassified_spends(
+        self,
+        limit: int | None = 10,
+        cursor: str | None = None,
+    ) -> UnclassifiedSpendsResult:
+        """List transactions needing user or agent category review."""
+        self._check_rate_limit()
+        cid = generate_correlation_id()
+        safe_limit = validate_limit_arg(limit, default=10, max_limit=Limits.MAX_RESULTS)
+        offset = 0
+        if cursor:
+            try:
+                decoded = base64.urlsafe_b64decode(cursor.encode("ascii")).decode("ascii")
+                offset = int(decoded.split(":")[-1])
+                offset = max(offset, 0)
+            except Exception:  # noqa: BLE001
+                raise AgentServiceError(
+                    ErrorCode.INVALID_ARGUMENT, "Invalid pagination cursor.", cid=cid
+                )
+
+        t0 = time.monotonic()
+        with get_readonly_session(self.settings) as session:
+            db_t0 = time.monotonic()
+            raw_res = list_transactions(
+                session,
+                needs_review=True,
+                limit=safe_limit + 1,
+                offset=offset,
+                sort_by="date",
+                sort_dir="desc",
+            )
+            db_duration = (time.monotonic() - db_t0) * 1000
+
+        raw_items = raw_res.get("items", [])
+        total_count = raw_res.get("total", len(raw_items))
+        has_more = len(raw_items) > safe_limit
+        page_items = raw_items[:safe_limit]
+
+        next_cursor = None
+        if has_more:
+            next_cursor = base64.urlsafe_b64encode(
+                f"unclassified:{offset + safe_limit}".encode("ascii")
+            ).decode("ascii")
+
+        items = [
+            UnclassifiedTransactionItem(
+                public_id=to_public_id("txn", tx["id"], self.principal.profile),
+                date=tx["transaction_date"][:10] if tx.get("transaction_date") else "",
+                amount=money_from_decimal(tx.get("amount")),
+                merchant=sanitize_merchant(tx.get("merchant_raw"), tx.get("merchant_normalized")),
+                description=sanitize_description(tx.get("description")),
+                payment_method=tx.get("payment_method"),
+                account_masked=mask_account(tx.get("account")),
+                direction=tx.get("direction", "debit"),
+                suggested_category=tx.get("category"),
+            )
+            for tx in page_items
+        ]
+
+        result = UnclassifiedSpendsResult(
+            total_count=total_count,
+            items=items,
+            has_more=has_more,
+            next_cursor=next_cursor,
+        )
+        validate_agent_dto(result, cid=cid)
+        log_audit_event(
+            cid=cid,
+            tool="get_unclassified_spends",
+            principal=self.principal,
+            duration_ms=(time.monotonic() - t0) * 1000,
+            db_ms=db_duration,
+            items_count=len(items),
+        )
+        return result
+
+    # -------------------------------------------------------------------------
+    # 11. classify_transaction
+    # -------------------------------------------------------------------------
+    def classify_transaction(
+        self,
+        transaction_id: str,
+        category: str,
+        subcategory: str | None = None,
+        create_rule: bool = True,
+        apply_to_past: bool = False,
+        reasoning: str | None = None,
+    ) -> ClassifyTransactionResult:
+        """Classify an unreviewed transaction and optionally persist a merchant rule."""
+        self._check_rate_limit()
+        cid = generate_correlation_id()
+        t0 = time.monotonic()
+
+        # 1. Resolve opaque public ID to internal UUID
+        try:
+            internal_tx_id = from_public_id("txn", transaction_id.strip(), self.principal.profile)
+        except ValueError as err:
+            raise AgentServiceError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"Invalid transaction identifier '{transaction_id}'. Please retrieve a valid ID via get_unclassified_spends.",
+                cid=cid,
+            ) from err
+
+        category_clean = category.strip()
+        subcategory_clean = subcategory.strip() if subcategory else None
+
+        # 2. Open dedicated short-lived writable session for classification
+        from mymonee.db.models import Category as CatModel
+        from mymonee.db.models import Subcategory as SubCatModel
+        from mymonee.db.session import get_session_factory
+        from mymonee.services.transactions import classify_transaction as core_classify
+
+        SessionFactory = get_session_factory()
+        with SessionFactory() as session:
+            # Resolve category by name or slug
+            matched_cat = session.scalar(
+                select(CatModel).where(func.lower(CatModel.name) == category_clean.lower())
+            )
+            if not matched_cat:
+                matched_cat = session.scalar(
+                    select(CatModel).where(func.lower(CatModel.slug) == category_clean.lower())
+                )
+
+            if not matched_cat:
+                raise AgentServiceError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    f"Unknown category '{category_clean}'. Use list_budget_categories to view valid categories.",
+                    cid=cid,
+                )
+
+            # Resolve subcategory if provided
+            matched_sub = None
+            if subcategory_clean:
+                matched_sub = session.scalar(
+                    select(SubCatModel).where(
+                        SubCatModel.category_id == matched_cat.id,
+                        func.lower(SubCatModel.name) == subcategory_clean.lower(),
+                    )
+                )
+                if not matched_sub:
+                    matched_sub = session.scalar(
+                        select(SubCatModel).where(
+                            SubCatModel.category_id == matched_cat.id,
+                            func.lower(SubCatModel.slug) == subcategory_clean.lower(),
+                        )
+                    )
+                if not matched_sub:
+                    raise AgentServiceError(
+                        ErrorCode.INVALID_ARGUMENT,
+                        f"Unknown or mismatched subcategory '{subcategory_clean}' for category '{matched_cat.name}'.",
+                        cid=cid,
+                    )
+
+            # Check if transaction exists
+            tx = session.get(Transaction, internal_tx_id)
+            if not tx:
+                raise AgentServiceError(
+                    ErrorCode.NOT_FOUND,
+                    f"Transaction '{transaction_id}' was not found in the ledger.",
+                    cid=cid,
+                )
+
+            # Count past candidates if apply_to_past is requested
+            backfilled_count = 0
+            if apply_to_past and tx.merchant_name:
+                past_candidates = session.scalars(
+                    select(Transaction).where(
+                        Transaction.merchant_name == tx.merchant_name,
+                        Transaction.id != tx.id,
+                        Transaction.user_verified.is_(False),
+                    )
+                ).all()
+                backfilled_count = len(past_candidates)
+
+            # Execute authoritative domain classification
+            try:
+                updated_tx = core_classify(
+                    session,
+                    internal_tx_id,
+                    category_id=matched_cat.id,
+                    subcategory_id=matched_sub.id if matched_sub else None,
+                    create_rule=create_rule,
+                    apply_to_past=apply_to_past,
+                )
+                session.commit()
+            except Exception as err:
+                session.rollback()
+                logger.exception("Failed to classify transaction %s", internal_tx_id)
+                raise AgentServiceError(
+                    ErrorCode.INTERNAL_ERROR,
+                    f"Failed to execute classification: {err}",
+                    cid=cid,
+                ) from err
+
+            msg = (
+                f"Successfully classified transaction as '{matched_cat.name}'"
+                f"{f' > {matched_sub.name}' if matched_sub else ''}."
+            )
+            if create_rule:
+                msg += " Created persistent merchant rule."
+            if apply_to_past and backfilled_count > 0:
+                merchant_display = (
+                    updated_tx.merchant_normalized or updated_tx.merchant_raw or "merchant"
+                )
+                msg += f" Backfilled {backfilled_count} past transactions for '{merchant_display}'."
+
+            result = ClassifyTransactionResult(
+                public_id=transaction_id,
+                status="classified",
+                category=matched_cat.name,
+                category_slug=matched_cat.slug,
+                subcategory=matched_sub.name if matched_sub else None,
+                subcategory_slug=matched_sub.slug if matched_sub else None,
+                rule_created=create_rule,
+                backfilled_count=backfilled_count,
+                message=msg,
+            )
+
+        validate_agent_dto(result, cid=cid)
+        log_audit_event(
+            cid=cid,
+            tool="classify_transaction",
+            principal=self.principal,
+            duration_ms=(time.monotonic() - t0) * 1000,
+            outcome="classified",
+            items_count=1 + backfilled_count,
         )
         return result

@@ -110,6 +110,29 @@ AGENT_CAPABILITIES: dict[str, CapabilitySpec] = {
         method_name="get_agent_capabilities",
         read_only=True,
     ),
+    "get_unclassified_spends": CapabilitySpec(
+        name="get_unclassified_spends",
+        version="1.0",
+        description=(
+            "Returns pending transactions in the 'Needs Review' queue requiring categorization. "
+            "Includes sanitized merchant name, amount, date, masked account, and an opaque public transaction ID. "
+            "Use this tool to find transactions that need your classification intelligence."
+        ),
+        method_name="get_unclassified_spends",
+        read_only=True,
+    ),
+    "classify_transaction": CapabilitySpec(
+        name="classify_transaction",
+        version="1.0",
+        description=(
+            "Classifies an unreviewed transaction with a category and optional subcategory. "
+            "Automatically records a user correction and persists a deterministic merchant classification rule "
+            "(when create_rule=True) so MyMonee remembers this merchant permanently for future email syncs. "
+            "Can also backfill past unreviewed transactions from the same merchant (when apply_to_past=True)."
+        ),
+        method_name="classify_transaction",
+        read_only=False,
+    ),
 }
 
 AGENT_CAPABILITY_NAMES: frozenset[str] = frozenset(AGENT_CAPABILITIES.keys())

@@ -9,11 +9,13 @@ Guarantees:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 from decimal import Decimal
 from typing import Generic, TypeVar
 
+from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, ConfigDict, Field
 
 ID_SALT = b"mymonee-agent-v1-opaque-salt"
@@ -29,15 +31,44 @@ def money_from_decimal(value: Decimal | float | None, currency: str = "INR") -> 
     return Money(amount=f"{dec:.2f}", currency=currency)
 
 
+def _get_fernet_cipher(profile: str = "default") -> Fernet:
+    key_material = hashlib.sha256(ID_SALT + profile.encode("utf-8")).digest()
+    b64_key = base64.urlsafe_b64encode(key_material)
+    return Fernet(b64_key)
+
+
 def to_public_id(prefix: str, internal_id: str | int, profile: str = "default") -> str:
     """Generate a stable, opaque, profile-scoped public identifier.
 
-    Internal UUIDs, rowids, and database keys are NEVER exposed directly to Hermes.
+    For transactions ('txn'), uses authenticated Fernet encryption so IDs can be
+    safely and reversibly resolved by Hermes during classification without ever
+    leaking internal database UUIDs or allowing sequential guessing.
     """
+    if prefix == "txn":
+        cipher = _get_fernet_cipher(profile)
+        token = cipher.encrypt(str(internal_id).encode("utf-8")).decode("utf-8")
+        return f"{prefix}_{token}"
     key = ID_SALT + profile.encode("utf-8")
     raw_bytes = str(internal_id).encode("utf-8")
     digest = hmac.new(key, raw_bytes, hashlib.sha256).hexdigest()[:16]
     return f"{prefix}_{digest}"
+
+
+def from_public_id(expected_prefix: str, public_id: str, profile: str = "default") -> str:
+    """Resolve an opaque public identifier back to its internal identifier.
+
+    Raises ValueError if the prefix does not match, or if the token has been tampered with.
+    """
+    prefix_tag = f"{expected_prefix}_"
+    if not public_id.startswith(prefix_tag):
+        raise ValueError(f"Invalid identifier: expected prefix '{prefix_tag}'")
+    token = public_id[len(prefix_tag) :]
+    try:
+        cipher = _get_fernet_cipher(profile)
+        decrypted = cipher.decrypt(token.encode("utf-8")).decode("utf-8")
+        return decrypted
+    except (InvalidToken, Exception) as err:
+        raise ValueError("Invalid or tampered transaction identifier") from err
 
 
 class AgentDTO(BaseModel):
@@ -254,3 +285,54 @@ class AgentCapabilitiesResponse(AgentDTO):
     application_version: str
     currency: str
     capabilities: list[str]
+
+
+class UnclassifiedTransactionItem(AgentDTO):
+    """A transaction pending user or agent category review."""
+
+    public_id: str = Field(description="Opaque transaction identifier for classification")
+    date: str = Field(description="ISO date YYYY-MM-DD")
+    amount: Money = Field(description="Transaction amount and currency")
+    merchant: str = Field(description="Cleaned merchant or counterparty name")
+    description: str | None = Field(default=None, description="Transaction note or raw description")
+    payment_method: str | None = Field(
+        default=None, description="Payment channel e.g. UPI, card, netbanking"
+    )
+    account_masked: str | None = Field(
+        default=None, description="Masked account or card identifier"
+    )
+    direction: str = Field(description="'debit' or 'credit'")
+    suggested_category: str | None = Field(
+        default=None, description="Current tentative category suggestion if any"
+    )
+
+
+class UnclassifiedSpendsResult(AgentDTO):
+    """Response containing unclassified transactions requiring category review."""
+
+    total_count: int = Field(description="Total count of transactions pending review")
+    items: list[UnclassifiedTransactionItem] = Field(
+        description="List of unclassified transactions"
+    )
+    has_more: bool = Field(description="True if more unclassified items exist beyond this page")
+    next_cursor: str | None = Field(
+        default=None, description="Opaque pagination cursor for next batch"
+    )
+
+
+class ClassifyTransactionResult(AgentDTO):
+    """Outcome of a classify transaction operation."""
+
+    public_id: str = Field(description="Opaque transaction identifier that was classified")
+    status: str = Field(default="classified", description="Outcome status")
+    category: str = Field(description="Assigned category name")
+    category_slug: str = Field(description="Assigned category slug")
+    subcategory: str | None = Field(default=None, description="Assigned subcategory name")
+    subcategory_slug: str | None = Field(default=None, description="Assigned subcategory slug")
+    rule_created: bool = Field(
+        description="Whether a persistent merchant classification rule was created"
+    )
+    backfilled_count: int = Field(
+        default=0, description="Count of past unreviewed transactions from same merchant backfilled"
+    )
+    message: str = Field(description="Human-readable summary of the action")

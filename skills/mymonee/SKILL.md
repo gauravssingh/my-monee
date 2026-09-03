@@ -41,6 +41,13 @@ MyMonee is a local-first personal financial ledger. The tools are exposed via th
    - Entity identifiers are opaque public IDs (`txn_...`, `merch_...`). Do not guess or modify them.
    - PII, email bodies, OAuth tokens, and database file paths are strictly redacted by MyMonee.
 
+5. **Classification & External Brain (P1 Rule)**:
+   - You act as the **External Brain** of MyMonee's categorization system.
+   - Use `mcp__mymonee__get_unclassified_spends` to retrieve transactions from the "Needs Review" queue.
+   - When categorizing, match against standard categories from `mcp__mymonee__list_budget_categories`.
+   - Calling `mcp__mymonee__classify_transaction` records a user correction and persists a deterministic merchant classification rule (`create_rule=true`) so MyMonee remembers this merchant permanently.
+   - If the user asks to categorize all past transactions from this merchant as well, set `apply_to_past=true`.
+
 ---
 
 ## When to Use
@@ -53,13 +60,16 @@ MyMonee is a local-first personal financial ledger. The tools are exposed via th
 - User asks about their salary or total income ("What was my income over the last 3 months?")
 - User asks about savings or cash flow trends ("Am I saving money?" or "Show my cash flow trajectory")
 - User asks what expense categories exist in their budget.
+- User asks to see unclassified transactions ("What transactions need review?" or "Show unclassified expenses").
+- User instructs you to categorize a transaction ("Classify that ₹219 purchase as Entertainment > Subscriptions").
+- You want to proactively inspect unclassified items and suggest appropriate categories to the user.
 
 ---
 
 ## When NOT to Use
 
 - Real-time stock, mutual fund NAV, or cryptocurrency market quotes (MyMonee is an expense/income ledger, not a market ticker).
-- Modifying, editing, or deleting ledger entries (MyMonee MCP tools are strictly read-only).
+- Deleting transactions or modifying ledger accounts (transaction history is durable and immutable).
 - Managing bank credentials or syncing email accounts.
 
 ---
@@ -158,6 +168,34 @@ Use to check valid category and subcategory names.
   - Complete list of taxonomy categories and their subcategories.
 - **Example user queries**:
   - *"What expense categories are configured in my tracker?"*
+
+### 9. `mcp__mymonee__get_unclassified_spends`
+Use to inspect transactions that are currently in the "Needs Review" queue waiting for a category.
+- **Parameters**:
+  - `limit`: Number of items to fetch (default `10`, max `50`).
+  - `cursor`: Opaque pagination cursor.
+- **Returns**:
+  - Total pending count, item list (`public_id`, `date`, `amount`, `merchant`, `description`, `account_masked`, `direction`, `suggested_category`), and `next_cursor`.
+- **Example user queries**:
+  - *"Show my unclassified spends."*
+  - *"What transactions need my review?"*
+  - *"Do I have any uncategorized expenses from this week?"*
+
+### 10. `mcp__mymonee__classify_transaction`
+Use to apply a category classification to an unreviewed transaction. Automatically records a user correction and creates a persistent rule.
+- **Parameters**:
+  - `transaction_id`: The opaque `txn_...` ID returned by `get_unclassified_spends` or `search_transactions`.
+  - `category`: The category name or slug (e.g., `"Food"`, `"Entertainment"`). Must match a valid category from `list_budget_categories`.
+  - `subcategory`: Optional subcategory name or slug (e.g., `"Groceries"`, `"Subscriptions"`).
+  - `create_rule`: Boolean (default `true`). When `true`, persists a permanent merchant classification rule so MyMonee classifies future emails automatically.
+  - `apply_to_past`: Boolean (default `false`). When `true`, also backfills past unreviewed transactions from the same merchant.
+  - `reasoning`: Optional short note explaining why this category was selected.
+- **Returns**:
+  - Outcome status, assigned category & subcategory names/slugs, `rule_created` boolean, `backfilled_count`, and a confirmation message.
+- **Example user queries**:
+  - *"Classify txn_... as Entertainment > Subscriptions"*
+  - *"Categorize that ₹60 Doddla Pushpa expense as Food > Groceries and remember it for all future transactions"*
+  - *"Set this merchant to Utilities and update past transactions too"*
 
 ---
 

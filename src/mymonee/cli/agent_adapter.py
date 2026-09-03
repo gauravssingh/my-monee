@@ -96,6 +96,24 @@ def cmd_agent_categories(args: argparse.Namespace) -> None:
     format_dto_output(res, as_json=not args.text)
 
 
+def cmd_agent_unclassified(args: argparse.Namespace) -> None:
+    service = get_agent_service()
+    res = service.get_unclassified_spends(limit=args.limit or 10)
+    format_dto_output(res, as_json=not args.text)
+
+
+def cmd_agent_classify(args: argparse.Namespace) -> None:
+    service = get_agent_service()
+    res = service.classify_transaction(
+        transaction_id=args.transaction_id,
+        category=args.category,
+        subcategory=args.subcategory,
+        create_rule=not args.no_rule,
+        apply_to_past=args.apply_to_past,
+    )
+    format_dto_output(res, as_json=not args.text)
+
+
 def setup_agent_subparsers(agent_sub: Any) -> None:
     """Register agent subcommands for CLI testing."""
     p_sum = agent_sub.add_parser("summary", help="Monthly financial summary")
@@ -146,3 +164,23 @@ def setup_agent_subparsers(agent_sub: Any) -> None:
     p_cat = agent_sub.add_parser("categories", help="Authoritative budget category taxonomy")
     p_cat.add_argument("--text", action="store_true", help="Print as text")
     p_cat.set_defaults(func=cmd_agent_categories)
+
+    p_unc = agent_sub.add_parser(
+        "unclassified", help="List unclassified transactions pending category review"
+    )
+    p_unc.add_argument("--limit", "-l", type=int, default=10, help="Number of items to fetch")
+    p_unc.add_argument("--text", action="store_true", help="Print as text")
+    p_unc.set_defaults(func=cmd_agent_unclassified)
+
+    p_cls = agent_sub.add_parser("classify", help="Classify an unreviewed transaction")
+    p_cls.add_argument("transaction_id", help="Opaque public transaction ID (txn_...)")
+    p_cls.add_argument("--category", "-c", required=True, help="Category name or slug")
+    p_cls.add_argument("--subcategory", "-s", default=None, help="Subcategory name or slug")
+    p_cls.add_argument(
+        "--no-rule", action="store_true", help="Do not create persistent merchant rule"
+    )
+    p_cls.add_argument(
+        "--apply-to-past", action="store_true", help="Backfill past unreviewed transactions"
+    )
+    p_cls.add_argument("--text", action="store_true", help="Print as text")
+    p_cls.set_defaults(func=cmd_agent_classify)

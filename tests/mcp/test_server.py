@@ -22,9 +22,14 @@ def test_server_tool_registration_matches_capabilities():
         )
         for tool in tools:
             assert tool.annotations is not None
-            assert tool.annotations.read_only_hint is True, (
-                f"{tool.name} does not declare read_only_hint=True"
-            )
+            if tool.name == "classify_transaction":
+                assert tool.annotations.read_only_hint is False, (
+                    f"{tool.name} should declare read_only_hint=False"
+                )
+            else:
+                assert tool.annotations.read_only_hint is True, (
+                    f"{tool.name} does not declare read_only_hint=True"
+                )
 
     asyncio.run(_run())
 
@@ -36,7 +41,7 @@ def test_server_call_tool_success():
         assert not res.is_error
         assert res.structured_content is not None
         assert res.structured_content.get("agent_api_version") == "1.0"
-        assert len(res.structured_content.get("capabilities", [])) == 9
+        assert len(res.structured_content.get("capabilities", [])) == 11
 
     asyncio.run(_run())
 

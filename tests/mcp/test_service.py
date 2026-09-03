@@ -108,5 +108,7 @@ def test_list_budget_categories(agent_service: AgentService):
 def test_get_agent_capabilities(agent_service: AgentService):
     res = agent_service.get_agent_capabilities()
     assert res.agent_api_version == "1.0"
-    assert len(res.capabilities) == 9
+    assert len(res.capabilities) == 11
     assert "get_financial_summary" in res.capabilities
+    assert "get_unclassified_spends" in res.capabilities
+    assert "classify_transaction" in res.capabilities
