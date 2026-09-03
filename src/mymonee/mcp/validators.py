@@ -33,10 +33,29 @@ class BaseInputModel(BaseModel):
 
 
 MONTH_NAMES: dict[str, int] = {
-    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
-    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
-    "august": 8, "aug": 8, "september": 9, "sep": 9, "october": 10, "oct": 10,
-    "november": 11, "nov": 11, "december": 12, "dec": 12,
+    "january": 1,
+    "jan": 1,
+    "february": 2,
+    "feb": 2,
+    "march": 3,
+    "mar": 3,
+    "april": 4,
+    "apr": 4,
+    "may": 5,
+    "june": 6,
+    "jun": 6,
+    "july": 7,
+    "jul": 7,
+    "august": 8,
+    "aug": 8,
+    "september": 9,
+    "sep": 9,
+    "october": 10,
+    "oct": 10,
+    "november": 11,
+    "nov": 11,
+    "december": 12,
+    "dec": 12,
 }
 
 
@@ -58,6 +77,7 @@ def validate_month_arg(month: str | None) -> str:
     # Match single month name e.g. 'july' -> defaults to current year
     if val in MONTH_NAMES:
         from datetime import UTC, datetime
+
         curr_year = datetime.now(UTC).year
         return f"{curr_year:04d}-{MONTH_NAMES[val]:02d}"
 
@@ -88,7 +108,9 @@ def validate_range_arg(range_str: str | None) -> str:
     return clean
 
 
-def validate_limit_arg(limit: int | None, default: int = Limits.DEFAULT_RESULTS, max_limit: int = Limits.MAX_RESULTS) -> int:
+def validate_limit_arg(
+    limit: int | None, default: int = Limits.DEFAULT_RESULTS, max_limit: int = Limits.MAX_RESULTS
+) -> int:
     """Clamp limit to safe bounds [1, max_limit]."""
     if limit is None:
         return default
@@ -97,12 +119,18 @@ def validate_limit_arg(limit: int | None, default: int = Limits.DEFAULT_RESULTS,
     return min(int(limit), max_limit)
 
 
-def validate_months_arg(months: int | None, default: int = Limits.DEFAULT_HISTORY_MONTHS, max_months: int = Limits.MAX_HISTORY_MONTHS) -> int:
+def validate_months_arg(
+    months: int | None,
+    default: int = Limits.DEFAULT_HISTORY_MONTHS,
+    max_months: int = Limits.MAX_HISTORY_MONTHS,
+) -> int:
     """Clamp historical months lookback to safe bounds [1, max_months]."""
     if months is None:
         return default
     if months <= 0:
-        raise AgentServiceError(ErrorCode.INVALID_ARGUMENT, "Months parameter must be a positive integer.")
+        raise AgentServiceError(
+            ErrorCode.INVALID_ARGUMENT, "Months parameter must be a positive integer."
+        )
     return min(int(months), max_months)
 
 
@@ -119,7 +147,9 @@ def validate_date_arg(date_str: str | None, param_name: str = "date") -> date | 
     try:
         parsed = date.fromisoformat(val)
     except ValueError as err:
-        raise AgentServiceError(ErrorCode.INVALID_ARGUMENT, f"Invalid calendar date '{date_str}': {err}") from err
+        raise AgentServiceError(
+            ErrorCode.INVALID_ARGUMENT, f"Invalid calendar date '{date_str}': {err}"
+        ) from err
 
     if parsed.year < MIN_ALLOWED_YEAR or parsed.year > MAX_ALLOWED_YEAR:
         raise AgentServiceError(

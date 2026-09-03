@@ -48,7 +48,9 @@ def _configure_readonly_connection(engine: Engine) -> None:
             cursor.close()
 
     @event.listens_for(engine, "before_cursor_execute")
-    def set_query_deadline(conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any) -> None:
+    def set_query_deadline(
+        conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any
+    ) -> None:
         t0 = time.monotonic()
         try:
             dbapi_conn = conn.connection.dbapi_connection
@@ -63,7 +65,9 @@ def _configure_readonly_connection(engine: Engine) -> None:
             pass
 
     @event.listens_for(engine, "after_cursor_execute")
-    def clear_query_deadline(conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any) -> None:
+    def clear_query_deadline(
+        conn: Any, cursor: Any, statement: Any, parameters: Any, context: Any, executemany: Any
+    ) -> None:
         try:
             conn.connection.dbapi_connection.set_progress_handler(None, 1000)
         except Exception:  # noqa: BLE001, S110
@@ -81,6 +85,7 @@ def get_readonly_engine(settings: Settings | None = None) -> Engine:
     if not db_path.exists():
         # Ensure database file exists before opening read-only
         from mymonee.db.session import init_db
+
         init_db(settings)
 
     engine = create_engine(

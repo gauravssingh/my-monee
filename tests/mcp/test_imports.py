@@ -26,5 +26,7 @@ def test_writable_engine_not_imported_in_mcp():
         mod = importlib.import_module(mod_name)
         # Verify writable symbols are not present in module namespace
         assert not hasattr(mod, "get_engine"), f"{mod_name} exposes writable get_engine"
-        assert not hasattr(mod, "get_session_factory"), f"{mod_name} exposes writable get_session_factory"
+        assert not hasattr(mod, "get_session_factory"), (
+            f"{mod_name} exposes writable get_session_factory"
+        )
         assert not hasattr(mod, "init_engine"), f"{mod_name} exposes writable init_engine"

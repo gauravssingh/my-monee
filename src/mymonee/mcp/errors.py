@@ -48,7 +48,12 @@ class AgentServiceError(Exception):
 
     def to_public_message(self) -> str:
         """Format a safe, correlation-tracked message for Hermes."""
-        if self.code in (ErrorCode.INVALID_ARGUMENT, ErrorCode.NOT_FOUND, ErrorCode.LIMIT_EXCEEDED, ErrorCode.RATE_LIMITED):
+        if self.code in (
+            ErrorCode.INVALID_ARGUMENT,
+            ErrorCode.NOT_FOUND,
+            ErrorCode.LIMIT_EXCEEDED,
+            ErrorCode.RATE_LIMITED,
+        ):
             return f"{self.user_message} [cid: {self.cid}]"
         # All internal, timeout, or unexpected errors fail closed with a generic message
         return f"Unable to complete requested operation. [cid: {self.cid}]"

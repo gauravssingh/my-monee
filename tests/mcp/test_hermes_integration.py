@@ -35,9 +35,12 @@ def _run_hermes_query(query: str, timeout: int = 90) -> tuple[str, dict]:
     try:
         cmd = [
             "hermes",
-            "-s", "mymonee",
-            "-z", query,
-            "--usage-file", str(usage_path),
+            "-s",
+            "mymonee",
+            "-z",
+            query,
+            "--usage-file",
+            str(usage_path),
         ]
         t0 = time.monotonic()
         proc = subprocess.run(
@@ -50,7 +53,9 @@ def _run_hermes_query(query: str, timeout: int = 90) -> tuple[str, dict]:
         duration = time.monotonic() - t0
 
         if proc.returncode != 0:
-            pytest.fail(f"Hermes query failed (exit {proc.returncode}): {proc.stderr}\n{proc.stdout}")
+            pytest.fail(
+                f"Hermes query failed (exit {proc.returncode}): {proc.stderr}\n{proc.stdout}"
+            )
 
         usage_data = {}
         if usage_path.exists() and usage_path.stat().st_size > 0:

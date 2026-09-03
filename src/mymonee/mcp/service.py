@@ -172,7 +172,9 @@ class AgentService:
             commitments_spent=money_from_decimal(summary.get("commitments_spent", 0.0)),
             income=money_from_decimal(summary.get("income", 0.0)),
             net_cash_flow=money_from_decimal(summary.get("net_cash_flow", 0.0)),
-            previous_month_spent=money_from_decimal(overview.get("month_comparison", {}).get("previous_spent", 0.0)),
+            previous_month_spent=money_from_decimal(
+                overview.get("month_comparison", {}).get("previous_spent", 0.0)
+            ),
             spent_change_pct=overview.get("month_comparison", {}).get("spent_change_pct"),
             transaction_count=int(summary.get("transaction_count", 0)),
             top_categories=top_cats,
@@ -219,8 +221,11 @@ class AgentService:
                         category=c["category"],
                         total=money_from_decimal(c["total"]),
                         previous_total=money_from_decimal(c.get("previous_total", 0.0)),
-                        change_pct=round(((c["total"] - c["previous_total"]) / c["previous_total"] * 100.0), 1)
-                        if c.get("previous_total", 0.0) > 0 else None,
+                        change_pct=round(
+                            ((c["total"] - c["previous_total"]) / c["previous_total"] * 100.0), 1
+                        )
+                        if c.get("previous_total", 0.0) > 0
+                        else None,
                         transaction_count=int(c.get("count", 0)),
                         share_pct=float(c.get("percentage", 0.0)),
                     )
@@ -260,7 +265,9 @@ class AgentService:
                 )
 
             cat_name = cat_db.name
-            analytics = get_category_analytics(session, cat_db.id, range_str=range_val, year=y, month=m)
+            analytics = get_category_analytics(
+                session, cat_db.id, range_str=range_val, year=y, month=m
+            )
             db_duration = (time.monotonic() - db_t0) * 1000
 
         summary = analytics.get("summary", {})
@@ -278,7 +285,9 @@ class AgentService:
                 name=sanitize_merchant(None, m_info.get("name")),
                 amount=money_from_decimal(m_info.get("spend", 0.0)),
                 count=int(m_info.get("tx_count", 0)),
-                public_id=to_public_id("merch", m_info.get("name", "unknown"), self.principal.profile),
+                public_id=to_public_id(
+                    "merch", m_info.get("name", "unknown"), self.principal.profile
+                ),
             )
             for m_info in analytics.get("merchants", [])[:10]
         ]
@@ -331,11 +340,15 @@ class AgentService:
         self._check_rate_limit()
         cid = generate_correlation_id()
         if not merchant_name or not merchant_name.strip():
-            raise AgentServiceError(ErrorCode.INVALID_ARGUMENT, "Merchant name is required.", cid=cid)
+            raise AgentServiceError(
+                ErrorCode.INVALID_ARGUMENT, "Merchant name is required.", cid=cid
+            )
 
         clean_name = validate_query_text(merchant_name)
         months_val = validate_months_arg(months)
-        limit_val = validate_limit_arg(limit, default=Limits.DEFAULT_MERCHANT_RECENT, max_limit=Limits.MAX_MERCHANT_RECENT)
+        limit_val = validate_limit_arg(
+            limit, default=Limits.DEFAULT_MERCHANT_RECENT, max_limit=Limits.MAX_MERCHANT_RECENT
+        )
 
         now = datetime.now(IST)
         start_year, start_month = shift_month(now.year, now.month, -(months_val - 1))
@@ -436,7 +449,9 @@ class AgentService:
         parsed_end = validate_date_arg(end_date, "end_date")
         min_amt = validate_amount_arg(min_amount, "min_amount")
         max_amt = validate_amount_arg(max_amount, "max_amount")
-        limit_val = validate_limit_arg(limit, default=Limits.DEFAULT_RESULTS, max_limit=Limits.MAX_RESULTS)
+        limit_val = validate_limit_arg(
+            limit, default=Limits.DEFAULT_RESULTS, max_limit=Limits.MAX_RESULTS
+        )
 
         offset = 0
         if cursor:
@@ -444,7 +459,9 @@ class AgentService:
                 decoded = base64.b64decode(cursor).decode("utf-8")
                 offset = int(decoded.split(":")[-1])
             except Exception:  # noqa: BLE001
-                raise AgentServiceError(ErrorCode.INVALID_ARGUMENT, "Invalid pagination cursor.", cid=cid)
+                raise AgentServiceError(
+                    ErrorCode.INVALID_ARGUMENT, "Invalid pagination cursor.", cid=cid
+                )
 
         t0 = time.monotonic()
         with get_readonly_session(self.settings) as session:
@@ -523,13 +540,16 @@ class AgentService:
         with get_readonly_session(self.settings) as session:
             db_t0 = time.monotonic()
             subscriptions_db = session.execute(
-                select(Subscription, RecurringTransaction)
-                .join(RecurringTransaction, Subscription.recurring_transaction_id == RecurringTransaction.id)
+                select(Subscription, RecurringTransaction).join(
+                    RecurringTransaction,
+                    Subscription.recurring_transaction_id == RecurringTransaction.id,
+                )
             ).all()
 
             bills_db = session.execute(
-                select(Bill, RecurringTransaction)
-                .join(RecurringTransaction, Bill.recurring_transaction_id == RecurringTransaction.id)
+                select(Bill, RecurringTransaction).join(
+                    RecurringTransaction, Bill.recurring_transaction_id == RecurringTransaction.id
+                )
             ).all()
             db_duration = (time.monotonic() - db_t0) * 1000
 
@@ -540,8 +560,14 @@ class AgentService:
             for s, rt in subscriptions_db:
                 amt = Decimal(str(s.amount or 0.0))
                 freq = (rt.frequency or "monthly").lower()
-                annual = Decimal(str(s.annual_cost)) if s.annual_cost else (amt if freq == "yearly" else amt * 12)
-                monthly = amt if freq == "monthly" else (annual / 12 if annual > 0 else Decimal("0.00"))
+                annual = (
+                    Decimal(str(s.annual_cost))
+                    if s.annual_cost
+                    else (amt if freq == "yearly" else amt * 12)
+                )
+                monthly = (
+                    amt if freq == "monthly" else (annual / 12 if annual > 0 else Decimal("0.00"))
+                )
                 total_monthly += monthly
                 total_annual += annual
 
@@ -550,7 +576,9 @@ class AgentService:
                         service_name=s.name[:50],
                         amount=money_from_decimal(amt),
                         billing_frequency=freq,
-                        next_expected_date=rt.next_expected_date.strftime("%Y-%m-%d") if rt.next_expected_date else None,
+                        next_expected_date=rt.next_expected_date.strftime("%Y-%m-%d")
+                        if rt.next_expected_date
+                        else None,
                         annual_cost=money_from_decimal(annual),
                         status=s.status or "active",
                     )
@@ -570,7 +598,9 @@ class AgentService:
                         service_name=b.name[:50],
                         amount=money_from_decimal(amt),
                         billing_frequency=freq,
-                        next_expected_date=rt.next_expected_date.strftime("%Y-%m-%d") if rt.next_expected_date else None,
+                        next_expected_date=rt.next_expected_date.strftime("%Y-%m-%d")
+                        if rt.next_expected_date
+                        else None,
                         annual_cost=money_from_decimal(annual),
                         status=b.status or "active",
                     )
@@ -619,7 +649,11 @@ class AgentService:
                 for tx in candidates:
                     if not tx.transaction_date:
                         continue
-                    dt = tx.transaction_date.astimezone(IST) if tx.transaction_date.tzinfo else tx.transaction_date
+                    dt = (
+                        tx.transaction_date.astimezone(IST)
+                        if tx.transaction_date.tzinfo
+                        else tx.transaction_date
+                    )
                     is_salary = tx.subcategory and tx.subcategory.slug == "salary"
 
                     if is_salary:
