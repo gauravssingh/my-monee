@@ -195,6 +195,8 @@ mymonee agent categories
 | `get_cash_flow_trends` | Multi-month cash flow trajectory comparing total qualifying spent, income, and net savings/deficit. | `mcp__mymonee__get_cash_flow_trends` |
 | `list_budget_categories` | The authoritative category and subcategory taxonomy configured in MyMonee. | `mcp__mymonee__list_budget_categories` |
 | `get_agent_capabilities` | Contract versioning metadata and supported capability names. | `mcp__mymonee__get_agent_capabilities` |
+| `get_unclassified_spends` | Review pending/unclassified transactions requiring category assignment. Emits Fernet-authenticated reversible public transaction IDs (`txn_...`). | `mcp__mymonee__get_unclassified_spends` |
+| `classify_transaction` | Update a transaction's category/subcategory using its opaque public token (`txn_...`) and human-readable slugs. Write-capable tool (`readOnlyHint=False`). | `mcp__mymonee__classify_transaction` |
 
 ---
 
@@ -237,3 +239,50 @@ MyMonee MCP responses are intentionally privacy-filtered.
   → Hermes invokes `mcp__mymonee__get_income_and_salary(months=3)`.
 - **"Show me my net savings trend over the past six months."**
   → Hermes invokes `mcp__mymonee__get_cash_flow_trends(months=6)`.
+- **"Review my unclassified transactions and classify them."**
+  → Hermes invokes `mcp__mymonee__get_unclassified_spends()`, queries `mcp__mymonee__list_budget_categories()`, and classifies via `mcp__mymonee__classify_transaction(transaction_id="txn_...", category_slug="...", subcategory_slug="...")`.
+
+---
+
+## 7. Automated Continuous Deployment via Hermes Webhooks
+
+Hermes serves as the external automation and control plane for MyMonee. When a pull request is merged into `main` on GitHub, Hermes automatically pulls the latest changes, builds the production frontend, restarts the local macOS daemon, and verifies system health.
+
+```text
+GitHub (PR Merged into main)
+          │
+          │ POST /webhooks/mymonee-deploy (Signed HMAC-SHA256)
+          ▼
+Tailscale Funnel (Port 443 HTTPS Proxy)
+          │
+          ▼
+Hermes Webhook Gateway (Port 8644)
+          ├── 1. HMAC-SHA256 signature verification (X-Hub-Signature-256)
+          ├── 2. Declarative filter evaluation:
+          │      action == "closed"
+          │      pull_request.merged == true
+          │      pull_request.base.ref == "main"
+          │
+          ▼ (HTTP 202 Accepted)
+Hermes Agent (Autonomous Session)
+          │
+          │ Toolset: ["terminal"] (Restricted per-route permissions)
+          │
+          ▼
+scripts/trigger_deploy.sh
+          ├── 1. Guardrail: Must be on branch 'main' (aborts otherwise)
+          ├── 2. Guardrail: Working tree must be clean (git status --porcelain, aborts otherwise)
+          ├── 3. git fetch origin main && git pull --ff-only origin main
+          ├── 4. scripts/deploy_local.sh (npm run build in web/)
+          ├── 5. launchctl kickstart -k gui/501/com.personal.my-monee
+          └── 6. Health check verification (http://127.0.0.1:8477/api/health)
+          │
+          ▼
+Telegram Status Delivery (Chat ID: 1117425083)
+```
+
+### Architectural Principles:
+1. **No Intermediate Webhook Receivers**: GitHub talks directly to Hermes's native webhook platform via Tailscale Funnel. No custom microservice or HTTP listener needed.
+2. **Hard Security Boundary**: HMAC verification and declarative filtering occur at the gateway layer before any model turns or shell processes are spawned. Unsigned or non-qualifying requests are stopped at the edge.
+3. **Strict Deterministic Contract**: The agent is restricted to `terminal` toolset and given an explicit, un-improvised instruction to run `scripts/trigger_deploy.sh` and capture the exit code.
+4. **Development Checkout Safety**: The deployment script enforces branch purity and clean working trees; it will never stash or manipulate active development changes unexpectedly.
