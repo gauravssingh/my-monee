@@ -28,12 +28,14 @@ from mymonee.mcp.models import (
     CashFlowResponse,
     CategoryDeepDive,
     CategorySpendingResponse,
+    ClassifyTransactionResult,
     FinancialSummary,
     IncomeResponse,
     MerchantHistory,
     Page,
     RecurringExpensesResponse,
     TransactionItem,
+    UnclassifiedSpendsResult,
 )
 from mymonee.mcp.principal import AgentPrincipal, create_agent_principal
 from mymonee.mcp.service import AgentService
@@ -223,6 +225,52 @@ def create_mcp_server(
     )
     async def get_agent_capabilities() -> AgentCapabilitiesResponse:
         return await _execute_with_gate(service.get_agent_capabilities)
+
+    # 10. get_unclassified_spends
+    spec_unc = AGENT_CAPABILITIES["get_unclassified_spends"]
+
+    @server.tool(
+        name=spec_unc.name,
+        description=spec_unc.description,
+        annotations=READ_ONLY_ANNOTATIONS,
+    )
+    async def get_unclassified_spends(
+        limit: int = 10,
+        cursor: str | None = None,
+    ) -> UnclassifiedSpendsResult:
+        return await _execute_with_gate(service.get_unclassified_spends, limit=limit, cursor=cursor)
+
+    # 11. classify_transaction
+    spec_cls = AGENT_CAPABILITIES["classify_transaction"]
+
+    WRITE_ANNOTATIONS = ToolAnnotations(
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+    )
+
+    @server.tool(
+        name=spec_cls.name,
+        description=spec_cls.description,
+        annotations=WRITE_ANNOTATIONS,
+    )
+    async def classify_transaction(
+        transaction_id: str,
+        category: str,
+        subcategory: str | None = None,
+        create_rule: bool = True,
+        apply_to_past: bool = False,
+        reasoning: str | None = None,
+    ) -> ClassifyTransactionResult:
+        return await _execute_with_gate(
+            service.classify_transaction,
+            transaction_id=transaction_id,
+            category=category,
+            subcategory=subcategory,
+            create_rule=create_rule,
+            apply_to_past=apply_to_past,
+            reasoning=reasoning,
+        )
 
     return server
 
