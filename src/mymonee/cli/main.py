@@ -206,6 +206,7 @@ def cmd_reconcile(args: argparse.Namespace) -> None:
 
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
+
     from mymonee.config import reload_settings
     from mymonee.logging_setup import setup_logging
 
@@ -231,6 +232,11 @@ def cmd_data_export(args: argparse.Namespace) -> None:
     out_file = Path(args.output or "mymonee_ledger_export.json")
     out_file.write_text(json.dumps(bundle, indent=2), encoding="utf-8")
     print(f"✓ JSON bundle exported to {out_file} ({out_file.stat().st_size:,} bytes)")
+
+
+def cmd_mcp(args: argparse.Namespace) -> None:
+    from mymonee.mcp.server import run_mcp_stdio
+    run_mcp_stdio()
 
 
 def main() -> None:
@@ -298,6 +304,16 @@ def main() -> None:
     p_d_export = data_sub.add_parser("export", help="Export ledger into portable JSON")
     p_d_export.add_argument("--output", "-o", type=str, default="mymonee_ledger_export.json", help="Output filepath")
     p_d_export.set_defaults(func=cmd_data_export)
+
+    # mcp
+    p_mcp = subparsers.add_parser("mcp", help="Start the MyMonee FastMCP server (stdio transport for Hermes Agent)")
+    p_mcp.set_defaults(func=cmd_mcp)
+
+    # agent
+    p_agent = subparsers.add_parser("agent", help="Agent service CLI adapter for testing and scripts")
+    agent_sub = p_agent.add_subparsers(dest="agent_cmd", help="Agent subcommands")
+    from mymonee.cli.agent_adapter import setup_agent_subparsers
+    setup_agent_subparsers(agent_sub)
 
     args = parser.parse_args()
     if not hasattr(args, "func"):
