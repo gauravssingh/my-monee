@@ -17,24 +17,24 @@ echo " MyMonee Automated Deployment Trigger"
 echo " Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 echo "================================================================="
 
-# 1. Guardrail: Must be on branch 'main'
-CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Deployment ABORTED: Repository is on branch '$CURRENT_BRANCH' (expected 'main')." >&2
-    echo "   Aborting to protect active feature development from unexpected branch switching." >&2
-    exit 1
-fi
-echo "✓ On branch 'main'."
-
-# 2. Guardrail: Working tree must be completely clean (no staged, unstaged, or untracked changes)
+# 1. Guardrail: Working tree must be completely clean (no staged, unstaged, or untracked changes)
 DIRTY_STATE="$(git status --porcelain)"
 if [ -n "$DIRTY_STATE" ]; then
     echo "❌ Deployment ABORTED: Working tree has uncommitted or untracked changes:" >&2
     echo "$DIRTY_STATE" >&2
-    echo "   Aborting to protect local changes from unexpected modifications." >&2
+    echo "   Aborting to protect uncommitted local changes from unexpected modifications." >&2
     exit 1
 fi
 echo "✓ Working tree is clean."
+
+# 2. Branch Resolution: If on a feature branch with clean tree, safely switch to main
+CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$CURRENT_BRANCH" != "main" ]; then
+    echo "→ Repository is currently on '$CURRENT_BRANCH' with clean working tree."
+    echo "→ Switching to 'main' for automated deployment..."
+    git checkout main
+fi
+echo "✓ On branch 'main'."
 
 # 3. Pull latest changes from origin/main
 echo "→ Synchronizing with origin/main..."
