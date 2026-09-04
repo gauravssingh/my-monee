@@ -2,6 +2,7 @@ import { Component, lazy, Suspense, useEffect, useState, type ErrorInfo, type Re
 import { Navigate, NavLink, Route, Routes } from "react-router-dom";
 import LockScreen from "./components/LockScreen";
 import { api } from "./api";
+import { useToast } from "./hooks/useToast";
 
 const OverviewPage = lazy(() => import("./pages/OverviewPage"));
 const TransactionsPage = lazy(() => import("./pages/TransactionsPage"));
@@ -50,12 +51,76 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 }
 
+interface SyncNavButtonProps {
+  syncing: boolean;
+  onSync: () => void;
+  className?: string;
+}
+
+function SyncNavButton({ syncing, onSync, className = "" }: SyncNavButtonProps) {
+  return (
+    <button
+      type="button"
+      className={`topbar-sync-btn ${className}`.trim()}
+      title="Incremental Sync"
+      aria-label="Incremental Sync"
+      disabled={syncing}
+      onClick={onSync}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+        className={syncing ? "spin" : ""}
+        style={{ transformOrigin: "center" }}
+      >
+        <polyline points="23 4 23 10 17 10" />
+        <polyline points="1 20 1 14 7 14" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+      </svg>
+    </button>
+  );
+}
+
 export default function App() {
+  const { showToast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [authConfigured, setAuthConfigured] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  const handleIncrementalSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const result = await api.gmailSync({ fullYear: false, maxMessages: 2000 });
+      if (result.status === "error") {
+        showToast(result.error_summary || "Sync encountered errors", "error");
+      } else if (result.emails_discovered === 0 && result.transactions_extracted === 0) {
+        showToast("Sync complete: No new transaction emails found", "success");
+      } else {
+        const extractedMsg = `${result.transactions_extracted} new transaction${result.transactions_extracted === 1 ? "" : "s"}`;
+        showToast(
+          `Sync complete: ${extractedMsg} (${result.emails_discovered} scanned, ${result.transactions_duplicated} duplicates)`,
+          "success"
+        );
+      }
+      window.dispatchEvent(new CustomEvent("mymonee:sync-completed", { detail: result }));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Sync failed", "error");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     api.authStatus()
@@ -166,6 +231,7 @@ export default function App() {
           <NavLink to="/categories">Categories</NavLink>
           <NavLink to="/accounts">Accounts</NavLink>
           <NavLink to="/merchants">Merchants</NavLink>
+          <SyncNavButton syncing={syncing} onSync={() => void handleIncrementalSync()} />
           <NavLink
             to="/settings"
             title="Settings"
@@ -198,6 +264,11 @@ export default function App() {
 
         {/* Mobile Navigation Controls */}
         <div className="mobile-nav-controls">
+          <SyncNavButton
+            syncing={syncing}
+            onSync={() => void handleIncrementalSync()}
+            className="btn icon-btn"
+          />
           <NavLink
             to="/settings"
             title="Settings"

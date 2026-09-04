@@ -260,6 +260,39 @@ textarea {
   font-weight: 600;
 }
 
+.topbar-sync-btn {
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.desktop-nav .topbar-sync-btn {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-nav-controls .topbar-sync-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-sync-btn:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.topbar-sync-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .nav-dropdown {
   position: relative;
   display: inline-block;
@@ -1860,6 +1893,20 @@ textarea.input {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+  transform-origin: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

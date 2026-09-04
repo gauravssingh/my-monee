@@ -445,6 +445,14 @@ export default function TransactionsPage({ needsReview = false }: Props) {
     return () => controller.abort();
   }, [load]);
 
+  useEffect(() => {
+    const handleSync = () => {
+      void load();
+    };
+    window.addEventListener("mymonee:sync-completed", handleSync);
+    return () => window.removeEventListener("mymonee:sync-completed", handleSync);
+  }, [load]);
+
   // Reset pagination when any filter changes
   useEffect(() => {
     setOffset(0);

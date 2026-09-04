@@ -80,6 +80,31 @@ export default function OverviewPage() {
     };
   }, [date.year, date.month]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const handleSync = () => {
+      setLoading(true);
+      api
+        .overview(date.year, date.month)
+        .then((o) => {
+          if (cancelled) return;
+          setOverview(o);
+          setError(null);
+        })
+        .catch((err: Error) => {
+          if (!cancelled) setError(err.message);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    };
+    window.addEventListener("mymonee:sync-completed", handleSync);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("mymonee:sync-completed", handleSync);
+    };
+  }, [date.year, date.month]);
+
 
   function openTrend(metric: TrendMetricType) {
     setTrendMetric(metric);
