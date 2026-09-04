@@ -270,8 +270,8 @@ Hermes Agent (Autonomous Session)
           │
           ▼
 scripts/trigger_deploy.sh
-          ├── 1. Guardrail: Must be on branch 'main' (aborts otherwise)
-          ├── 2. Guardrail: Working tree must be clean (git status --porcelain, aborts otherwise)
+          ├── 1. Guardrail: Working tree must be clean (git status --porcelain, aborts otherwise)
+          ├── 2. Branch check: Safely switches to 'main' if clean feature branch
           ├── 3. git fetch origin main && git pull --ff-only origin main
           ├── 4. scripts/deploy_local.sh (npm run build in web/)
           ├── 5. launchctl kickstart -k gui/501/com.personal.my-monee
