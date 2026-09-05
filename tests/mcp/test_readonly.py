@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import event, text
 
-from mymonee.config import get_settings
+from mymonee.config import Settings
 from mymonee.mcp.errors import AgentServiceError
 from mymonee.mcp.principal import create_agent_principal
 from mymonee.mcp.readonly_db import get_readonly_engine, get_readonly_session
@@ -26,23 +26,26 @@ MUTATION_KEYWORDS = [
 ]
 
 
-def test_sqlite_runtime_readonly_enforcement():
+def test_sqlite_runtime_readonly_enforcement(test_settings: Settings, db_session):
     """Verify that the SQLite engine at the connection level actively rejects writes."""
-    settings = get_settings()
-
-    with pytest.raises((Exception, AgentServiceError)), get_readonly_session(settings) as session:
+    with (
+        pytest.raises((Exception, AgentServiceError)),
+        get_readonly_session(test_settings) as session,
+    ):
         session.execute(text("CREATE TABLE evil_table (id INT)"))
         session.commit()
 
-    with pytest.raises((Exception, AgentServiceError)), get_readonly_session(settings) as session:
+    with (
+        pytest.raises((Exception, AgentServiceError)),
+        get_readonly_session(test_settings) as session,
+    ):
         session.execute(text("DELETE FROM transactions WHERE 1=1"))
         session.commit()
 
 
-def test_automated_sql_statement_tracing_on_tool_execution():
+def test_automated_sql_statement_tracing_on_tool_execution(test_settings: Settings, db_session):
     """Verify via SQLAlchemy cursor events that zero mutation statements occur during tool execution."""
-    settings = get_settings()
-    engine = get_readonly_engine(settings)
+    engine = get_readonly_engine(test_settings)
     executed_statements: list[str] = []
 
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
@@ -51,7 +54,7 @@ def test_automated_sql_statement_tracing_on_tool_execution():
     event.listen(engine, "before_cursor_execute", before_cursor_execute)
     try:
         principal = create_agent_principal()
-        service = AgentService(principal, settings=settings)
+        service = AgentService(principal, settings=test_settings)
 
         # Run multiple domain capabilities
         service.get_financial_summary(month="current")

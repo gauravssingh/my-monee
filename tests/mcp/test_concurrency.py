@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 
+from mymonee.config import Settings
 from mymonee.mcp.server import create_mcp_server
 
 
-def test_concurrent_tool_calls_execute_safely():
+def test_concurrent_tool_calls_execute_safely(test_settings: Settings, db_session):
     async def _run():
-        server = create_mcp_server()
+        server = create_mcp_server(settings=test_settings)
 
         # Launch 5 concurrent calls to test the semaphore gate
         tasks = [

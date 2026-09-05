@@ -77,11 +77,17 @@ def _configure_readonly_connection(engine: Engine) -> None:
 def get_readonly_engine(settings: Settings | None = None) -> Engine:
     """Initialize or return the dedicated read-only SQLite engine."""
     global _readonly_engine, _ReadonlySessionFactory
-    if _readonly_engine is not None:
-        return _readonly_engine
-
     settings = settings or get_settings()
-    db_path = settings.database_path()
+    db_path = settings.database_path().resolve()
+
+    if _readonly_engine is not None:
+        if getattr(_readonly_engine, "_mymonee_db_path", None) == db_path:
+            return _readonly_engine
+        try:
+            _readonly_engine.dispose()
+        except Exception:  # noqa: BLE001, S110
+            pass
+
     if not db_path.exists():
         # Ensure database file exists before opening read-only
         from mymonee.db.session import init_db
@@ -93,6 +99,7 @@ def get_readonly_engine(settings: Settings | None = None) -> Engine:
         echo=False,
         future=True,
     )
+    engine._mymonee_db_path = db_path
     _configure_readonly_connection(engine)
     _readonly_engine = engine
     _ReadonlySessionFactory = sessionmaker(
@@ -108,8 +115,7 @@ def get_readonly_engine(settings: Settings | None = None) -> Engine:
 @contextmanager
 def get_readonly_session(settings: Settings | None = None) -> Generator[Session, None, None]:
     """Context manager yielding a strictly read-only SQLAlchemy session with auto-rollback."""
-    if _ReadonlySessionFactory is None:
-        get_readonly_engine(settings)
+    get_readonly_engine(settings)
     assert _ReadonlySessionFactory is not None
 
     session: Session = _ReadonlySessionFactory()

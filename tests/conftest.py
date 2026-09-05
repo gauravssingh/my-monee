@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +24,7 @@ def test_settings(tmp_path: Path) -> Settings:
 @pytest.fixture
 def db_session(test_settings: Settings) -> Generator[Session, None, None]:
     init_db(test_settings)
-    session_factory = get_session_factory()
+    session_factory = get_session_factory(test_settings)
     with session_factory() as session:
         yield session
 

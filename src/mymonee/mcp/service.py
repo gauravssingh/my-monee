@@ -930,7 +930,7 @@ class AgentService:
         from mymonee.db.session import get_session_factory
         from mymonee.services.transactions import classify_transaction as core_classify
 
-        SessionFactory = get_session_factory()
+        SessionFactory = get_session_factory(self.settings)
         with SessionFactory() as session:
             # Resolve category by name or slug
             matched_cat = session.scalar(
