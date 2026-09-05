@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from mymonee.config import get_settings
+from mymonee.config import Settings
 from mymonee.mcp.errors import AgentServiceError, ErrorCode
 from mymonee.mcp.limits import Limits
 from mymonee.mcp.principal import create_agent_principal
@@ -54,11 +54,10 @@ def test_query_length_bounding():
     assert exc_info.value.code == ErrorCode.LIMIT_EXCEEDED
 
 
-def test_service_rate_limiter():
+def test_service_rate_limiter(test_settings: Settings):
     """Verify that rapid successive calls trigger RATE_LIMITED error."""
-    settings = get_settings()
     principal = create_agent_principal()
-    service = AgentService(principal, settings=settings)
+    service = AgentService(principal, settings=test_settings)
 
     # Exhaust rate limit
     for _ in range(Limits.RATE_LIMIT_PER_MINUTE):

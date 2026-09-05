@@ -3,17 +3,67 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from mymonee.config import get_settings
+from mymonee.config import Settings
+from mymonee.db.models import Category, Subcategory, Transaction, new_id, utcnow
 from mymonee.mcp.principal import create_agent_principal
 from mymonee.mcp.service import AgentService
 
 
 @pytest.fixture
-def agent_service() -> AgentService:
-    settings = get_settings()
+def agent_service(db_session: Session, test_settings: Settings) -> AgentService:
+    # Seed isolated sample data into test database
+    food_cat = db_session.scalar(select(Category).where(Category.slug == "food"))
+    groceries_sub = db_session.scalar(select(Subcategory).where(Subcategory.slug == "groceries"))
+    income_cat = db_session.scalar(select(Category).where(Category.slug == "income"))
+
+    tx_zepto = Transaction(
+        id=new_id(),
+        account="HDFC Bank XX1234",
+        source="test",
+        fingerprint=f"test-zepto-{new_id()}",
+        transaction_date=utcnow(),
+        amount=540.00,
+        currency="INR",
+        direction="debit",
+        transaction_type="DEBIT",
+        merchant_raw="Zepto Quick Commerce",
+        merchant_normalized="Zepto",
+        category_id=food_cat.id if food_cat else None,
+        subcategory_id=groceries_sub.id if groceries_sub else None,
+        is_duplicate=False,
+        is_transfer=False,
+        excludes_from_spending=False,
+        needs_review=False,
+        user_verified=True,
+    )
+    tx_salary = Transaction(
+        id=new_id(),
+        account="Salary Account XX5678",
+        source="test",
+        fingerprint=f"test-salary-{new_id()}",
+        transaction_date=utcnow(),
+        amount=150000.00,
+        currency="INR",
+        direction="credit",
+        transaction_type="CREDIT",
+        merchant_raw="ACME Corp",
+        merchant_normalized="acme corp",
+        category_id=income_cat.id if income_cat else None,
+        description="Salary credit /Sala/2026",
+        is_duplicate=False,
+        is_transfer=False,
+        excludes_from_spending=False,
+        needs_review=False,
+        user_verified=True,
+    )
+    db_session.add_all([tx_zepto, tx_salary])
+    db_session.commit()
+
     principal = create_agent_principal(actor="pytest")
-    return AgentService(principal=principal, settings=settings)
+    return AgentService(principal=principal, settings=test_settings)
 
 
 def test_get_financial_summary(agent_service: AgentService):

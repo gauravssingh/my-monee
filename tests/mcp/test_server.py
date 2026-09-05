@@ -7,13 +7,14 @@ import asyncio
 import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
+from mymonee.config import Settings
 from mymonee.mcp.capabilities import AGENT_CAPABILITY_NAMES
 from mymonee.mcp.server import create_mcp_server
 
 
-def test_server_tool_registration_matches_capabilities():
+def test_server_tool_registration_matches_capabilities(test_settings: Settings, db_session):
     async def _run():
-        server = create_mcp_server()
+        server = create_mcp_server(settings=test_settings)
         tools = await server.list_tools()
         registered_names = {t.name for t in tools}
 
@@ -34,9 +35,9 @@ def test_server_tool_registration_matches_capabilities():
     asyncio.run(_run())
 
 
-def test_server_call_tool_success():
+def test_server_call_tool_success(test_settings: Settings, db_session):
     async def _run():
-        server = create_mcp_server()
+        server = create_mcp_server(settings=test_settings)
         res = await server.call_tool("get_agent_capabilities", {})
         assert not res.is_error
         assert res.structured_content is not None
@@ -46,9 +47,9 @@ def test_server_call_tool_success():
     asyncio.run(_run())
 
 
-def test_server_call_tool_invalid_argument_error_boundary():
+def test_server_call_tool_invalid_argument_error_boundary(test_settings: Settings, db_session):
     async def _run():
-        server = create_mcp_server()
+        server = create_mcp_server(settings=test_settings)
         with pytest.raises(ToolError) as exc_info:
             await server.call_tool("get_financial_summary", {"month": "bad-month-99"})
 

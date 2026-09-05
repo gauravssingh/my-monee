@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from mymonee.config import get_settings
+from mymonee.config import Settings
 from mymonee.mcp.errors import AgentServiceError, ErrorCode
 from mymonee.mcp.principal import create_agent_principal
 from mymonee.mcp.service import AgentService
@@ -16,10 +16,9 @@ from mymonee.mcp.validators import (
 
 
 @pytest.fixture
-def service() -> AgentService:
-    settings = get_settings()
+def service(db_session, test_settings: Settings) -> AgentService:
     principal = create_agent_principal()
-    return AgentService(principal=principal, settings=settings)
+    return AgentService(principal=principal, settings=test_settings)
 
 
 def test_sql_injection_treated_as_literal_text(service: AgentService):

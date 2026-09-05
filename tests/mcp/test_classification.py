@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from mymonee.config import get_settings
+from mymonee.config import Settings
 from mymonee.db.models import (
     Category,
     ClassificationRule,
@@ -22,10 +23,9 @@ from mymonee.mcp.service import AgentService
 
 
 @pytest.fixture
-def agent_service() -> AgentService:
-    settings = get_settings()
+def agent_service(db_session: Session, test_settings: Settings) -> AgentService:
     principal = create_agent_principal(actor="pytest")
-    return AgentService(principal=principal, settings=settings)
+    return AgentService(principal=principal, settings=test_settings)
 
 
 def test_public_id_reversible_roundtrip():
@@ -52,10 +52,30 @@ def test_public_id_tamper_detection():
 
 
 def test_get_unclassified_spends(agent_service: AgentService):
+    SessionFactory = get_session_factory(agent_service.settings)
+    with SessionFactory() as session:
+        test_tx = Transaction(
+            id=new_id(),
+            account="HDFC Bank",
+            source="test",
+            fingerprint=f"test-unclassified-probe-{new_id()}",
+            transaction_date=utcnow(),
+            amount=120.00,
+            currency="INR",
+            direction="debit",
+            merchant_raw="Corner Bakery",
+            merchant_normalized="corner bakery",
+            needs_review=True,
+            user_verified=False,
+        )
+        session.add(test_tx)
+        session.commit()
+
     res = agent_service.get_unclassified_spends(limit=5)
     assert hasattr(res, "items")
     assert hasattr(res, "total_count")
-    assert res.total_count >= 0
+    assert res.total_count >= 1
+    assert len(res.items) >= 1
 
     for item in res.items:
         assert item.public_id.startswith("txn_")
@@ -67,7 +87,7 @@ def test_get_unclassified_spends(agent_service: AgentService):
 
 
 def test_classify_transaction_flow(agent_service: AgentService):
-    SessionFactory = get_session_factory()
+    SessionFactory = get_session_factory(agent_service.settings)
     with SessionFactory() as session:
         # Create a fresh test category, subcategory, account, and unreviewed transaction
         cat = session.scalar(select(Category).where(Category.slug == "food-dining"))

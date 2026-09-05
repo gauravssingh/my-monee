@@ -23,7 +23,7 @@ def _sqlite_url(path: Path) -> str:
 
 def _configure_sqlite(engine: Engine) -> None:
     @event.listens_for(engine, "connect")
-    def set_sqlite_pragma(dbapi_connection, connection_record) -> None:  # noqa: ARG001
+    def set_sqlite_pragma(dbapi_connection, connection_record) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
@@ -33,8 +33,13 @@ def _configure_sqlite(engine: Engine) -> None:
 
 def init_engine(settings: Settings | None = None) -> Engine:
     global _engine, _SessionLocal
+    if _engine is not None:
+        try:
+            _engine.dispose()
+        except Exception:  # noqa: BLE001, S110
+            pass
     settings = settings or get_settings()
-    db_path = settings.database_path()
+    db_path = settings.database_path().resolve()
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     engine = create_engine(
@@ -42,20 +47,35 @@ def init_engine(settings: Settings | None = None) -> Engine:
         echo=settings.database.echo,
         future=True,
     )
+    engine._mymonee_db_path = db_path
     _configure_sqlite(engine)
     _engine = engine
     _SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
     return engine
 
 
-def get_engine() -> Engine:
+def get_engine(settings: Settings | None = None) -> Engine:
+    if settings is not None:
+        target_path = settings.database_path().resolve()
+        if _engine is not None and getattr(_engine, "_mymonee_db_path", None) == target_path:
+            return _engine
+        return init_engine(settings)
     if _engine is None:
         return init_engine()
     return _engine
 
 
-def get_session_factory() -> sessionmaker[Session]:
-    if _SessionLocal is None:
+def get_session_factory(settings: Settings | None = None) -> sessionmaker[Session]:
+    if settings is not None:
+        target_path = settings.database_path().resolve()
+        if (
+            _engine is not None
+            and _SessionLocal is not None
+            and getattr(_engine, "_mymonee_db_path", None) == target_path
+        ):
+            return _SessionLocal
+        init_engine(settings)
+    elif _SessionLocal is None:
         init_engine()
     assert _SessionLocal is not None
     return _SessionLocal
@@ -101,14 +121,11 @@ def init_db(settings: Settings | None = None) -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "CREATE TABLE IF NOT EXISTS schema_meta ("
-                "key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+                "CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
             )
         )
         conn.execute(
-            text(
-                "INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', '1')"
-            )
+            text("INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', '1')")
         )
 
 
