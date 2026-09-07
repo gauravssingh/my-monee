@@ -27,7 +27,11 @@ def _configure_sqlite(engine: Engine) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA cache_size=-64000")
+        cursor.execute("PRAGMA mmap_size=268435456")
+        cursor.execute("PRAGMA temp_store=MEMORY")
         cursor.close()
 
 
@@ -109,15 +113,43 @@ def _migrate_columns(engine: Engine) -> None:
                 )
 
 
+def _migrate_indexes(engine: Engine) -> None:
+    """Additive migration ensuring critical performance and foreign key indexes exist."""
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS ix_tx_category ON transactions (category_id);",
+        "CREATE INDEX IF NOT EXISTS ix_tx_subcategory ON transactions (subcategory_id);",
+        "CREATE INDEX IF NOT EXISTS ix_tx_merchant_entity ON transactions (merchant_entity_id);",
+        "CREATE INDEX IF NOT EXISTS ix_tx_source_email ON transactions (source_email_id);",
+        "CREATE INDEX IF NOT EXISTS ix_data_issue_tx_status ON data_issue_flags (transaction_id, status);",
+        "CREATE INDEX IF NOT EXISTS ix_subcategories_slug ON subcategories (slug);",
+        "CREATE INDEX IF NOT EXISTS ix_emails_received_at ON emails (received_at);",
+        "CREATE INDEX IF NOT EXISTS ix_emails_parse_status ON emails (parse_status);",
+        "CREATE INDEX IF NOT EXISTS ix_postings_event_id ON postings (event_id);",
+        "CREATE INDEX IF NOT EXISTS ix_postings_acc_dir ON postings (account_id, direction);",
+        "CREATE INDEX IF NOT EXISTS ix_merchant_aliases_merchant_id ON merchant_aliases (merchant_id);",
+        "CREATE INDEX IF NOT EXISTS ix_subscriptions_recurring_tx_id ON subscriptions (recurring_transaction_id);",
+        "CREATE INDEX IF NOT EXISTS ix_bills_recurring_tx_id ON bills (recurring_transaction_id);",
+        "CREATE INDEX IF NOT EXISTS ix_tx_link_to ON transaction_links (to_transaction_id);",
+        "CREATE INDEX IF NOT EXISTS ix_ingestion_events_run_id ON ingestion_events (run_id);",
+        "CREATE INDEX IF NOT EXISTS ix_ingestion_runs_started_at ON ingestion_runs (started_at);",
+        "CREATE INDEX IF NOT EXISTS ix_classification_rules_merchant_entity ON classification_rules (merchant_entity_id);",
+        "CREATE INDEX IF NOT EXISTS ix_stmt_val_status ON credit_card_statements (validation_status);",
+    ]
+    with engine.begin() as conn:
+        for idx_sql in indexes:
+            conn.exec_driver_sql(idx_sql)
+
+
 def init_db(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     engine = init_engine(settings)
     Base.metadata.create_all(bind=engine)
     _migrate_columns(engine)
+    _migrate_indexes(engine)
     with Session(engine) as session:
         seed_defaults(session)
         session.commit()
-    # Record schema version for future migrations
+    # Record schema version for future migrations and run PRAGMA optimize
     with engine.begin() as conn:
         conn.execute(
             text(
@@ -127,6 +159,7 @@ def init_db(settings: Settings | None = None) -> None:
         conn.execute(
             text("INSERT OR IGNORE INTO schema_meta (key, value) VALUES ('schema_version', '1')")
         )
+        conn.exec_driver_sql("PRAGMA optimize;")
 
 
 def get_db() -> Generator[Session, None, None]:

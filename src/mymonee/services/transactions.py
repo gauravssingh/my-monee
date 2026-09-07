@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import case, exists, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from mymonee.db.models import (
@@ -157,17 +157,19 @@ def list_transactions(
             | (Transaction.account.ilike(like))
         )
     if date_from:
-        start = datetime.combine(date_from, time.min, tzinfo=timezone.utc)
+        start = datetime.combine(date_from, time.min, tzinfo=UTC)
         stmt = stmt.where(Transaction.transaction_date >= start)
     if date_to:
-        end = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=timezone.utc)
+        end = datetime.combine(date_to + timedelta(days=1), time.min, tzinfo=UTC)
         stmt = stmt.where(Transaction.transaction_date < end)
     if merchant_id:
         stmt = (
             stmt.where(Transaction.merchant_entity_id == merchant_id)
             .where(Transaction.is_transfer.is_(False))
             .where(Transaction.excludes_from_spending.is_(False))
-            .where(Transaction.transaction_type.notin_(["not_a_transaction", "declined", "transfer"]))
+            .where(
+                Transaction.transaction_type.notin_(["not_a_transaction", "declined", "transfer"])
+            )
         )
 
     cats = list(category_ids or [])
@@ -196,25 +198,29 @@ def list_transactions(
 
         if has_uncat and resolved_category_ids:
             stmt = stmt.where(
-                (Transaction.category_id.is_(None)) | (Transaction.category_id.in_(resolved_category_ids))
+                (Transaction.category_id.is_(None))
+                | (Transaction.category_id.in_(resolved_category_ids))
             )
         elif has_uncat:
             stmt = stmt.where(Transaction.category_id.is_(None))
         elif resolved_category_ids:
             if len(resolved_category_ids) == 1 and subcategory_id:
                 single_cat_id = next(iter(resolved_category_ids))
-                subcat_id_resolved = session.scalar(
-                    select(Subcategory.id).where(
-                        (Subcategory.id == subcategory_id)
-                        | (
-                            (Subcategory.category_id == single_cat_id)
-                            & (
-                                (func.lower(Subcategory.slug) == subcategory_id.lower())
-                                | (func.lower(Subcategory.name) == subcategory_id.lower())
+                subcat_id_resolved = (
+                    session.scalar(
+                        select(Subcategory.id).where(
+                            (Subcategory.id == subcategory_id)
+                            | (
+                                (Subcategory.category_id == single_cat_id)
+                                & (
+                                    (func.lower(Subcategory.slug) == subcategory_id.lower())
+                                    | (func.lower(Subcategory.name) == subcategory_id.lower())
+                                )
                             )
                         )
                     )
-                ) or subcategory_id
+                    or subcategory_id
+                )
                 stmt = stmt.where(
                     (Transaction.category_id == single_cat_id)
                     & (Transaction.subcategory_id == subcat_id_resolved)
@@ -226,14 +232,17 @@ def list_transactions(
     stmt = _apply_sort(base_filtered_stmt, sort_by, sort_dir)
 
     subq = base_filtered_stmt.subquery()
-    total = session.scalar(select(func.count()).select_from(subq)) or 0
-    total_amount = session.scalar(select(func.coalesce(func.sum(subq.c.amount), 0))) or 0
-    total_debit = session.scalar(
-        select(func.coalesce(func.sum(subq.c.amount), 0)).where(subq.c.direction == "debit")
-    ) or 0
-    total_credit = session.scalar(
-        select(func.coalesce(func.sum(subq.c.amount), 0)).where(subq.c.direction == "credit")
-    ) or 0
+    agg_row = session.execute(
+        select(
+            func.count(),
+            func.coalesce(func.sum(subq.c.amount), 0),
+            func.coalesce(func.sum(case((subq.c.direction == "debit", subq.c.amount), else_=0)), 0),
+            func.coalesce(
+                func.sum(case((subq.c.direction == "credit", subq.c.amount), else_=0)), 0
+            ),
+        ).select_from(subq)
+    ).one()
+    total, total_amount, total_debit, total_credit = agg_row
 
     rows = session.execute(stmt.limit(limit).offset(offset)).unique().scalars().all()
     return {
@@ -360,6 +369,7 @@ def classify_transaction(
     # 1. Deterministic User Rule Persistence
     if create_rule:
         from mymonee.classification.rules import upsert_user_classification_rule
+
         rule = upsert_user_classification_rule(
             session,
             tx,
@@ -379,8 +389,9 @@ def classify_transaction(
     _apply_category_side_effects(tx, category, subcategory)
     sync_transaction_postings(session, tx)
     tx.updated_at = utcnow()
-    
+
     from mymonee.services.ai import track_user_classification_feedback
+
     track_user_classification_feedback(
         session,
         transaction_id=tx.id,
@@ -397,7 +408,9 @@ def classify_transaction(
                     Transaction.id != tx.id,
                     Transaction.user_verified == False,
                     or_(
-                        Transaction.merchant_entity_id == tx.merchant_entity_id if tx.merchant_entity_id else False,
+                        Transaction.merchant_entity_id == tx.merchant_entity_id
+                        if tx.merchant_entity_id
+                        else False,
                         Transaction.merchant_normalized.ilike(merchant_name),
                         Transaction.merchant_raw.ilike(merchant_name),
                     ),
@@ -416,7 +429,11 @@ def classify_transaction(
                 _apply_category_side_effects(ptx, category, subcategory)
                 sync_transaction_postings(session, ptx)
                 ptx.updated_at = utcnow()
-            logger.info("Backfilled %d historical transactions for merchant %s", len(past_txs), merchant_name)
+            logger.info(
+                "Backfilled %d historical transactions for merchant %s",
+                len(past_txs),
+                merchant_name,
+            )
 
     session.flush()
     session.refresh(tx, attribute_names=["category", "subcategory"])
