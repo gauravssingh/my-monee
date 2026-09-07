@@ -677,7 +677,7 @@ GitHub (PR Merged into main)
          │
          │ HTTPS POST /webhooks/mymonee-deploy
          ▼
-Tailscale Funnel (Port 443 Ingress)
+Cloudflare Tunnel (HTTPS Ingress)
          │
          ▼
 Hermes Webhook Gateway (Port 8644)
@@ -703,5 +703,5 @@ Telegram Notification (Delivered to Chat ID 1117425083)
 ### Safety Principles:
 - **Zero Arbitrary Execution**: External webhook payloads are never passed to shell prompts or interpreted as commands. The agent executes a single, deterministic script.
 - **Working Tree Non-Interference**: Deployments reject dirty trees or feature branches without modifying, stashing, or overwriting developer checkouts.
-- **Direct Infrastructure**: Bypasses intermediate webhook microservices by leveraging native Hermes HMAC checking, event filtering, and Tailscale Funnel.
+- **Direct Infrastructure**: Bypasses intermediate webhook microservices by leveraging native Hermes HMAC checking, event filtering, and Cloudflare Tunnel.
 

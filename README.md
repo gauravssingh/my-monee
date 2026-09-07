@@ -298,7 +298,7 @@ Access the dashboard at **`http://<your-server-ip>:8477`**.
 For automated releases straight from GitHub PR merges into `main`:
 
 ```text
-GitHub (PR Merged) ──► Tailscale Funnel (:443) ──► Hermes Gateway (:8644) ──► scripts/trigger_deploy.sh
+GitHub (PR Merged) ──► Cloudflare Tunnel (HTTPS) ──► Hermes Gateway (:8644) ──► scripts/trigger_deploy.sh
 ```
 
 - **Safety Guardrails**: Fast-forwards `main`, aborts on uncommitted or dirty working tree state (`git status --porcelain`).
