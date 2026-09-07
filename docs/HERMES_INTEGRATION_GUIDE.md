@@ -253,7 +253,7 @@ GitHub (PR Merged into main)
           │
           │ POST /webhooks/mymonee-deploy (Signed HMAC-SHA256)
           ▼
-Tailscale Funnel (Port 443 HTTPS Proxy)
+Cloudflare Tunnel (HTTPS Ingress)
           │
           ▼
 Hermes Webhook Gateway (Port 8644)
@@ -282,7 +282,7 @@ Telegram Status Delivery (Chat ID: 1117425083)
 ```
 
 ### Architectural Principles:
-1. **No Intermediate Webhook Receivers**: GitHub talks directly to Hermes's native webhook platform via Tailscale Funnel. No custom microservice or HTTP listener needed.
+1. **No Intermediate Webhook Receivers**: GitHub talks directly to Hermes's native webhook platform via Cloudflare Tunnel. No custom microservice or HTTP listener needed.
 2. **Hard Security Boundary**: HMAC verification and declarative filtering occur at the gateway layer before any model turns or shell processes are spawned. Unsigned or non-qualifying requests are stopped at the edge.
 3. **Strict Deterministic Contract**: The agent is restricted to `terminal` toolset and given an explicit, un-improvised instruction to run `scripts/trigger_deploy.sh` and capture the exit code.
 4. **Development Checkout Safety**: The deployment script enforces branch purity and clean working trees; it will never stash or manipulate active development changes unexpectedly.
