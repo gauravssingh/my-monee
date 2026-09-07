@@ -43,7 +43,10 @@ def _configure_readonly_connection(engine: Engine) -> None:
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA query_only = ON;")
-            cursor.execute("PRAGMA busy_timeout = 2000;")
+            cursor.execute("PRAGMA busy_timeout = 5000;")
+            cursor.execute("PRAGMA cache_size = -64000;")
+            cursor.execute("PRAGMA mmap_size = 268435456;")
+            cursor.execute("PRAGMA temp_store = MEMORY;")
         finally:
             cursor.close()
 

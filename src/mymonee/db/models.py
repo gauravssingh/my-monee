@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -24,7 +24,7 @@ from sqlalchemy.types import JSON
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_id() -> str:
@@ -61,7 +61,10 @@ class Subcategory(Base):
 
     category: Mapped[Category] = relationship(back_populates="subcategories")
 
-    __table_args__ = (UniqueConstraint("category_id", "slug", name="uq_subcategory_slug"),)
+    __table_args__ = (
+        UniqueConstraint("category_id", "slug", name="uq_subcategory_slug"),
+        Index("ix_subcategories_slug", "slug"),
+    )
 
 
 class Merchant(Base):
@@ -97,7 +100,10 @@ class MerchantAlias(Base):
 
     merchant: Mapped[Merchant] = relationship(back_populates="aliases")
 
-    __table_args__ = (UniqueConstraint("alias_normalized", name="uq_merchant_alias_norm"),)
+    __table_args__ = (
+        UniqueConstraint("alias_normalized", name="uq_merchant_alias_norm"),
+        Index("ix_merchant_aliases_merchant_id", "merchant_id"),
+    )
 
 
 class Email(Base):
@@ -114,13 +120,18 @@ class Email(Base):
     parse_error: Mapped[str | None] = mapped_column(Text)
     provider_hint: Mapped[str | None] = mapped_column(String(100))
     headers_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
-    body_text: Mapped[str | None] = mapped_column(Text)
-    body_html: Mapped[str | None] = mapped_column(Text)
+    body_text: Mapped[str | None] = mapped_column(Text, deferred=True)
+    body_html: Mapped[str | None] = mapped_column(Text, deferred=True)
     body_text_path: Mapped[str | None] = mapped_column(Text)  # opt-in raw storage
     extra_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_emails_received_at", "received_at"),
+        Index("ix_emails_parse_status", "parse_status"),
     )
 
 
@@ -190,6 +201,10 @@ class Transaction(Base):
         ),
         Index("ix_tx_date", "transaction_date"),
         Index("ix_tx_needs_review", "needs_review"),
+        Index("ix_tx_category", "category_id"),
+        Index("ix_tx_subcategory", "subcategory_id"),
+        Index("ix_tx_merchant_entity", "merchant_entity_id"),
+        Index("ix_tx_source_email", "source_email_id"),
         UniqueConstraint(
             "source",
             "fingerprint",
@@ -217,6 +232,7 @@ class TransactionLink(Base):
             "kind",
             name="uq_tx_link",
         ),
+        Index("ix_tx_link_to", "to_transaction_id"),
     )
 
 
@@ -241,6 +257,8 @@ class ClassificationRule(Base):
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
 
+    __table_args__ = (Index("ix_classification_rules_merchant_entity", "merchant_entity_id"),)
+
 
 class ClassificationCorrection(Base):
     """Audit trail of every user-driven category correction.
@@ -259,7 +277,9 @@ class ClassificationCorrection(Base):
     previous_subcategory_id: Mapped[str | None] = mapped_column(ForeignKey("subcategories.id"))
     previous_classification_source: Mapped[str | None] = mapped_column(String(32))
     previous_classification_confidence: Mapped[float | None] = mapped_column(Float)
-    previous_classification_signals: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+    previous_classification_signals: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, default=dict
+    )
 
     new_category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
     new_subcategory_id: Mapped[str | None] = mapped_column(ForeignKey("subcategories.id"))
@@ -303,6 +323,7 @@ class DataIssueFlag(Base):
         Index("ix_data_issue_status", "status"),
         Index("ix_data_issue_type", "issue_type"),
         Index("ix_data_issue_source", "source"),
+        Index("ix_data_issue_tx_status", "transaction_id", "status"),
     )
 
 
@@ -336,6 +357,8 @@ class IngestionRun(Base):
     error_summary: Mapped[str | None] = mapped_column(Text)
     extra_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
 
+    __table_args__ = (Index("ix_ingestion_runs_started_at", "started_at"),)
+
 
 class IngestionEvent(Base):
     __tablename__ = "ingestion_events"
@@ -350,6 +373,8 @@ class IngestionEvent(Base):
     extra_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    __table_args__ = (Index("ix_ingestion_events_run_id", "run_id"),)
+
 
 class AppSetting(Base):
     __tablename__ = "settings"
@@ -359,8 +384,6 @@ class AppSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
-
-
 
 
 class Institution(Base):
@@ -404,7 +427,6 @@ class Account(Base):
     )
 
 
-
 class FinancialEvent(Base):
     __tablename__ = "financial_events"
 
@@ -430,9 +452,16 @@ class Posting(Base):
     account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
     category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
     amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
-    direction: Mapped[str] = mapped_column(String(16), nullable=False) # debit/credit
-    posting_type: Mapped[str] = mapped_column(String(32), nullable=False) # expense, liability_decrease, asset_decrease, etc
+    direction: Mapped[str] = mapped_column(String(16), nullable=False)  # debit/credit
+    posting_type: Mapped[str] = mapped_column(
+        String(32), nullable=False
+    )  # expense, liability_decrease, asset_decrease, etc
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
+
+    __table_args__ = (
+        Index("ix_postings_event_id", "event_id"),
+        Index("ix_postings_acc_dir", "account_id", "direction"),
+    )
 
 
 class IncomeSource(Base):
@@ -443,7 +472,7 @@ class IncomeSource(Base):
     category_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id"))
     account_id: Mapped[str | None] = mapped_column(ForeignKey("accounts.id"))
     expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
-    frequency: Mapped[str] = mapped_column(String(32)) # monthly, weekly, etc
+    frequency: Mapped[str] = mapped_column(String(32))  # monthly, weekly, etc
     next_expected_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
 
@@ -468,7 +497,9 @@ class RecurringTransaction(Base):
     next_expected_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
-    status: Mapped[str] = mapped_column(String(32), default="detected") # detected, active, paused, cancelled, ignored
+    status: Mapped[str] = mapped_column(
+        String(32), default="detected"
+    )  # detected, active, paused, cancelled, ignored
 
     matching_rules_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
 
@@ -483,7 +514,9 @@ class TransactionRecurringLink(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     transaction_id: Mapped[str] = mapped_column(ForeignKey("transactions.id"), nullable=False)
-    recurring_transaction_id: Mapped[str] = mapped_column(ForeignKey("recurring_transactions.id"), nullable=False)
+    recurring_transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("recurring_transactions.id"), nullable=False
+    )
     match_type: Mapped[str] = mapped_column(String(32), default="auto")  # auto, manual
     confidence: Mapped[float | None] = mapped_column(Float)
     matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -501,50 +534,64 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    recurring_transaction_id: Mapped[str] = mapped_column(ForeignKey("recurring_transactions.id"), nullable=False)
+    recurring_transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("recurring_transactions.id"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    
+
     amount: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
     annual_cost: Mapped[float | None] = mapped_column(Numeric(18, 4))
-    
+
     last_paid_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_paid_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
     next_expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
-    
-    status: Mapped[str] = mapped_column(String(32), default="detected") # detected, active, paused, cancelled, ignored
-    
+
+    status: Mapped[str] = mapped_column(
+        String(32), default="detected"
+    )  # detected, active, paused, cancelled, ignored
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+    __table_args__ = (Index("ix_subscriptions_recurring_tx_id", "recurring_transaction_id"),)
 
 
 class Bill(Base):
     __tablename__ = "bills"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    recurring_transaction_id: Mapped[str] = mapped_column(ForeignKey("recurring_transactions.id"), nullable=False)
+    recurring_transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("recurring_transactions.id"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    
-    bill_type: Mapped[str] = mapped_column(String(32), default="OTHER") # UTILITY, SUBSCRIPTION, INSURANCE, RENT, LOAN, CREDIT_CARD, OTHER
+
+    bill_type: Mapped[str] = mapped_column(
+        String(32), default="OTHER"
+    )  # UTILITY, SUBSCRIPTION, INSURANCE, RENT, LOAN, CREDIT_CARD, OTHER
     autopay: Mapped[bool] = mapped_column(Boolean, default=False)
-    
+
     minimum_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
     average_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
     median_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
     max_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
     amount_stddev: Mapped[float | None] = mapped_column(Numeric(18, 4))
-    
+
     last_paid_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_paid_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
     next_expected_amount: Mapped[float | None] = mapped_column(Numeric(18, 4))
-    
-    status: Mapped[str] = mapped_column(String(32), default="detected") # detected, active, paused, cancelled, ignored
-    
+
+    status: Mapped[str] = mapped_column(
+        String(32), default="detected"
+    )  # detected, active, paused, cancelled, ignored
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
+
+    __table_args__ = (Index("ix_bills_recurring_tx_id", "recurring_transaction_id"),)
 
 
 class Budget(Base):
@@ -563,12 +610,12 @@ class AIOperation(Base):
     __tablename__ = "ai_operations"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    operation_type: Mapped[str] = mapped_column(String(64), nullable=False) # e.g. classification
-    provider: Mapped[str] = mapped_column(String(64), nullable=False) # e.g. gemini
-    model: Mapped[str] = mapped_column(String(64), nullable=False) # e.g. gemini-2.5-flash
+    operation_type: Mapped[str] = mapped_column(String(64), nullable=False)  # e.g. classification
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)  # e.g. gemini
+    model: Mapped[str] = mapped_column(String(64), nullable=False)  # e.g. gemini-2.5-flash
     prompt_version: Mapped[str | None] = mapped_column(String(64))
 
-    source_type: Mapped[str] = mapped_column(String(64)) # e.g. transaction
+    source_type: Mapped[str] = mapped_column(String(64))  # e.g. transaction
     source_id: Mapped[str] = mapped_column(String(36))
 
     input_hash: Mapped[str | None] = mapped_column(String(128))
@@ -576,7 +623,9 @@ class AIOperation(Base):
     output_json: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     confidence: Mapped[float | None] = mapped_column(Float)
-    status: Mapped[str] = mapped_column(String(32), default="suggested") # suggested, accepted, corrected, ignored, failed, invalid
+    status: Mapped[str] = mapped_column(
+        String(32), default="suggested"
+    )  # suggested, accepted, corrected, ignored, failed, invalid
     validation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -693,7 +742,9 @@ class StatementAccount(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     statement: Mapped[CreditCardStatement] = relationship(back_populates="statement_accounts")
-    transactions: Mapped[list[StatementTransaction]] = relationship(back_populates="statement_account")
+    transactions: Mapped[list[StatementTransaction]] = relationship(
+        back_populates="statement_account"
+    )
 
     __table_args__ = (
         Index("ix_stmt_acc_stmt_id", "statement_id"),
@@ -778,9 +829,15 @@ class StatementTransaction(Base):
     raw_text: Mapped[str | None] = mapped_column(Text)
     source_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict)
 
-    attribution_status: Mapped[str] = mapped_column(String(32), default="UNKNOWN")  # EXACT, UNKNOWN, INFERRED
-    matched_transaction_id: Mapped[str | None] = mapped_column(ForeignKey("transactions.id", ondelete="SET NULL"))
-    match_status: Mapped[str] = mapped_column(String(32), default="UNMATCHED")  # UNMATCHED, MATCHED, POSSIBLE_MATCH, DUPLICATE, LIABILITY_PAYMENT
+    attribution_status: Mapped[str] = mapped_column(
+        String(32), default="UNKNOWN"
+    )  # EXACT, UNKNOWN, INFERRED
+    matched_transaction_id: Mapped[str | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL")
+    )
+    match_status: Mapped[str] = mapped_column(
+        String(32), default="UNMATCHED"
+    )  # UNMATCHED, MATCHED, POSSIBLE_MATCH, DUPLICATE, LIABILITY_PAYMENT
     match_confidence: Mapped[float | None] = mapped_column(Float)
     match_reason: Mapped[str | None] = mapped_column(Text)
 
@@ -788,7 +845,9 @@ class StatementTransaction(Base):
 
     statement: Mapped[CreditCardStatement] = relationship(back_populates="transactions")
     statement_account: Mapped[StatementAccount | None] = relationship(back_populates="transactions")
-    matched_transaction: Mapped[Transaction | None] = relationship("Transaction", foreign_keys=[matched_transaction_id])
+    matched_transaction: Mapped[Transaction | None] = relationship(
+        "Transaction", foreign_keys=[matched_transaction_id]
+    )
 
     __table_args__ = (
         Index("ix_stmt_tx_stmt_id", "statement_id"),
@@ -842,11 +901,10 @@ class StatementProcessingEvent(Base):
 
 
 @event.listens_for(Transaction, "before_update")
-def _touch_transaction_updated_at(mapper, connection, target: Transaction) -> None:  # noqa: ARG001
+def _touch_transaction_updated_at(mapper, connection, target: Transaction) -> None:
     target.updated_at = utcnow()
 
 
 @event.listens_for(CreditCardStatement, "before_update")
-def _touch_statement_updated_at(mapper, connection, target: CreditCardStatement) -> None:  # noqa: ARG001
+def _touch_statement_updated_at(mapper, connection, target: CreditCardStatement) -> None:
     target.updated_at = utcnow()
-

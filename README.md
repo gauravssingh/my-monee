@@ -174,11 +174,93 @@ $ mymonee data export --output ledger_export.json
 
 ---
 
-## 🚀 Deployment Guides
+## 🚀 Getting Started & Installation
 
-### Option 1: Docker Compose (Recommended for Self-Hosting & NAS)
+> [!TIP]
+> For a comprehensive, illustrated setup walkthrough with Google Cloud Console screenshots and troubleshooting, see the [Complete New User Setup Guide](docs/SETUP_GUIDE.md).
 
-Ideal for Synology, TrueNAS, Raspberry Pi, or local Linux home servers:
+### 📋 Prerequisites
+
+* **Python 3.12+** (`python3 --version`)
+* **Node.js 20+** & **npm** (`node --version`)
+* **Google Cloud Account** (for free, read-only Gmail API access to ingest notification alerts)
+
+---
+
+### Option 1: Native macOS Installation (Recommended)
+
+Ideal for running locally or as a 24/7 background daemon on a Mac mini or MacBook:
+
+#### 1. Clone & Set Up Python Virtual Environment
+```bash
+git clone https://github.com/gauravssingh/my-monee.git
+cd my-monee
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -e ".[dev]"
+```
+
+#### 2. Build the Web Frontend
+The frontend is a React + TypeScript single-page application served directly by FastAPI from `web/dist`:
+```bash
+cd web
+npm install
+npm run build
+cd ..
+```
+
+#### 3. Configure Google Cloud OAuth (Gmail Alerts Ingestion)
+To sync bank debits, credit card alerts, and UPI receipts directly from your email:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) and create a project (e.g. `MyMonee`).
+2. Navigate to **APIs & Services** → **Library**, search for **Gmail API**, and click **Enable**.
+3. Under **OAuth consent screen**:
+   - Choose **External** → enter app name (`MyMonee`) and your email.
+   - Add scope: `https://www.googleapis.com/auth/gmail.readonly`.
+   - Under **Test Users**, add your Gmail address.
+4. Under **Credentials** → **Create Credentials** → **OAuth client ID**:
+   - Select **Web application** (or Desktop app).
+   - Set **Authorized redirect URIs** to: `http://127.0.0.1:8477/oauth/callback`.
+   - Download the client JSON.
+5. Save the file to `~/Library/Application Support/ExpenseTracker/gmail_credentials.json`, or import it directly via the web UI in Step 4.
+
+#### 4. Run the Application & Complete Onboarding
+```bash
+python -m mymonee
+```
+Open **`http://localhost:8477`** in your browser. The **5-Step Calibration Wizard** will guide you through:
+* Currency & regional formatting (`INR ₹`, `USD $`, `EUR €`)
+* One-click Gmail OAuth authorization (tokens are safely stored in your macOS Keychain)
+* Auto-discovery of bank accounts and cards from past emails
+* Pay-period salary attribution rules and fixed commitments (Rent, EMIs, Subscriptions)
+
+*(Alternatively, try the dashboard without connecting Gmail by visiting **Settings** → **"Run demo emails"**).*
+
+#### 5. Run 24/7 as a Background Daemon (`launchd`)
+To keep MyMonee running continuously in the background and auto-start on boot:
+```bash
+# 1. Copy the LaunchAgent template
+cp scripts/launchd/com.personal.my-monee.plist.example ~/Library/LaunchAgents/com.personal.my-monee.plist
+
+# 2. Edit ~/Library/LaunchAgents/com.personal.my-monee.plist and replace /Users/YOU with your actual home directory
+
+# 3. Create log directory and load the agent
+mkdir -p ~/Library/Logs/my-monee
+chmod +x scripts/run_server.sh
+launchctl load -w ~/Library/LaunchAgents/com.personal.my-monee.plist
+```
+
+---
+
+### Option 2: Docker Compose (NAS / Linux / Raspberry Pi)
+
+Ideal for Synology, TrueNAS, Raspberry Pi, or home server environments:
+
+```bash
+mkdir -p data config
+```
+
+Place your `gmail_credentials.json` into `./data/gmail_credentials.json`, then launch:
 
 ```yaml
 # docker-compose.yml
@@ -208,41 +290,6 @@ services:
 docker compose up -d
 ```
 Access the dashboard at **`http://<your-server-ip>:8477`**.
-
----
-
-### Option 2: Native macOS Installation (Daemon via `launchd`)
-
-Ideal for running 24/7 on a Mac mini or MacBook:
-
-1. **Set Up Python Environment**:
-   ```bash
-   git clone https://github.com/gauravssingh/my-monee.git
-   cd my-monee
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -e ".[dev]"
-   ```
-
-2. **Build Web Frontend**:
-   ```bash
-   cd web
-   npm install
-   npm run build
-   cd ..
-   ```
-
-3. **Run Application**:
-   ```bash
-   python -m mymonee
-   ```
-   Open **`http://localhost:8477`** in your browser.
-
-4. **Background Service (`launchd`)**:
-   ```bash
-   cp scripts/launchd/com.personal.mymonee.plist.example ~/Library/LaunchAgents/com.personal.mymonee.plist
-   launchctl load -w ~/Library/LaunchAgents/com.personal.mymonee.plist
-   ```
 
 ---
 
