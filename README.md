@@ -172,6 +172,24 @@ $ mymonee reconcile
 $ mymonee data export --output ledger_export.json
 ```
 
+### 🔎 Optional: Semantic Search over the Ledger
+
+With the local [`embedding-g2`](docs/EMBEDDINGS.md) service running, the ledger can be indexed
+with local embeddings and searched by meaning instead of keywords. Disabled by default; nothing
+leaves the machine. Once enabled, ledger changes queue indexing work automatically — edits,
+reclassifications and exclusions keep the index in step, and semantic search never returns a stale
+vector while a re-index is pending.
+
+```bash
+$ mymonee embeddings status      # coverage + live model compatibility
+$ mymonee embeddings index       # enqueue and embed only what is missing or changed
+$ mymonee embeddings process     # drain the durable job queue
+$ mymonee embeddings search "morning coffee and pastries"
+```
+
+See [Local Embeddings & Semantic Search](docs/EMBEDDINGS.md) for enablement, the durable job
+queue, vector compatibility rules, and failure behaviour.
+
 ---
 
 ## 🚀 Getting Started & Installation
