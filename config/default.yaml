@@ -53,3 +53,15 @@ ai:
     - gemini-3.7-flash
     - gemini-3.5-flash-lite
     - gemini-3.1-flash-lite
+
+# Local embedding-g2 service (loopback only) — semantic search over the ledger.
+# Disabled by default; enable with embeddings.enabled=true in config.local.yaml.
+embeddings:
+  enabled: false
+  base_url: http://127.0.0.1:8001
+  timeout_seconds: 35.0
+  batch_size: 50
+  request_max_attempts: 5
+  max_attempts: 5
+  backoff_seconds: 0.5
+  stale_job_seconds: 300

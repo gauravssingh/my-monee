@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -10,9 +12,6 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
-
-import os
-import sys
 
 def default_data_dir() -> Path:
     # 1. Environment variable override
@@ -120,12 +119,48 @@ class DashboardConfig(BaseModel):
 class BankingConfig(BaseModel):
     upi_handles: list[str] = Field(
         default_factory=lambda: [
-            "okaxis", "okicici", "oksbi", "okhdfcbank", 
-            "ybl", "ibl", "axl", "paytm", "apl",
-            "sbi", "hdfcbank", "icici", "axisbank", 
-            "upi", "pnb", "kotak", "barodampay"
+            "okaxis",
+            "okicici",
+            "oksbi",
+            "okhdfcbank",
+            "ybl",
+            "ibl",
+            "axl",
+            "paytm",
+            "apl",
+            "sbi",
+            "hdfcbank",
+            "icici",
+            "axisbank",
+            "upi",
+            "pnb",
+            "kotak",
+            "barodampay",
         ]
     )
+
+
+class EmbeddingsConfig(BaseModel):
+    """Local embedding service integration (embedding-g2) for semantic search over the ledger.
+
+    Disabled by default, like other opt-in inference features. This integration only talks to a
+    service on the loopback interface; no transaction data leaves the machine.
+    """
+
+    enabled: bool = False
+    base_url: str = "http://127.0.0.1:8001"
+    # embedding-g2 queues inference internally (30s budget) before answering, so allow more.
+    timeout_seconds: float = 35.0
+    # At or below embedding-g2's max_batch_size (50).
+    batch_size: int = 50
+    # Transient-failure retries per HTTP request (503 SERVER_BUSY / MODEL_NOT_READY / transport).
+    request_max_attempts: int = 5
+    # Durable job attempts before a job is marked failed (each attempt may issue requests).
+    max_attempts: int = 5
+    backoff_seconds: float = 0.5
+    # A job left "running" for longer than this (a crashed run) may be reclaimed.
+    stale_job_seconds: int = 300
+
 
 class Settings(BaseSettings):
     app: AppConfig = Field(default_factory=AppConfig)
@@ -138,6 +173,7 @@ class Settings(BaseSettings):
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     banking: BankingConfig = Field(default_factory=BankingConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
+    embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
 
     def resolved_data_dir(self) -> Path:
         path = self.app.data_dir or default_data_dir()
@@ -163,9 +199,13 @@ class Settings(BaseSettings):
         legacy_nested = data_dir / "db" / "expense_tracker.db"
 
         # If legacy database with data exists and configured is smaller/empty, use legacy
-        if legacy.exists() and (not configured.exists() or legacy.stat().st_size > configured.stat().st_size):
+        if legacy.exists() and (
+            not configured.exists() or legacy.stat().st_size > configured.stat().st_size
+        ):
             return legacy
-        if legacy_nested.exists() and (not configured.exists() or legacy_nested.stat().st_size > configured.stat().st_size):
+        if legacy_nested.exists() and (
+            not configured.exists() or legacy_nested.stat().st_size > configured.stat().st_size
+        ):
             return legacy_nested
 
         if configured.exists():
@@ -210,7 +250,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Config root must be a mapping: {path}")
+        raise ValueError(f"Config root must be a mapping: {path}")  # noqa: TRY004
     return data
 
 

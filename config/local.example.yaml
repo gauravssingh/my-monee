@@ -31,3 +31,15 @@ ai: {}
   #   - gemini-3.7-flash
   #   - gemini-3.5-flash-lite
   #   - gemini-3.1-flash-lite
+
+embeddings: {}
+  # Local embedding-g2 service on the loopback interface (no data leaves the machine).
+  # Requires embedding-g2 to be running: curl -s http://127.0.0.1:8001/health
+  # enabled: true
+  # base_url: http://127.0.0.1:8001
+  # timeout_seconds: 35.0   # must exceed embedding-g2's 30s inference-queue budget
+  # batch_size: 50          # embedding-g2 max_batch_size
+  # request_max_attempts: 5 # HTTP attempts per request (transient failures only)
+  # max_attempts: 5         # durable job attempts before a job is marked failed
+  # backoff_seconds: 0.5
+  # stale_job_seconds: 300

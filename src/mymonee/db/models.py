@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Numeric,
     String,
     Text,
@@ -897,6 +898,95 @@ class StatementProcessingEvent(Base):
     __table_args__ = (
         Index("ix_stmt_event_stmt_id", "statement_id"),
         Index("ix_stmt_event_stage", "stage"),
+    )
+
+
+class TransactionEmbedding(Base):
+    """A stored embedding-g2 vector for one transaction, pinned to a model revision.
+
+    The compatibility key (model_id / model_revision / preprocessing_version / dimensions) is
+    stored per row: vectors produced by different model revisions are not comparable and must
+    never be mixed in one similarity computation. `vector` holds little-endian packed float32.
+    """
+
+    __tablename__ = "transaction_embeddings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    transaction_id: Mapped[str] = mapped_column(
+        ForeignKey("transactions.id", ondelete="CASCADE"), nullable=False
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    model_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    model_revision: Mapped[str | None] = mapped_column(String(64))
+    preprocessing_version: Mapped[str | None] = mapped_column(String(32))
+    dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Part of the compatibility key: cosine similarity is only valid for unit-normalized vectors,
+    # and the client refuses to store anything else, so this is a per-row assertion of that fact.
+    normalization: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
+
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    vector: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+    transaction: Mapped[Transaction] = relationship(foreign_keys=[transaction_id])
+
+    @property
+    def compatibility_key(self) -> tuple[str, str | None, str | None, int, bool]:
+        """Fields that must match before two vectors may be compared (mirrors ServiceContract)."""
+        return (
+            self.model_id,
+            self.model_revision,
+            self.preprocessing_version,
+            self.dimensions,
+            self.normalization,
+        )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "transaction_id", "chunk_index", "model_revision", name="uq_tx_embedding_revision"
+        ),
+        Index("ix_tx_embedding_transaction", "transaction_id"),
+        Index("ix_tx_embedding_model_revision", "model_revision"),
+    )
+
+
+class EmbeddingJob(Base):
+    """Durable indexing queue row: one pending vector for one transaction chunk.
+
+    Jobs outlive the process. `attempts` plus `next_attempt_at` implement retry with exponential
+    backoff, so an embedding service that is down delays indexing without losing work or
+    blocking the ledger.
+    """
+
+    __tablename__ = "embedding_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    source_type: Mapped[str] = mapped_column(String(32), default="transaction", nullable=False)
+    source_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        UniqueConstraint("source_type", "source_id", "chunk_index", name="uq_embedding_job_source"),
+        Index("ix_embedding_job_status", "status"),
+        Index("ix_embedding_job_next_attempt", "next_attempt_at"),
     )
 
 
