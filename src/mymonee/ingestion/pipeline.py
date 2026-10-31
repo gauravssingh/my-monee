@@ -5,14 +5,14 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mymonee.config import Settings
 from mymonee.classification.enrichment import apply_parsed_enrichment
+from mymonee.config import Settings
 from mymonee.db.models import (
     Account,
     Email,
@@ -38,6 +38,40 @@ from mymonee.parsers.registry import registry
 
 logger = logging.getLogger(__name__)
 
+_RATE_LIMIT_STATUS_CODES = frozenset({403, 429})
+_RATE_LIMIT_TOKENS = ("quota", "rate limit", "ratelimitexceeded", "userrate")
+
+
+def _error_text(exc: BaseException) -> str:
+    """Everything the exception knows about itself, lowercased.
+
+    googleapiclient's `HttpError` only exposes the parsed `error.message` via
+    `reason`, but the raw body can carry the reason code (`rateLimitExceeded`)
+    when the message is empty.
+    """
+    parts = [str(exc), str(getattr(exc, "reason", ""))]
+    content = getattr(exc, "content", None)
+    if isinstance(content, bytes):
+        content = content.decode("utf-8", "replace")
+    if isinstance(content, str):
+        parts.append(content)
+    return " ".join(parts).lower()
+
+
+def _is_rate_limit_error(exc: BaseException) -> bool:
+    """True when Gmail throttled the request (quota / per-user rate limit).
+
+    googleapiclient raises plain `HttpError` for throttling, so counting those as
+    parser failures hides the real remedy (back off) behind a parse-error count.
+    """
+    status = getattr(exc, "status_code", None) or getattr(
+        getattr(exc, "resp", None), "status", None
+    )
+    if status not in _RATE_LIMIT_STATUS_CODES:
+        return False
+    text = _error_text(exc)
+    return any(token in text for token in _RATE_LIMIT_TOKENS)
+
 
 @dataclass
 class PipelineResult:
@@ -50,6 +84,7 @@ class PipelineResult:
     transactions_duplicated: int = 0
     transactions_rejected: int = 0
     parsing_errors: int = 0
+    rate_limited: int = 0
     auth_errors: int = 0
     error_summary: str | None = None
 
@@ -158,21 +193,25 @@ def _resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | N
 
     # 2. Check if an alias matches normalized name
     alias = session.scalar(
-        select(MerchantAlias).where(
+        select(MerchantAlias)
+        .where(
             (MerchantAlias.alias_normalized == norm_val)
             | (func.lower(MerchantAlias.alias_normalized) == norm_val.lower())
-        ).limit(1)
+        )
+        .limit(1)
     )
     if alias:
         return alias.merchant_id
 
     # 3. Check if Merchant exists by normalized_key or display_name
     merchant = session.scalar(
-        select(Merchant).where(
+        select(Merchant)
+        .where(
             (Merchant.normalized_key == norm_val)
             | (func.lower(Merchant.normalized_key) == norm_val.lower())
             | (func.lower(Merchant.display_name) == raw_val.lower())
-        ).limit(1)
+        )
+        .limit(1)
     )
     if merchant:
         return merchant.id
@@ -189,10 +228,12 @@ def _resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | N
 
     if raw:
         existing_alias = session.scalar(
-            select(MerchantAlias).where(
+            select(MerchantAlias)
+            .where(
                 (MerchantAlias.alias_normalized == norm_val)
                 | (func.lower(MerchantAlias.alias_normalized) == norm_val.lower())
-            ).limit(1)
+            )
+            .limit(1)
         )
         if not existing_alias:
             try:
@@ -205,7 +246,7 @@ def _resolve_merchant_entity_id(session: Session, raw: str | None, norm: str | N
                     )
                     session.add(alias)
                     session.flush()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
     return merchant.id
@@ -232,7 +273,12 @@ def _apply_parsed_fields(
     tx.transaction_type = parsed.transaction_type
     tx.merchant_raw = parsed.merchant_raw
     tx.merchant_normalized = normalize_merchant(parsed.merchant_raw)
-    is_transfer_tx = bool(extra.get("is_transfer", parsed.transaction_type == "transfer" or extra.get("category_slug") == "transfers"))
+    is_transfer_tx = bool(
+        extra.get(
+            "is_transfer",
+            parsed.transaction_type == "transfer" or extra.get("category_slug") == "transfers",
+        )
+    )
     if session is not None and not is_transfer_tx and parsed.transaction_type != "transfer":
         tx.merchant_entity_id = _resolve_merchant_entity_id(
             session, tx.merchant_raw, tx.merchant_normalized
@@ -372,9 +418,7 @@ def _persist_parsed(
         reference_number=parsed.reference_number,
     )
     source = f"gmail:{provider_hint}" if provider_hint else "gmail:unknown"
-    existing = session.scalar(
-        select(Transaction).where(Transaction.fingerprint == fingerprint)
-    )
+    existing = session.scalar(select(Transaction).where(Transaction.fingerprint == fingerprint))
     if existing is None and parsed.reference_number:
         existing = session.scalar(
             select(Transaction).where(
@@ -407,7 +451,7 @@ def _persist_parsed(
         raw_email_reference=message.id,
     )
     _apply_parsed_fields(tx, parsed, source=source, session=session)
-    
+
     # Ledger integration
     acc = _get_or_create_account(session, parsed)
     if acc:
@@ -419,7 +463,7 @@ def _persist_parsed(
             tx.account = f"{acc.name} ({num_str})"
         else:
             tx.account = acc.name
-    
+
     event = FinancialEvent(
         event_type="purchase" if parsed.direction == "debit" else "deposit",
         event_date=parsed.transaction_date,
@@ -429,30 +473,34 @@ def _persist_parsed(
     session.add(event)
     session.flush()
     tx.financial_event_id = event.id
-    
-    session.add(Posting(
-        event_id=event.id,
-        account_id=acc.id,
-        amount=parsed.amount,
-        direction=parsed.direction,
-        posting_type="asset_decrease" if parsed.direction == "debit" else "asset_increase"
-    ))
-    
+
+    session.add(
+        Posting(
+            event_id=event.id,
+            account_id=acc.id,
+            amount=parsed.amount,
+            direction=parsed.direction,
+            posting_type="asset_decrease" if parsed.direction == "debit" else "asset_increase",
+        )
+    )
+
     session.add(tx)
     session.flush()
-    
+
     # After apply_parsed_enrichment, the tx.category_id will be set if matched.
     # We should add the category posting.
     apply_parsed_enrichment(session, tx, parsed)
-    
+
     if tx.category_id:
-        session.add(Posting(
-            event_id=event.id,
-            category_id=tx.category_id,
-            amount=parsed.amount,
-            direction="credit" if parsed.direction == "debit" else "debit",
-            posting_type="expense" if parsed.direction == "debit" else "income"
-        ))
+        session.add(
+            Posting(
+                event_id=event.id,
+                category_id=tx.category_id,
+                amount=parsed.amount,
+                direction="credit" if parsed.direction == "debit" else "debit",
+                posting_type="expense" if parsed.direction == "debit" else "income",
+            )
+        )
 
     result.transactions_extracted += 1
 
@@ -471,9 +519,7 @@ def _build_query(
     if not ignore_watermark:
         watermark = _get_sync(session, "gmail.last_internal_date_ms")
         if watermark and watermark.value and watermark.value.isdigit():
-            dt = datetime.fromtimestamp(int(watermark.value) / 1000, tz=timezone.utc) - timedelta(
-                days=1
-            )
+            dt = datetime.fromtimestamp(int(watermark.value) / 1000, tz=UTC) - timedelta(days=1)
             return rules.build_gmail_query(after_date=dt.strftime("%Y/%m/%d"))
 
     if settings.gmail.sync_after_date:
@@ -512,7 +558,7 @@ def run_ingestion_pipeline(
     try:
         if source is None:
             source = GmailApiSource(settings)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.error("Gmail client initialization failed: %s", exc)
         result.auth_errors = 1
         result.status = IngestionRunStatus.FAILED
@@ -537,7 +583,7 @@ def run_ingestion_pipeline(
 
     try:
         message_ids = source.list_message_ids(query, max_results=max_messages)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.error("Failed to query Gmail messages: %s", exc)
         result.status = IngestionRunStatus.FAILED
         result.error_summary = f"list failed: {exc}"
@@ -563,9 +609,14 @@ def run_ingestion_pipeline(
                 ):
                     result.emails_skipped += 1
                     if existing.parse_status == EmailParseStatus.PARSED:
-                        tx_count = session.scalar(
-                            select(func.count()).select_from(Transaction).where(Transaction.source_email_id == existing.id)
-                        ) or 1
+                        tx_count = (
+                            session.scalar(
+                                select(func.count())
+                                .select_from(Transaction)
+                                .where(Transaction.source_email_id == existing.id)
+                            )
+                            or 1
+                        )
                         result.transactions_duplicated += tx_count
                     logger.debug("Skipped already processed message %s", message_id)
                     continue
@@ -587,7 +638,9 @@ def run_ingestion_pipeline(
                     )
                     result.emails_processed += 1
                     result.emails_skipped += 1
-                    logger.debug("Message %s skipped: not a financial candidate (%s)", message_id, reason)
+                    logger.debug(
+                        "Message %s skipped: not a financial candidate (%s)", message_id, reason
+                    )
                     continue
 
                 ctx = _to_email_context(message)
@@ -602,7 +655,12 @@ def run_ingestion_pipeline(
                     )
                     result.emails_processed += 1
                     result.transactions_rejected += 1
-                    logger.warning("No parser matched message %s (provider: %s, score: %.2f)", message_id, provider, provider_score)
+                    logger.warning(
+                        "No parser matched message %s (provider: %s, score: %.2f)",
+                        message_id,
+                        provider,
+                        provider_score,
+                    )
                     _log_event(
                         session,
                         run.id,
@@ -616,7 +674,7 @@ def run_ingestion_pipeline(
 
                 try:
                     parsed_list = plugin.parse(ctx)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     result.parsing_errors += 1
                     _upsert_email(
                         session,
@@ -626,7 +684,9 @@ def run_ingestion_pipeline(
                         parse_error=str(exc),
                     )
                     result.emails_processed += 1
-                    logger.warning("Parse error on message %s via %s: %s", message_id, plugin.name, exc)
+                    logger.warning(
+                        "Parse error on message %s via %s: %s", message_id, plugin.name, exc
+                    )
                     _log_event(
                         session,
                         run.id,
@@ -647,7 +707,9 @@ def run_ingestion_pipeline(
                     )
                     result.emails_processed += 1
                     result.transactions_rejected += 1
-                    logger.debug("Parser %s returned 0 transactions for message %s", plugin.name, message_id)
+                    logger.debug(
+                        "Parser %s returned 0 transactions for message %s", plugin.name, message_id
+                    )
                     continue
 
                 _upsert_email(
@@ -666,7 +728,13 @@ def run_ingestion_pipeline(
                         force_update=force_reparse,
                     )
                 result.emails_processed += 1
-                logger.debug("Parsed message %s into %d tx via %s (score=%.2f)", message_id, len(parsed_list), plugin.name, score)
+                logger.debug(
+                    "Parsed message %s into %d tx via %s (score=%.2f)",
+                    message_id,
+                    len(parsed_list),
+                    plugin.name,
+                    score,
+                )
                 _log_event(
                     session,
                     run.id,
@@ -678,24 +746,44 @@ def run_ingestion_pipeline(
         except Exception as exc:
             # session.begin_nested() has rolled back only this message's savepoint.
             # Outer session and previously flushed messages remain intact.
-            result.parsing_errors += 1
-            logger.exception("Failed processing message %s", message_id)
+            if _is_rate_limit_error(exc):
+                # Throttling is not a parser bug: count it separately, skip the
+                # traceback spam, and keep the message for the next sync.
+                result.rate_limited += 1
+                event_type = "message_rate_limited"
+                level = "warning"
+                logger.warning("Gmail throttled message %s: %s", message_id, exc)
+            else:
+                result.parsing_errors += 1
+                event_type = "message_error"
+                level = "error"
+                logger.exception("Failed processing message %s", message_id)
             try:
                 _log_event(
                     session,
                     run.id,
-                    event_type="message_error",
+                    event_type=event_type,
                     message=str(exc),
                     email_id=message_id,
-                    level="error",
+                    level=level,
                 )
                 session.flush()
             except Exception:
                 logger.debug("Could not record message_error log event", exc_info=True)
             continue
 
-    # Update sync watermark
-    if newest_internal is not None:
+    # Advance the watermark only when every discovered message was fetched. A throttled
+    # fetch leaves a message behind whose timestamp is unknown, and discovery only replays
+    # the last day — advancing past it would skip that message permanently. Holding the
+    # watermark makes the next sync re-discover the same window; already-processed messages
+    # are skipped before any fetch, so the replay costs one list call plus the misses.
+    if result.rate_limited:
+        logger.warning(
+            "Not advancing the Gmail watermark: %d message(s) were rate-limited and will be "
+            "replayed by the next sync",
+            result.rate_limited,
+        )
+    elif newest_internal is not None:
         _set_sync(session, "gmail.last_internal_date_ms", str(newest_internal))
     _set_sync(session, "gmail.last_sync_at", utcnow().isoformat())
     try:
@@ -705,9 +793,10 @@ def run_ingestion_pipeline(
     except Exception:
         logger.debug("Could not fetch Gmail historyId", exc_info=True)
 
-    if result.parsing_errors and result.transactions_extracted:
+    failed_messages = result.parsing_errors + result.rate_limited
+    if failed_messages and result.transactions_extracted:
         result.status = IngestionRunStatus.PARTIAL
-    elif result.auth_errors or (result.parsing_errors and not result.emails_processed):
+    elif result.auth_errors or (failed_messages and not result.emails_processed):
         result.status = IngestionRunStatus.FAILED
     else:
         result.status = IngestionRunStatus.SUCCESS
@@ -722,11 +811,15 @@ def run_ingestion_pipeline(
     run.parsing_errors = result.parsing_errors
     run.auth_errors = result.auth_errors
     run.error_summary = result.error_summary
-    run.extra_json = {"query": query, "emails_skipped": result.emails_skipped}
+    run.extra_json = {
+        "query": query,
+        "emails_skipped": result.emails_skipped,
+        "rate_limited": result.rate_limited,
+    }
     session.flush()
 
     logger.info(
-        "Ingestion pipeline completed [%s]: discovered=%d processed=%d extracted=%d skipped=%d duplicated=%d parse_errors=%d auth_errors=%d",
+        "Ingestion pipeline completed [%s]: discovered=%d processed=%d extracted=%d skipped=%d duplicated=%d parse_errors=%d rate_limited=%d auth_errors=%d",
         result.status,
         result.emails_discovered,
         result.emails_processed,
@@ -734,6 +827,7 @@ def run_ingestion_pipeline(
         result.emails_skipped,
         result.transactions_duplicated,
         result.parsing_errors,
+        result.rate_limited,
         result.auth_errors,
     )
     return result
