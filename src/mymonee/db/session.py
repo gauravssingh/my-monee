@@ -8,6 +8,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from mymonee.config import Settings, get_settings
 from mymonee.db.models import Base
@@ -74,6 +75,10 @@ def init_engine(settings: Settings | None = None) -> Engine:
         _sqlite_url(db_path),
         echo=settings.database.echo,
         future=True,
+        # SQLite is a local file: opening a connection is cheap, and the default
+        # QueuePool (5 + 10 overflow) starves the API when slow work — AI
+        # classification, Gmail fetches — holds sessions for tens of seconds.
+        poolclass=NullPool,
     )
     engine._mymonee_db_path = db_path
     engine._mymonee_settings = settings
