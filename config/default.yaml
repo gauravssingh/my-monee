@@ -51,12 +51,20 @@ dashboard:
 
 ai:
   enabled: true
-  provider: gemini
-  model: gemini-3.7-flash
+  # All online AI calls go through OpenRouter. Use model IDs from
+  # https://openrouter.ai/models — e.g. google/gemini-3.7-flash for chat
+  # classification, or typesafe/jev-1.13 for Jev System One decisions.
+  provider: openrouter
+  # Jev = typed decisions via /systemone (fast, cheap, can't invent a category id).
+  model: typesafe/jev-1.13
+  base_url: https://openrouter.ai/api/v1
+  timeout_seconds: 60.0
+  max_attempts: 3
+  backoff_seconds: 0.5
+  # Chat fallback used only if Jev fails (2.0s / $0.0001 vs Gemini's 3.6s / $0.0035).
+  disable_reasoning: true
   fallback_models:
-    - gemini-3.7-flash
-    - gemini-3.5-flash-lite
-    - gemini-3.1-flash-lite
+    - deepseek/deepseek-v4.1-flash
 
 # Local embedding-g2 service (loopback only) — semantic search over the ledger.
 # Disabled by default; enable with embeddings.enabled=true in config.local.yaml.

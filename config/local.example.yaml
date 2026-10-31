@@ -29,12 +29,15 @@ privacy: {}
 
 ai: {}
   # enabled: true
-  # provider: gemini
-  # model: gemini-3.7-flash
-  # fallback_models:
-  #   - gemini-3.7-flash
-  #   - gemini-3.5-flash-lite
-  #   - gemini-3.1-flash-lite
+  # provider: openrouter          # OPENROUTER_API_KEY in .env / environment
+  # model: typesafe/jev-1.13      # Jev System One; or any chat model id
+  # base_url: https://openrouter.ai/api/v1
+  # timeout_seconds: 60.0
+  # max_attempts: 3
+  # backoff_seconds: 0.5
+  # disable_reasoning: true       # chat path only; Jev ignores it
+  # fallback_models:              # used only if Jev fails
+  #   - deepseek/deepseek-v4.1-flash
 
 embeddings: {}
   # Local embedding-g2 service on the loopback interface (no data leaves the machine).

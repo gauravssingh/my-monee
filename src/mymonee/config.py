@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from dotenv import load_dotenv
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -37,6 +38,22 @@ def default_data_dir() -> Path:
 
 def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def _load_local_env() -> None:
+    """Load `.env` from the repo root and the data directory, never overriding real env vars.
+
+    Every entry point (server, CLI, MCP, scripts) imports this module, so secrets such as
+    OPENROUTER_API_KEY are available everywhere — previously only the FastAPI app loaded them.
+    """
+    for candidate in (repo_root() / ".env", default_data_dir() / ".env"):
+        try:
+            load_dotenv(candidate, override=False)
+        except OSError:
+            continue
+
+
+_load_local_env()
 
 
 def bundled_config_path() -> Path:
@@ -109,16 +126,30 @@ class GmailConfig(BaseModel):
 
 
 class AIConfig(BaseModel):
+    """Online (external) AI for classification suggestions. Opt-in, and never leaves the Mac
+    without `privacy.allow_external_ai`."""
+
     enabled: bool = False
-    provider: str = "gemini"
-    model: str = "gemini-3.7-flash"
-    fallback_models: list[str] = Field(
-        default_factory=lambda: [
-            "gemini-3.7-flash",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite",
-        ]
-    )
+    # "openrouter" sends every online call through OpenRouter — chat models via
+    # /chat/completions and Jev (typesafe/*) via /systemone. "gemini" keeps the direct
+    # Google SDK path for existing installs.
+    provider: str = "openrouter"
+    # Jev (TypeSafe System One) answers /systemone with a typed choice plus probabilities:
+    # ~0.5s and $0.00009 per classification, versus ~3.6s and $0.0035 for a reasoning chat
+    # model. A chat model is kept as the fallback path when Jev is unavailable.
+    model: str = "typesafe/jev-1.13"
+    # Chat fallback used only when Jev fails: DeepSeek measured 2.0s / $0.0001 per
+    # classification against Gemini's 3.6s / $0.0035.
+    fallback_models: list[str] = Field(default_factory=lambda: ["deepseek/deepseek-v4.1-flash"])
+    base_url: str = "https://openrouter.ai/api/v1"
+    # Suppress reasoning tokens on the chat path (Jev ignores it). Endpoints that mandate
+    # reasoning, such as Gemini flash, reject it with 400 and the provider drops it and retries.
+    disable_reasoning: bool = True
+    timeout_seconds: float = 60.0
+    # Transient-failure retries per request (429 / 5xx / transport). OpenAI-compatible
+    # providers can take tens of seconds, so keep the ceiling modest.
+    max_attempts: int = 3
+    backoff_seconds: float = 0.5
 
 
 class PrivacyConfig(BaseModel):
