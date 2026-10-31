@@ -6,6 +6,10 @@ app:
   host: 0.0.0.0
   port: 8477
   data_dir: null  # null → ~/Library/Application Support/MyMonee or /data
+  # Public origin when served through a reverse proxy/tunnel, e.g.
+  # https://my-monee.example.com. Used to build the OAuth callback URI for
+  # browsers on other machines; must match an authorized redirect URI.
+  public_url: null
 
 database:
   filename: mymonee.db

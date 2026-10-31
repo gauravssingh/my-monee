@@ -6,6 +6,10 @@
 app: {}
   # data_dir: ~/Library/Application Support/MyMonee
   # port: 8477
+  # Public origin when the app is served through a proxy/tunnel. Required for
+  # Gmail OAuth from any browser that is not on this machine, and its
+  # <public_url>/oauth/callback URI must be registered on the Google client.
+  # public_url: https://my-monee.example.com
 
 database: {}
   # filename: mymonee.db

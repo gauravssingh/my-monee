@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import shutil
-import html
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -18,7 +19,6 @@ from sqlalchemy.orm import Session
 from mymonee.api.deps import db_session, settings_dep
 from mymonee.config import Settings
 from mymonee.db.models import CreditCardStatement, Email
-
 from mymonee.ingestion.gmail.client import GmailApiSource
 from mymonee.ingestion.gmail.links import gmail_web_url
 from mymonee.ingestion.gmail.oauth import (
@@ -61,14 +61,18 @@ def _validate_client_secrets(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get("/api/gmail/status")
-def gmail_status(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
+def gmail_status(
+    request: Request,
+    settings: Settings = Depends(settings_dep),  # noqa: B008
+) -> dict[str, Any]:
     creds_path = settings.gmail_credentials_path()
     return {
         "enabled": settings.gmail.enabled,
         "connected": is_connected(settings),
         "credentials_file": str(creds_path),
         "credentials_file_present": creds_path.exists(),
-        "redirect_uri": settings.oauth_redirect_uri(),
+        "redirect_uri": settings.oauth_redirect_uri(request_host=request.url.hostname),
+        "redirect_uris": settings.oauth_redirect_uris(),
         "scopes": settings.gmail.scopes,
         "sync_after_date": settings.gmail.sync_after_date,
         "initial_lookback_days": settings.gmail.initial_lookback_days,
@@ -79,7 +83,7 @@ def gmail_status(settings: Settings = Depends(settings_dep)) -> dict[str, Any]:
 @router.post("/api/gmail/credentials")
 def install_credentials(
     body: CredentialsInstallBody,
-    settings: Settings = Depends(settings_dep),
+    settings: Settings = Depends(settings_dep),  # noqa: B008
 ) -> dict[str, Any]:
     payload = _validate_client_secrets(body.client_secrets)
     path = settings.gmail_credentials_path()
@@ -101,7 +105,7 @@ def install_credentials(
 @router.post("/api/gmail/credentials/from-path")
 def install_credentials_from_path(
     path: str = Query(..., description="Absolute path to downloaded client_secret JSON"),
-    settings: Settings = Depends(settings_dep),
+    settings: Settings = Depends(settings_dep),  # noqa: B008
 ) -> dict[str, Any]:
     src = Path(path).expanduser()
     if not src.exists():
@@ -114,11 +118,14 @@ def install_credentials_from_path(
 
 
 @router.post("/api/gmail/auth/start")
-def gmail_auth_start(settings: Settings = Depends(settings_dep)) -> dict[str, str]:
+def gmail_auth_start(
+    request: Request,
+    settings: Settings = Depends(settings_dep),  # noqa: B008
+) -> dict[str, str]:
     if not settings.gmail.enabled:
         raise HTTPException(status_code=400, detail="Gmail integration is disabled in config")
     try:
-        started = start_oauth(settings)
+        started = start_oauth(settings, request_host=request.url.hostname)
     except GmailAuthError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"authorization_url": started.authorization_url, "state": started.state}
@@ -129,7 +136,7 @@ def oauth_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-    settings: Settings = Depends(settings_dep),
+    settings: Settings = Depends(settings_dep),  # noqa: B008
 ) -> HTMLResponse:
     def page(title: str, body: str, *, ok: bool) -> HTMLResponse:
         color = "#0c6e5c" if ok else "#9b2c2c"
@@ -153,7 +160,9 @@ def oauth_callback(
     if error:
         return page("Gmail connection failed", error, ok=False)
     if not code:
-        return page("Gmail connection failed", "Missing OAuth code. Start again from Settings.", ok=False)
+        return page(
+            "Gmail connection failed", "Missing OAuth code. Start again from Settings.", ok=False
+        )
     try:
         complete_oauth(settings, code=code, state=state)
     except GmailAuthError as exc:
@@ -174,10 +183,11 @@ def oauth_callback(
 
 @router.post("/api/ingestion/demo")
 def ingestion_demo(
-    session: Session = Depends(db_session),
-    settings: Settings = Depends(settings_dep),
+    session: Session = Depends(db_session),  # noqa: B008
+    settings: Settings = Depends(settings_dep),  # noqa: B008
 ) -> dict[str, Any]:
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from mymonee.ingestion.gmail.client import FixtureMessageSource, GmailMessage
     from mymonee.ingestion.pipeline import run_ingestion_pipeline, run_ingestion_result_dict
 
@@ -188,7 +198,7 @@ def ingestion_demo(
             sender="alerts@hdfcbank.net",
             subject="INR 2,499.50 debited",
             snippet="INR 2,499.50 debited from A/c XX8899",
-            received_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+            received_at=datetime(2026, 8, 1, tzinfo=UTC),
             label_ids=["INBOX"],
             headers={},
             body_text="INR 2,499.50 debited from A/c XX8899 on 01-08-2026 towards RAZ*SWIGGY. UPI Ref: 9988776655",
@@ -200,7 +210,7 @@ def ingestion_demo(
             sender="alerts@axisbank.com",
             subject="Transaction alert for Axis Bank Card",
             snippet="Your Axis Bank Credit Card ending 1234 was used",
-            received_at=datetime(2026, 8, 2, tzinfo=timezone.utc),
+            received_at=datetime(2026, 8, 2, tzinfo=UTC),
             label_ids=["INBOX"],
             headers={},
             body_text="Your Axis Bank Credit Card ending 1234 was used for INR 4,999.00 at AMAZON INDIA on 02-08-2026. Ref: 11223344.",
@@ -212,7 +222,7 @@ def ingestion_demo(
             sender="alerts@scapia.cards",
             subject="Transaction on Scapia Federal Credit Card",
             snippet="Spent INR 1,250.00 on Scapia Card",
-            received_at=datetime(2026, 8, 3, tzinfo=timezone.utc),
+            received_at=datetime(2026, 8, 3, tzinfo=UTC),
             label_ids=["INBOX"],
             headers={},
             body_text="Spent INR 1,250.00 on Scapia Card at UBER INDIA on 03-08-2026. Ref: 55667788.",
@@ -224,7 +234,7 @@ def ingestion_demo(
             sender="newsletter@updates.com",
             subject="Your weekly digest",
             snippet="Here is your newsletter update",
-            received_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
+            received_at=datetime(2026, 8, 4, tzinfo=UTC),
             label_ids=["INBOX"],
             headers={},
             body_text="Here is your newsletter update.",
@@ -242,15 +252,15 @@ def ingestion_demo(
 
 
 @router.post("/api/gmail/disconnect")
-def gmail_disconnect(settings: Settings = Depends(settings_dep)) -> dict[str, bool]:
+def gmail_disconnect(settings: Settings = Depends(settings_dep)) -> dict[str, bool]:  # noqa: B008
     clear_credentials()
     return {"disconnected": True, "connected": is_connected(settings)}
 
 
 @router.post("/api/gmail/sync")
 def gmail_sync(
-    session: Session = Depends(db_session),
-    settings: Settings = Depends(settings_dep),
+    session: Session = Depends(db_session),  # noqa: B008
+    settings: Settings = Depends(settings_dep),  # noqa: B008
     max_messages: int | None = Query(default=None, ge=1, le=5000),
     force_reparse: bool = False,
     after_date: str | None = Query(
@@ -285,8 +295,8 @@ def gmail_sync(
 @router.get("/api/gmail/messages/{message_id}")
 def fetch_gmail_message(
     message_id: str,
-    session: Session = Depends(db_session),
-    settings: Settings = Depends(settings_dep),
+    session: Session = Depends(db_session),  # noqa: B008
+    settings: Settings = Depends(settings_dep),  # noqa: B008
 ) -> dict[str, Any]:
     """Realtime fetch of a known ingested email body (not persisted)."""
 
@@ -318,4 +328,3 @@ def fetch_gmail_message(
         "gmail_url": gmail_web_url(thread_id=message.thread_id, message_id=message.id),
         "stored_locally": False,
     }
-

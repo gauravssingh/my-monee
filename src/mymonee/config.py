@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import os
 import sys
 from functools import lru_cache
@@ -9,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -59,6 +60,26 @@ class AppConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8477
     data_dir: Path | None = None
+    # Public origin this app is served from when it sits behind a reverse proxy or
+    # tunnel (e.g. "https://my-monee.example.com"). Required for browser-based
+    # OAuth from any host other than the machine running the server: Google must
+    # redirect back to an origin the visitor's browser can actually reach.
+    public_url: str | None = None
+
+    @field_validator("public_url")
+    @classmethod
+    def _normalize_public_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        url = value.strip().rstrip("/")
+        if not url:
+            return None
+        if not url.startswith(("http://", "https://")):
+            raise ValueError(
+                "app.public_url must be an absolute http(s) origin, "
+                "e.g. https://my-monee.example.com"
+            )
+        return url
 
 
 class DatabaseConfig(BaseModel):
@@ -162,6 +183,19 @@ class EmbeddingsConfig(BaseModel):
     stale_job_seconds: int = 300
 
 
+def _is_loopback_host(host: str) -> bool:
+    """True when `host` only resolves on the machine serving the app."""
+    if not host:
+        return True
+    candidate = host.strip().strip("[]").lower()
+    if candidate == "localhost" or candidate.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(candidate).is_loopback
+    except ValueError:
+        return False
+
+
 class Settings(BaseSettings):
     app: AppConfig = Field(default_factory=AppConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
@@ -227,11 +261,44 @@ class Settings(BaseSettings):
             return Path(self.gmail.credentials_file).expanduser()
         return self.resolved_data_dir() / "gmail_credentials.json"
 
-    def oauth_redirect_uri(self) -> str:
+    def oauth_redirect_uri(self, *, request_host: str | None = None) -> str:
+        """Redirect URI Google must send the browser back to.
+
+        Loopback stays the default: a Desktop OAuth client only accepts loopback
+        URIs, and local-only setups must not depend on a tunnel being up. But when
+        the app is reached through a non-loopback host (proxy, tunnel, phone),
+        ``127.0.0.1`` resolves on the *visitor's* machine — so the request has to
+        come back to the configured public origin instead.
+        """
+        if request_host and not _is_loopback_host(request_host):
+            public = self._public_oauth_callback()
+            if public:
+                return public
+
         # Google's OAuth client only accepts loopback redirect URIs, so this
         # must stay 127.0.0.1 even if app.host is bound wider (e.g. 0.0.0.0).
+        return self._loopback_oauth_callback()
+
+    def oauth_redirect_uris(self) -> list[str]:
+        """Every redirect URI that has to be registered on the Google client.
+
+        Google matches redirect URIs literally, so the loopback URI and the
+        public URI — when one is configured — must both be listed.
+        """
+        uris = [self._loopback_oauth_callback()]
+        public = self._public_oauth_callback()
+        if public:
+            uris.append(public)
+        return uris
+
+    def _loopback_oauth_callback(self) -> str:
         host = self.app.host if self.app.host not in ("0.0.0.0", "::") else "127.0.0.1"
         return f"http://{host}:{self.app.port}/oauth/callback"
+
+    def _public_oauth_callback(self) -> str | None:
+        if not self.app.public_url:
+            return None
+        return f"{self.app.public_url}/oauth/callback"
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

@@ -533,7 +533,10 @@ export type GmailStatus = {
   connected: boolean;
   credentials_file: string;
   credentials_file_present: boolean;
+  /** Redirect URI Google will use for the host this page was loaded from. */
   redirect_uri: string;
+  /** Every redirect URI the Google OAuth client must have registered. */
+  redirect_uris: string[];
   scopes: string[];
   sync_after_date: string | null;
   initial_lookback_days: number;
@@ -597,6 +600,8 @@ export type IngestionResult = {
   transactions_duplicated: number;
   transactions_rejected: number;
   parsing_errors: number;
+  /** Messages Gmail throttled (quota / rate limit); retried on the next sync. */
+  rate_limited: number;
   auth_errors: number;
   error_summary: string | null;
 };
