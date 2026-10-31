@@ -119,10 +119,19 @@ Follow these steps in Google Cloud Console:
 3. Choose **Application type**:
    * **Web application** (Recommended)
 4. Name: `MyMonee Desktop Client`
-5. Under **Authorized redirect URIs**, click **+ Add URI** and add:
+5. Under **Authorized redirect URIs**, click **+ Add URI** and add every callback URI you will use:
    ```text
    http://127.0.0.1:8477/oauth/callback
    ```
+   If you also reach MyMonee through a proxy or tunnel (e.g. Cloudflare Tunnel on
+   `https://my-monee.example.com`), add that origin as a second redirect URI and set
+   `app.public_url` to the same origin in `config.local.yaml`:
+   ```text
+   https://my-monee.example.com/oauth/callback
+   ```
+   Google sends the browser to the URI used at authorization time, and `127.0.0.1` only
+   resolves on the machine running the server — without the public URI, OAuth from any
+   other device dead-ends. Google matches URIs literally, so both must be listed.
 6. Click **Create**.
 7. In the confirmation dialog, click **Download JSON**.
 
@@ -151,7 +160,7 @@ When you open `http://127.0.0.1:8477` for the first time, MyMonee guides you thr
    * Click **Connect Gmail**.
    * A Google authorization window will open. If you see *"Google hasn’t verified this app"*, click **Advanced** → **Go to MyMonee (unsafe)** (this warning is normal for personal Developer projects).
    * Grant read-only access.
-   * Google redirects back to `http://127.0.0.1:8477/oauth/callback`. Refresh tokens are securely stored in your **macOS Keychain** (or encrypted token storage on Linux).
+   * Google redirects back to `http://127.0.0.1:8477/oauth/callback` (or `<app.public_url>/oauth/callback` when you are browsing through a proxy or tunnel). Refresh tokens are securely stored in your **macOS Keychain** (or encrypted token storage on Linux).
 4. **Discover Financial Sources**:
    * MyMonee scans your recent emails to detect bank accounts, credit cards, and UPI apps (e.g. Axis Bank, HDFC, Scapia, Federal Bank, PhonePe).
    * Confirm which accounts and cards belong to you and set optional opening balances.
@@ -308,8 +317,12 @@ mymonee db integrity
 ## 9. Troubleshooting & FAQs
 
 ### Q: Google OAuth displays `redirect_uri_mismatch` (Error 400)
-* **Cause**: The redirect URI in Google Cloud Console does not match `http://127.0.0.1:8477/oauth/callback`.
-* **Fix**: Go to Google Cloud Console → **APIs & Services** → **Credentials** → click your OAuth 2.0 Client ID. Under **Authorized redirect URIs**, ensure `http://127.0.0.1:8477/oauth/callback` is listed. Note that `localhost` and `127.0.0.1` are treated as different URIs by Google; MyMonee uses `127.0.0.1`.
+* **Cause**: The redirect URI in Google Cloud Console does not match what MyMonee sent. MyMonee uses `http://127.0.0.1:8477/oauth/callback` locally, and `<app.public_url>/oauth/callback` when the page was loaded from a non-loopback host.
+* **Fix**: Go to Google Cloud Console → **APIs & Services** → **Credentials** → click your OAuth 2.0 Client ID. Under **Authorized redirect URIs**, list the URI reported under **Settings → Gmail Connection → Advanced → Redirect URI** (it is printed with a copy button). Note that `localhost` and `127.0.0.1` are treated as different URIs by Google; MyMonee uses `127.0.0.1`.
+
+### Q: OAuth from a phone or another machine fails / lands on a blank `127.0.0.1` page
+* **Cause**: The loopback callback only exists on the machine running the server, so Google is sending the browser to *its* own `127.0.0.1`.
+* **Fix**: Set `app.public_url` in `config.local.yaml` to the origin you browse (`https://my-monee.example.com`), add `https://my-monee.example.com/oauth/callback` to the Google client's authorized redirect URIs, then restart MyMonee.
 
 ### Q: "Google hasn't verified this app" screen during OAuth
 * **Cause**: Your OAuth app is in "Testing" mode in Google Cloud Console.

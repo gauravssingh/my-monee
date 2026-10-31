@@ -237,8 +237,12 @@ To sync bank debits, credit card alerts, and UPI receipts directly from your ema
    - Add scope: `https://www.googleapis.com/auth/gmail.readonly`.
    - Under **Test Users**, add your Gmail address.
 4. Under **Credentials** → **Create Credentials** → **OAuth client ID**:
-   - Select **Web application** (or Desktop app).
+   - Select **Web application**.
    - Set **Authorized redirect URIs** to: `http://127.0.0.1:8477/oauth/callback`.
+   - Reaching the app through a proxy/tunnel (e.g. `https://my-monee.example.com`)? Add
+     `https://my-monee.example.com/oauth/callback` as a second redirect URI and set
+     `app.public_url: https://my-monee.example.com` in the local config — Google sends the
+     browser to `127.0.0.1` otherwise, which only exists on *your* machine.
    - Download the client JSON.
 5. Save the file to `~/Library/Application Support/ExpenseTracker/gmail_credentials.json`, or import it directly via the web UI in Step 4.
 
