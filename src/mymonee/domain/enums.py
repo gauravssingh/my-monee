@@ -73,3 +73,10 @@ class DataIssueStatus(StrEnum):
     OPEN = "open"
     RESOLVED = "resolved"
     DISMISSED = "dismissed"
+
+
+class EmbeddingJobStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"

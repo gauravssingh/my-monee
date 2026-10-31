@@ -93,8 +93,10 @@ Data lives under `~/Library/Application Support/ExpenseTracker/` (DB, logs, cred
 - `field_name` is restricted to `FLAGGABLE_FIELDS` in `services/data_issues.py`; `reported_value` is always a live snapshot read off the transaction at flag time, never user-typed
 
 ### Gmail OAuth
-- Prefer **Web application** client if redirect URIs must be configured; Desktop clients often hide URI fields
+- Prefer **Web application** client if redirect URIs must be configured; Desktop clients often hide URI fields and only accept loopback URIs
 - Required redirect: `http://127.0.0.1:8477/oauth/callback`
+- Served behind a proxy/tunnel? Set `app.public_url` (e.g. `https://my-monee.example.com`) and register `<public_url>/oauth/callback` on the same client. A browser on another machine cannot resolve *its* `127.0.0.1` to the server, so a loopback callback dead-ends there — `oauth_redirect_uri(request_host=…)` returns the public URI for non-loopback hosts and loopback otherwise
+- Pending blob (Keychain) carries `state`/`code_verifier`/`redirect_uri`; the token exchange reuses the stored `redirect_uri`, so start and callback must agree (Google matches it literally)
 - PKCE `code_verifier` must persist between `start_oauth` and `complete_oauth` (Keychain pending blob)
 - Install/replace credentials from Settings UI or `gmail_credentials.json` in data dir
 
@@ -112,6 +114,8 @@ Data lives under `~/Library/Application Support/ExpenseTracker/` (DB, logs, cred
 - `UPILITE` is a real Axis channel token (include in patterns)
 - Do not commit credentials, Keychain material, `config.local.yaml`, SQLite data, or `scripts/launchd/com.personal.my-monee.plist`; use `config/local.example.yaml` and the launchd `.example` as templates
 - Sandbox may hit `readonly database` on the real SQLite path — use full permissions for DB writes
+- SQLite engine uses `poolclass=NullPool` (`db/session.py`): sessions held across slow work (AI classify, Gmail fetch) must never queue behind a bounded pool. The old QueuePool (5 + 10 overflow, 30s timeout) turned dashboard requests into 500s
+- Sync accounting: Gmail throttling (403 quota / 429 `rateLimitExceeded`) counts as `rate_limited`, never `parsing_errors` — persisted in `ingestion_runs.extra_json` since the table has no column for it
 
 ## Key files
 

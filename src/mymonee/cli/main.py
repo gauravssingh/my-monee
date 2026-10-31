@@ -208,6 +208,175 @@ def cmd_reconcile(args: argparse.Namespace) -> None:
         print(f"  • Matched Refunds:   {stats.get('refunds_paired', 0)}")
 
 
+def cmd_embeddings_status(args: argparse.Namespace) -> None:
+    settings = load_settings()
+    init_db(settings)
+    from mymonee.db.session import get_session_factory
+    from mymonee.services.embeddings import embedding_status
+
+    with get_session_factory()() as session:
+        status = embedding_status(session, settings=settings)
+
+    print("Embedding status\n")
+    print(f"  Enabled         {'✓ Yes' if status['enabled'] else '○ No'} ({status['base_url']})")
+    service = status["service"]
+    if service is None:
+        print("  Service         ○ Not queried (embeddings disabled)")
+    elif not service.get("reachable"):
+        print(f"  Service         ✗ Unreachable — {service['error']}")
+    elif not service.get("compatible"):
+        print(f"  Service         ✗ Incompatible contract — {service['error']}")
+    else:
+        print(f"  Service         ✓ {service['model_id']}")
+        print(f"  Model Revision  {service['model_revision']}")
+        print(f"  Device          {service['device']} / {service['precision']}")
+        print(f"  Dimensions      {service['dimensions']}")
+    print(f"  Stored Vectors  {status['stored_vectors']:,}")
+    print(f"  Indexable Rows  {status['indexable_transactions']:,}")
+    if status["current_revision_vectors"] is not None:
+        print(f"  Current Rev     {status['current_revision_vectors']:,}")
+    if status["stale_vectors"] is not None:
+        print(f"  Stale Vectors   {status['stale_vectors']:,}")
+    if status["stored_by_revision"]:
+        revisions = ", ".join(
+            f"{rev}: {count:,}" for rev, count in status["stored_by_revision"].items()
+        )
+        print(f"  By Revision     {revisions}")
+    jobs = status["jobs"]
+    if jobs:
+        summary = ", ".join(f"{name}: {count:,}" for name, count in sorted(jobs.items()))
+        print(f"  Jobs            {summary}")
+    else:
+        print("  Jobs            none")
+    if status["needs_reindex"]:
+        print(
+            "\n  ⚠ Some transactions have no vector for the live model revision — run: mymonee embeddings index"
+        )
+
+
+def cmd_embeddings_index(args: argparse.Namespace) -> None:
+    settings = load_settings()
+    init_db(settings)
+    from mymonee.db.session import get_session_factory
+    from mymonee.services.embeddings import (
+        EmbeddingContractError,
+        EmbeddingsDisabled,
+        EmbeddingServiceUnavailable,
+        index_transactions,
+    )
+
+    try:
+        with get_session_factory()() as session:
+            result = index_transactions(
+                session, limit=args.limit, force=args.force, settings=settings
+            )
+    except EmbeddingsDisabled as exc:
+        print(f"✗ {exc}")
+        raise SystemExit(1) from exc
+    except EmbeddingServiceUnavailable as exc:
+        print(f"✗ Embedding service unavailable: {exc}")
+        raise SystemExit(1) from exc
+    except EmbeddingContractError as exc:
+        print(f"✗ Embedding service contract violated: {exc}")
+        raise SystemExit(1) from exc
+
+    enqueue = result["enqueue"]
+    process = result["process"]
+    contract = result["contract"]
+    print(f"Model           {contract.model_id} ({contract.model_revision})")
+    print("✓ Enqueue:")
+    print(f"  • Candidates: {enqueue['candidates']:,}")
+    print(f"  • Enqueued:   {enqueue['enqueued']:,}")
+    print(f"  • Refreshed:  {enqueue['refreshed']:,}")
+    print(f"  • Skipped:    {enqueue['skipped']:,}")
+    print("✓ Process:")
+    print(f"  • Claimed:    {process['claimed']:,}")
+    print(f"  • Embedded:   {process['embedded']:,}")
+    print(f"  • Skipped:    {process['skipped']:,}")
+    print(f"  • Retried:    {process['retried']:,}")
+    print(f"  • Failed:     {process['failed']:,}")
+    print(f"  • Dropped:    {process['dropped']:,}")
+
+
+def cmd_embeddings_process(args: argparse.Namespace) -> None:
+    settings = load_settings()
+    init_db(settings)
+    from mymonee.db.session import get_session_factory
+    from mymonee.services.embeddings import (
+        EmbeddingContractError,
+        EmbeddingsDisabled,
+        EmbeddingServiceUnavailable,
+        process_embedding_jobs,
+    )
+
+    try:
+        with get_session_factory()() as session:
+            process = process_embedding_jobs(session, limit=args.limit, settings=settings)
+    except EmbeddingsDisabled as exc:
+        print(f"✗ {exc}")
+        raise SystemExit(1) from exc
+    except EmbeddingServiceUnavailable as exc:
+        print(f"✗ Embedding service unavailable: {exc}")
+        raise SystemExit(1) from exc
+    except EmbeddingContractError as exc:
+        print(f"✗ Embedding service contract violated: {exc}")
+        raise SystemExit(1) from exc
+
+    if not process["claimed"]:
+        print("○ No due embedding jobs.")
+        return
+    print("✓ Processed embedding jobs:")
+    print(f"  • Claimed:  {process['claimed']:,}")
+    print(f"  • Embedded: {process['embedded']:,}")
+    print(f"  • Skipped:  {process['skipped']:,}")
+    print(f"  • Retried:  {process['retried']:,}")
+    print(f"  • Failed:   {process['failed']:,}")
+    print(f"  • Dropped:  {process['dropped']:,}")
+
+
+def cmd_embeddings_search(args: argparse.Namespace) -> None:
+    settings = load_settings()
+    init_db(settings)
+    from mymonee.db.session import get_session_factory
+    from mymonee.services.embeddings import (
+        EmbeddingContractError,
+        EmbeddingsDisabled,
+        EmbeddingServiceUnavailable,
+        search_transactions_semantic,
+    )
+
+    try:
+        with get_session_factory()() as session:
+            results = search_transactions_semantic(
+                session, args.query, limit=args.limit, settings=settings
+            )
+    except EmbeddingsDisabled as exc:
+        print(f"✗ {exc}")
+        raise SystemExit(1) from exc
+    except EmbeddingServiceUnavailable as exc:
+        print(f"✗ Embedding service unavailable: {exc}")
+        raise SystemExit(1) from exc
+    except EmbeddingContractError as exc:
+        print(f"✗ Embedding service contract violated: {exc}")
+        raise SystemExit(1) from exc
+
+    if not results:
+        print("○ No stored vectors match the live model revision — run: mymonee embeddings index")
+        return
+
+    print(f"Semantic results for {args.query!r} ({len(results)} of top matches):\n")
+    for rank, item in enumerate(results, start=1):
+        tx = item["transaction"]
+        date = (tx.get("transaction_date") or "")[:10]
+        merchant = tx.get("merchant_normalized") or tx.get("merchant_raw") or "Unknown Merchant"
+        print(
+            f"  {rank:>2}. {item['score']:.4f}  {date}  {tx.get('direction')} "
+            f"{tx.get('currency')} {tx.get('amount')}  {merchant}"
+        )
+        if tx.get("description"):
+            print(f"      {tx['description'][:100]}")
+
+
 def cmd_serve(args: argparse.Namespace) -> None:
     import uvicorn
 
@@ -315,6 +484,33 @@ def main() -> None:
         "--output", "-o", type=str, default="mymonee_ledger_export.json", help="Output filepath"
     )
     p_d_export.set_defaults(func=cmd_data_export)
+
+    # embeddings
+    p_emb = subparsers.add_parser(
+        "embeddings", help="Semantic indexing and search via the local embedding-g2 service"
+    )
+    emb_sub = p_emb.add_subparsers(dest="embeddings_cmd", help="Embedding subcommands")
+
+    p_e_status = emb_sub.add_parser("status", help="Indexing coverage and service compatibility")
+    p_e_status.set_defaults(func=cmd_embeddings_status)
+
+    p_e_index = emb_sub.add_parser("index", help="Enqueue and embed missing transaction vectors")
+    p_e_index.add_argument("--limit", type=int, default=None, help="Max transactions to consider")
+    p_e_index.add_argument(
+        "--force", action="store_true", help="Re-embed even when the content hash is unchanged"
+    )
+    p_e_index.set_defaults(func=cmd_embeddings_index)
+
+    p_e_process = emb_sub.add_parser("process", help="Process due embedding jobs (durable queue)")
+    p_e_process.add_argument("--limit", type=int, default=200, help="Max jobs to process")
+    p_e_process.set_defaults(func=cmd_embeddings_process)
+
+    p_e_search = emb_sub.add_parser(
+        "search", help="Semantic search over stored transaction vectors"
+    )
+    p_e_search.add_argument("query", type=str, help="Natural-language search query")
+    p_e_search.add_argument("--limit", type=int, default=10, help="Max results")
+    p_e_search.set_defaults(func=cmd_embeddings_search)
 
     # mcp
     p_mcp = subparsers.add_parser(

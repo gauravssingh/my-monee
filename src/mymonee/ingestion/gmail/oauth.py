@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -23,9 +24,39 @@ LEGACY_KEYRING_SERVICE = "ExpenseTracker"
 KEYRING_ACCOUNT = "gmail-oauth"
 STATE_ACCOUNT = "gmail-oauth-state"
 
+# A revoked/expired refresh token cannot fix itself; without this cache every caller
+# (is_connected, the API dependency, the pipeline) retries the network and logs a full
+# traceback, which is how one expiry produced duplicate ERROR records. The cache only
+# suppresses repeats for a short window and is cleared as soon as credentials change.
+_REFRESH_FAILURE_BACKOFF_SECONDS = 60.0
+_refresh_failure_until = 0.0
+_refresh_failure_detail: str | None = None
+
 
 class GmailAuthError(RuntimeError):
     pass
+
+
+def _clear_refresh_failure() -> None:
+    """Allow the next credential lookup to attempt a refresh again."""
+    global _refresh_failure_until, _refresh_failure_detail
+    _refresh_failure_until = 0.0
+    _refresh_failure_detail = None
+
+
+def _refresh_failure_active() -> bool:
+    return time.monotonic() < _refresh_failure_until
+
+
+def _record_refresh_failure(detail: str) -> None:
+    global _refresh_failure_until, _refresh_failure_detail
+    _refresh_failure_until = time.monotonic() + _REFRESH_FAILURE_BACKOFF_SECONDS
+    _refresh_failure_detail = detail
+
+
+def _is_invalid_grant(exc: BaseException) -> bool:
+    """True when Google rejected the refresh token itself (revoked or expired)."""
+    return "invalid_grant" in str(exc).lower()
 
 
 @dataclass
@@ -64,25 +95,27 @@ def _dict_to_credentials(data: dict[str, Any], scopes: list[str]) -> Credentials
 
 
 def save_credentials(creds: Credentials, settings: Settings | None = None) -> None:
+    _clear_refresh_failure()
     payload = json.dumps(_token_to_dict(creds))
     try:
         keyring.set_password(KEYRING_SERVICE, KEYRING_ACCOUNT, payload)
         logger.info("Stored Gmail OAuth credentials in macOS Keychain (MyMonee)")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.info("Keyring unavailable (%s), storing token in data directory", e)
 
     # In Linux/Docker or fallback, store to data_dir/gmail_token.json
     try:
         from mymonee.config import get_settings
+
         s = settings or get_settings()
         token_path = s.resolved_data_dir() / "gmail_token.json"
         token_path.write_text(payload, encoding="utf-8")
         # Secure file permissions (read/write only for owner)
         try:
             token_path.chmod(0o600)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Could not persist token file fallback: %s", e)
 
 
@@ -91,14 +124,14 @@ def load_credentials(settings: Settings) -> Credentials | None:
     # 1. Primary MyMonee Keychain
     try:
         raw = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
     # 2. Legacy ExpenseTracker Keychain fallback
     if not raw:
         try:
             raw = keyring.get_password(LEGACY_KEYRING_SERVICE, KEYRING_ACCOUNT)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     # 3. File fallback
@@ -107,7 +140,7 @@ def load_credentials(settings: Settings) -> Credentials | None:
         if token_path.exists():
             try:
                 raw = token_path.read_text(encoding="utf-8")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Could not read gmail_token.json: %s", e)
 
     if not raw:
@@ -122,21 +155,23 @@ def load_credentials(settings: Settings) -> Credentials | None:
 
 
 def clear_credentials(settings: Settings | None = None) -> None:
+    _clear_refresh_failure()
     try:
         keyring.delete_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
     try:
         keyring.delete_password(KEYRING_SERVICE, STATE_ACCOUNT)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
     try:
         from mymonee.config import get_settings
+
         s = settings or get_settings()
         token_path = s.resolved_data_dir() / "gmail_token.json"
         token_path.unlink(missing_ok=True)
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -155,12 +190,25 @@ def get_valid_credentials(settings: Settings, *, refresh: bool = True) -> Creden
     if creds.valid:
         return creds
     if refresh and creds.expired and creds.refresh_token:
+        if _refresh_failure_active():
+            # A recent attempt already failed: don't hammer Google or repeat the log line.
+            logger.debug("Skipping Gmail token refresh: %s", _refresh_failure_detail)
+            return None
         try:
             creds.refresh(Request())
             save_credentials(creds)
             return creds
-        except Exception:
-            logger.exception("Failed to refresh Gmail OAuth token")
+        except Exception as exc:
+            if _is_invalid_grant(exc):
+                detail = (
+                    "Gmail authorization was revoked or expired — reconnect Gmail in "
+                    "Settings to resume syncing"
+                )
+                logger.error("Failed to refresh Gmail OAuth token: %s", detail)
+            else:
+                detail = str(exc)
+                logger.exception("Failed to refresh Gmail OAuth token")
+            _record_refresh_failure(detail)
             return None
     return creds if creds.valid else None
 
@@ -205,9 +253,11 @@ def _clear_oauth_pending() -> None:
         pass
 
 
-def start_oauth(settings: Settings) -> AuthStart:
+def start_oauth(settings: Settings, *, request_host: str | None = None) -> AuthStart:
     _require_credentials_file(settings)
-    redirect_uri = settings.oauth_redirect_uri()
+    # Must match the URI Google is told at authorization time and the one used
+    # again at token exchange; the pending blob carries it across the redirect.
+    redirect_uri = settings.oauth_redirect_uri(request_host=request_host)
     flow = Flow.from_client_secrets_file(
         str(settings.gmail_credentials_path()),
         scopes=settings.gmail.scopes,

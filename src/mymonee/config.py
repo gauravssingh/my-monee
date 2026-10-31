@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import ipaddress
+import os
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings
 
-
-import os
-import sys
 
 def default_data_dir() -> Path:
     # 1. Environment variable override
@@ -39,6 +40,22 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _load_local_env() -> None:
+    """Load `.env` from the repo root and the data directory, never overriding real env vars.
+
+    Every entry point (server, CLI, MCP, scripts) imports this module, so secrets such as
+    OPENROUTER_API_KEY are available everywhere — previously only the FastAPI app loaded them.
+    """
+    for candidate in (repo_root() / ".env", default_data_dir() / ".env"):
+        try:
+            load_dotenv(candidate, override=False)
+        except OSError:
+            continue
+
+
+_load_local_env()
+
+
 def bundled_config_path() -> Path:
     """Resolve default.yaml from repo or installed package."""
     repo_config = repo_root() / "config" / "default.yaml"
@@ -60,6 +77,26 @@ class AppConfig(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8477
     data_dir: Path | None = None
+    # Public origin this app is served from when it sits behind a reverse proxy or
+    # tunnel (e.g. "https://my-monee.example.com"). Required for browser-based
+    # OAuth from any host other than the machine running the server: Google must
+    # redirect back to an origin the visitor's browser can actually reach.
+    public_url: str | None = None
+
+    @field_validator("public_url")
+    @classmethod
+    def _normalize_public_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        url = value.strip().rstrip("/")
+        if not url:
+            return None
+        if not url.startswith(("http://", "https://")):
+            raise ValueError(
+                "app.public_url must be an absolute http(s) origin, "
+                "e.g. https://my-monee.example.com"
+            )
+        return url
 
 
 class DatabaseConfig(BaseModel):
@@ -89,16 +126,30 @@ class GmailConfig(BaseModel):
 
 
 class AIConfig(BaseModel):
+    """Online (external) AI for classification suggestions. Opt-in, and never leaves the Mac
+    without `privacy.allow_external_ai`."""
+
     enabled: bool = False
-    provider: str = "gemini"
-    model: str = "gemini-3.7-flash"
-    fallback_models: list[str] = Field(
-        default_factory=lambda: [
-            "gemini-3.7-flash",
-            "gemini-3.5-flash-lite",
-            "gemini-3.1-flash-lite",
-        ]
-    )
+    # "openrouter" sends every online call through OpenRouter — chat models via
+    # /chat/completions and Jev (typesafe/*) via /systemone. "gemini" keeps the direct
+    # Google SDK path for existing installs.
+    provider: str = "openrouter"
+    # Jev (TypeSafe System One) answers /systemone with a typed choice plus probabilities:
+    # ~0.5s and $0.00009 per classification, versus ~3.6s and $0.0035 for a reasoning chat
+    # model. A chat model is kept as the fallback path when Jev is unavailable.
+    model: str = "typesafe/jev-1.13"
+    # Chat fallback used only when Jev fails: DeepSeek measured 2.0s / $0.0001 per
+    # classification against Gemini's 3.6s / $0.0035.
+    fallback_models: list[str] = Field(default_factory=lambda: ["deepseek/deepseek-v4.1-flash"])
+    base_url: str = "https://openrouter.ai/api/v1"
+    # Suppress reasoning tokens on the chat path (Jev ignores it). Endpoints that mandate
+    # reasoning, such as Gemini flash, reject it with 400 and the provider drops it and retries.
+    disable_reasoning: bool = True
+    timeout_seconds: float = 60.0
+    # Transient-failure retries per request (429 / 5xx / transport). OpenAI-compatible
+    # providers can take tens of seconds, so keep the ceiling modest.
+    max_attempts: int = 3
+    backoff_seconds: float = 0.5
 
 
 class PrivacyConfig(BaseModel):
@@ -120,12 +171,61 @@ class DashboardConfig(BaseModel):
 class BankingConfig(BaseModel):
     upi_handles: list[str] = Field(
         default_factory=lambda: [
-            "okaxis", "okicici", "oksbi", "okhdfcbank", 
-            "ybl", "ibl", "axl", "paytm", "apl",
-            "sbi", "hdfcbank", "icici", "axisbank", 
-            "upi", "pnb", "kotak", "barodampay"
+            "okaxis",
+            "okicici",
+            "oksbi",
+            "okhdfcbank",
+            "ybl",
+            "ibl",
+            "axl",
+            "paytm",
+            "apl",
+            "sbi",
+            "hdfcbank",
+            "icici",
+            "axisbank",
+            "upi",
+            "pnb",
+            "kotak",
+            "barodampay",
         ]
     )
+
+
+class EmbeddingsConfig(BaseModel):
+    """Local embedding service integration (embedding-g2) for semantic search over the ledger.
+
+    Disabled by default, like other opt-in inference features. This integration only talks to a
+    service on the loopback interface; no transaction data leaves the machine.
+    """
+
+    enabled: bool = False
+    base_url: str = "http://127.0.0.1:8001"
+    # embedding-g2 queues inference internally (30s budget) before answering, so allow more.
+    timeout_seconds: float = 35.0
+    # At or below embedding-g2's max_batch_size (50).
+    batch_size: int = 50
+    # Transient-failure retries per HTTP request (503 SERVER_BUSY / MODEL_NOT_READY / transport).
+    request_max_attempts: int = 5
+    # Durable job attempts before a job is marked failed (each attempt may issue requests).
+    max_attempts: int = 5
+    backoff_seconds: float = 0.5
+    # A job left "running" for longer than this (a crashed run) may be reclaimed.
+    stale_job_seconds: int = 300
+
+
+def _is_loopback_host(host: str) -> bool:
+    """True when `host` only resolves on the machine serving the app."""
+    if not host:
+        return True
+    candidate = host.strip().strip("[]").lower()
+    if candidate == "localhost" or candidate.endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(candidate).is_loopback
+    except ValueError:
+        return False
+
 
 class Settings(BaseSettings):
     app: AppConfig = Field(default_factory=AppConfig)
@@ -138,6 +238,7 @@ class Settings(BaseSettings):
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     banking: BankingConfig = Field(default_factory=BankingConfig)
     ai: AIConfig = Field(default_factory=AIConfig)
+    embeddings: EmbeddingsConfig = Field(default_factory=EmbeddingsConfig)
 
     def resolved_data_dir(self) -> Path:
         path = self.app.data_dir or default_data_dir()
@@ -163,9 +264,13 @@ class Settings(BaseSettings):
         legacy_nested = data_dir / "db" / "expense_tracker.db"
 
         # If legacy database with data exists and configured is smaller/empty, use legacy
-        if legacy.exists() and (not configured.exists() or legacy.stat().st_size > configured.stat().st_size):
+        if legacy.exists() and (
+            not configured.exists() or legacy.stat().st_size > configured.stat().st_size
+        ):
             return legacy
-        if legacy_nested.exists() and (not configured.exists() or legacy_nested.stat().st_size > configured.stat().st_size):
+        if legacy_nested.exists() and (
+            not configured.exists() or legacy_nested.stat().st_size > configured.stat().st_size
+        ):
             return legacy_nested
 
         if configured.exists():
@@ -187,11 +292,44 @@ class Settings(BaseSettings):
             return Path(self.gmail.credentials_file).expanduser()
         return self.resolved_data_dir() / "gmail_credentials.json"
 
-    def oauth_redirect_uri(self) -> str:
+    def oauth_redirect_uri(self, *, request_host: str | None = None) -> str:
+        """Redirect URI Google must send the browser back to.
+
+        Loopback stays the default: a Desktop OAuth client only accepts loopback
+        URIs, and local-only setups must not depend on a tunnel being up. But when
+        the app is reached through a non-loopback host (proxy, tunnel, phone),
+        ``127.0.0.1`` resolves on the *visitor's* machine — so the request has to
+        come back to the configured public origin instead.
+        """
+        if request_host and not _is_loopback_host(request_host):
+            public = self._public_oauth_callback()
+            if public:
+                return public
+
         # Google's OAuth client only accepts loopback redirect URIs, so this
         # must stay 127.0.0.1 even if app.host is bound wider (e.g. 0.0.0.0).
+        return self._loopback_oauth_callback()
+
+    def oauth_redirect_uris(self) -> list[str]:
+        """Every redirect URI that has to be registered on the Google client.
+
+        Google matches redirect URIs literally, so the loopback URI and the
+        public URI — when one is configured — must both be listed.
+        """
+        uris = [self._loopback_oauth_callback()]
+        public = self._public_oauth_callback()
+        if public:
+            uris.append(public)
+        return uris
+
+    def _loopback_oauth_callback(self) -> str:
         host = self.app.host if self.app.host not in ("0.0.0.0", "::") else "127.0.0.1"
         return f"http://{host}:{self.app.port}/oauth/callback"
+
+    def _public_oauth_callback(self) -> str | None:
+        if not self.app.public_url:
+            return None
+        return f"{self.app.public_url}/oauth/callback"
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -210,7 +348,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         data = yaml.safe_load(handle) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"Config root must be a mapping: {path}")
+        raise ValueError(f"Config root must be a mapping: {path}")  # noqa: TRY004
     return data
 
 

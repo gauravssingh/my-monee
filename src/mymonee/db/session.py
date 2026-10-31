@@ -8,6 +8,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from mymonee.config import Settings, get_settings
 from mymonee.db.models import Base
@@ -35,6 +36,30 @@ def _configure_sqlite(engine: Engine) -> None:
         cursor.close()
 
 
+class MyMoneeSession(Session):
+    """Writable ORM session that keeps embedding jobs in step with ledger changes.
+
+    The embedding lifecycle is a session-level concern (see
+    `mymonee.services.embeddings.lifecycle`): keeping it on a dedicated subclass leaves the
+    read-only MCP session factory untouched.
+    """
+
+
+@event.listens_for(MyMoneeSession, "before_flush")
+def _sync_embedding_jobs(session: Session, flush_context: object, instances: object) -> None:
+    """Enqueue/cancel embedding jobs inside the same transaction as the ledger change.
+
+    No-op unless embeddings are explicitly enabled for the engine's settings, so a disabled
+    install never accumulates jobs and never pays for the extra lookups.
+    """
+    settings = getattr(session.bind, "_mymonee_settings", None)
+    if settings is None or not settings.embeddings.enabled:
+        return
+    from mymonee.services.embeddings.lifecycle import sync_embedding_jobs_on_flush
+
+    sync_embedding_jobs_on_flush(session)
+
+
 def init_engine(settings: Settings | None = None) -> Engine:
     global _engine, _SessionLocal
     if _engine is not None:
@@ -50,11 +75,18 @@ def init_engine(settings: Settings | None = None) -> Engine:
         _sqlite_url(db_path),
         echo=settings.database.echo,
         future=True,
+        # SQLite is a local file: opening a connection is cheap, and the default
+        # QueuePool (5 + 10 overflow) starves the API when slow work — AI
+        # classification, Gmail fetches — holds sessions for tens of seconds.
+        poolclass=NullPool,
     )
     engine._mymonee_db_path = db_path
+    engine._mymonee_settings = settings
     _configure_sqlite(engine)
     _engine = engine
-    _SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+    _SessionLocal = sessionmaker(
+        bind=engine, class_=MyMoneeSession, autoflush=False, autocommit=False, future=True
+    )
     return engine
 
 
@@ -111,6 +143,15 @@ def _migrate_columns(engine: Engine) -> None:
                 conn.exec_driver_sql(
                     "ALTER TABLE credit_card_statements ADD COLUMN page_count INTEGER"
                 )
+
+        cursor = conn.exec_driver_sql("PRAGMA table_info(transaction_embeddings)")
+        embedding_cols = {row[1] for row in cursor.fetchall()}
+        if embedding_cols and "normalization" not in embedding_cols:
+            # Additive backfill: existing vectors were only ever stored unit-normalized.
+            conn.exec_driver_sql(
+                "ALTER TABLE transaction_embeddings "
+                "ADD COLUMN normalization BOOLEAN NOT NULL DEFAULT 1"
+            )
 
 
 def _migrate_indexes(engine: Engine) -> None:

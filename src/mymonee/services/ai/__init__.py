@@ -4,13 +4,16 @@ from __future__ import annotations
 
 from mymonee.services.ai.base import (
     AIProvider,
+    AIProviderAuthError,
     AIProviderError,
     ExternalAIOptInRequired,
     InvalidClassificationError,
     MissingAPIKeyError,
     require_external_ai_permission,
 )
-from mymonee.services.ai.gemini_provider import GeminiProvider, PROMPT_VERSION
+from mymonee.services.ai.gemini_provider import GeminiProvider
+from mymonee.services.ai.openrouter_provider import OpenRouterProvider
+from mymonee.services.ai.prompts import PROMPT_VERSION
 from mymonee.services.ai.schemas import (
     AISuggestionResponse,
     ClassificationResult,
@@ -23,7 +26,9 @@ from mymonee.services.ai.service import (
 )
 
 __all__ = [
+    "PROMPT_VERSION",
     "AIProvider",
+    "AIProviderAuthError",
     "AIProviderError",
     "AISuggestionResponse",
     "ClassificationResult",
@@ -31,7 +36,7 @@ __all__ = [
     "GeminiProvider",
     "InvalidClassificationError",
     "MissingAPIKeyError",
-    "PROMPT_VERSION",
+    "OpenRouterProvider",
     "TransactionContext",
     "get_ai_provider",
     "get_ai_suggestion",

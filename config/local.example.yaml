@@ -6,6 +6,10 @@
 app: {}
   # data_dir: ~/Library/Application Support/MyMonee
   # port: 8477
+  # Public origin when the app is served through a proxy/tunnel. Required for
+  # Gmail OAuth from any browser that is not on this machine, and its
+  # <public_url>/oauth/callback URI must be registered on the Google client.
+  # public_url: https://my-monee.example.com
 
 database: {}
   # filename: mymonee.db
@@ -25,9 +29,24 @@ privacy: {}
 
 ai: {}
   # enabled: true
-  # provider: gemini
-  # model: gemini-3.7-flash
-  # fallback_models:
-  #   - gemini-3.7-flash
-  #   - gemini-3.5-flash-lite
-  #   - gemini-3.1-flash-lite
+  # provider: openrouter          # OPENROUTER_API_KEY in .env / environment
+  # model: typesafe/jev-1.13      # Jev System One; or any chat model id
+  # base_url: https://openrouter.ai/api/v1
+  # timeout_seconds: 60.0
+  # max_attempts: 3
+  # backoff_seconds: 0.5
+  # disable_reasoning: true       # chat path only; Jev ignores it
+  # fallback_models:              # used only if Jev fails
+  #   - deepseek/deepseek-v4.1-flash
+
+embeddings: {}
+  # Local embedding-g2 service on the loopback interface (no data leaves the machine).
+  # Requires embedding-g2 to be running: curl -s http://127.0.0.1:8001/health
+  # enabled: true
+  # base_url: http://127.0.0.1:8001
+  # timeout_seconds: 35.0   # must exceed embedding-g2's 30s inference-queue budget
+  # batch_size: 50          # embedding-g2 max_batch_size
+  # request_max_attempts: 5 # HTTP attempts per request (transient failures only)
+  # max_attempts: 5         # durable job attempts before a job is marked failed
+  # backoff_seconds: 0.5
+  # stale_job_seconds: 300

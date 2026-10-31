@@ -24,6 +24,14 @@ class AIProviderError(Exception):
     """Raised when the AI provider encounters an upstream network, quota, or execution error."""
 
 
+class AIProviderAuthError(AIProviderError):
+    """Credentials are wrong or credits are exhausted.
+
+    Distinct from a generic provider error because no model fallback can fix it: retrying another
+    model just repeats the same rejection.
+    """
+
+
 def require_external_ai_permission(settings: Settings) -> None:
     """Backend hard gate enforcing that no external AI requests leave the Mac without explicit opt-in."""
     if not settings.privacy.allow_external_ai:

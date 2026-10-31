@@ -98,7 +98,11 @@ export default function AISettings({ status }: AISettingsProps) {
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">API Key Configuration</div>
-            <div className="settings-row-desc">Configured via <code>GEMINI_API_KEY</code> in your environment.</div>
+            <div className="settings-row-desc">
+              Configured via{" "}
+              <code>{status.app.ai_provider === "gemini" ? "GEMINI_API_KEY" : "OPENROUTER_API_KEY"}</code>{" "}
+              in your environment.
+            </div>
           </div>
           <div className="settings-row-value">
             <span className="badge-pill">Never Stored in Database</span>

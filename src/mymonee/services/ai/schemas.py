@@ -19,6 +19,9 @@ class TransactionContext(BaseModel):
     payment_method: str | None = None
     account: str | None = None
     card_last4: str | None = None
+    # Recent labels the user confirmed for this merchant, e.g. ["Food › Tea Break"].
+    # Populated by the suggestion service; nothing identifying is included.
+    merchant_history: list[str] = Field(default_factory=list)
 
 
 class CategoryOption(BaseModel):
@@ -72,6 +75,9 @@ class AISuggestionResponse(BaseModel):
     subcategory_name: str | None = None
     confidence: float
     signals: list[str]
+    # True when confidence clears classification.auto_threshold. The API never applies a
+    # suggestion by itself; this lets the caller decide whether a human must still confirm.
+    auto_apply: bool = False
     cached: bool = False
     provider: str
     model: str

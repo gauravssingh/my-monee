@@ -596,6 +596,7 @@ def get_system_status(session: Session, settings_summary: dict[str, Any]) -> dic
                 "emails_processed": last_run.emails_processed,
                 "transactions_extracted": last_run.transactions_extracted,
                 "parsing_errors": last_run.parsing_errors,
+                "rate_limited": (last_run.extra_json or {}).get("rate_limited", 0),
             }
             if last_run
             else None

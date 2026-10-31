@@ -27,6 +27,15 @@ export default function GmailSettings({
   const isValidating = loading || validating;
   const isBusy = busy !== null || isValidating;
 
+  const redirectUris = gmail.redirect_uris?.length ? gmail.redirect_uris : [gmail.redirect_uri];
+  // A loopback callback only exists on the machine running the server, so OAuth
+  // dead-ends in the browser of anyone who reached the UI through a public host.
+  const callbackIsLocalOnly =
+    new URL(gmail.redirect_uri).hostname === "127.0.0.1" ||
+    new URL(gmail.redirect_uri).hostname === "localhost";
+  const browsingRemotely = !["127.0.0.1", "localhost", "::1"].includes(window.location.hostname);
+  const redirectUriMismatch = callbackIsLocalOnly && browsingRemotely;
+
   async function connectGmail() {
     setBusy("connect");
     try {
@@ -238,6 +247,9 @@ export default function GmailSettings({
           <div className="settings-sync-feedback">
             <div className="feedback-status">
               <strong>Last Sync:</strong> {lastRun.status} · Discovered {lastRun.emails_discovered} emails · Extracted {lastRun.transactions_extracted} transactions · {lastRun.transactions_duplicated} duplicates
+              {lastRun.rate_limited > 0 && (
+                <span className="feedback-err"> · {lastRun.rate_limited} throttled by Gmail quota — sync again shortly</span>
+              )}
               {lastRun.error_summary && <span className="feedback-err"> · {lastRun.error_summary}</span>}
             </div>
           </div>
@@ -256,7 +268,8 @@ export default function GmailSettings({
             )}
           </div>
           <div className="settings-row-desc">
-            Import <code>credentials.json</code> generated from your Google Cloud Console Desktop application.
+            Import <code>credentials.json</code> generated from your Google Cloud Console OAuth client
+            (create a <strong>Web application</strong> client when the app is reached through a public host).
           </div>
         </div>
         <div className="oauth-upload-action">
@@ -311,19 +324,33 @@ export default function GmailSettings({
           <div className="settings-row">
             <div className="settings-row-info">
               <div className="settings-row-label">Redirect URI</div>
-              <div className="settings-row-desc">Loopback callback URI for OAuth loopback server.</div>
+              <div className="settings-row-desc">
+                {redirectUris.length > 1
+                  ? "List both URIs under Authorized redirect URIs on the Google OAuth client."
+                  : "Add this URI under Authorized redirect URIs on the Google OAuth client."}
+              </div>
+              {redirectUriMismatch && (
+                <div className="settings-row-desc" style={{ color: "var(--warning, #b45309)" }}>
+                  Google will send the callback to <span className="mono">{gmail.redirect_uri}</span>, which
+                  only exists on the machine running the server — this page is on{" "}
+                  <span className="mono">{window.location.origin}</span>. Set <code>app.public_url</code> to
+                  that origin and register <span className="mono">{window.location.origin}/oauth/callback</span>.
+                </div>
+              )}
             </div>
             <div className="settings-row-value">
-              <div className="mono-copy-group">
-                <span className="mono">{gmail.redirect_uri}</span>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => void navigator.clipboard.writeText(gmail.redirect_uri)}
-                >
-                  Copy
-                </button>
-              </div>
+              {redirectUris.map((uri) => (
+                <div className="mono-copy-group" key={uri}>
+                  <span className="mono">{uri}</span>
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => void navigator.clipboard.writeText(uri)}
+                  >
+                    Copy
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
