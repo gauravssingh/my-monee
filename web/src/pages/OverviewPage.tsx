@@ -5,8 +5,9 @@ import FinancialTrendModal, { type TrendMetricType } from "../components/Financi
 import MonthStrip from "../components/MonthStrip";
 import LedgerIntelligencePanel from "../components/LedgerIntelligencePanel";
 import AccountBadge from "../components/common/AccountBadge";
+import SurfaceCard from "../components/common/SurfaceCard";
+import SpendingCompositionCard from "../components/common/SpendingCompositionCard";
 import { formatMoney, formatCompactMoney, formatLakhOrK, formatDate } from "../format";
-
 
 function getHumanSummary(overview: Overview, date: { year: number; month: number }) {
   const spentStr = formatLakhOrK(overview.summary.spent, overview.currency);
@@ -105,7 +106,6 @@ export default function OverviewPage() {
     };
   }, [date.year, date.month]);
 
-
   function openTrend(metric: TrendMetricType) {
     setTrendMetric(metric);
     setTrendModalOpen(true);
@@ -124,8 +124,8 @@ export default function OverviewPage() {
       });
   }
 
-
   const daysInMonth = new Date(date.year, date.month, 0).getDate();
+  const prevMonthName = new Date(date.year, date.month - 2, 1).toLocaleDateString("en-GB", { month: "short" });
 
   const dailyMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -193,7 +193,7 @@ export default function OverviewPage() {
   }, [overview?.category_breakdown]);
 
   if (error) return <p className="error">Could not load overview: {error}</p>;
-  if (!overview && loading) return <p className="empty">Loading monthly analysis…</p>;
+  if (!overview && loading) return <p className="empty" style={{ padding: "48px 0", textAlign: "center" }}>Loading monthly analysis…</p>;
   if (!overview) return null;
 
   const maxDaily = fullDailyData.length > 0 ? Math.max(1, ...fullDailyData.map((d) => d.spent)) : 1;
@@ -214,36 +214,79 @@ export default function OverviewPage() {
   const livingTotal = livingCategories.reduce((acc, c) => acc + c.total, 0);
   const commitmentTotal = commitmentCategories.reduce((acc, c) => acc + c.total, 0);
 
+  const resolvedConsumerSpent = overview.summary.consumer_spent != null ? overview.summary.consumer_spent : livingTotal;
+  const resolvedCommitmentsSpent = overview.summary.commitments_spent || commitmentTotal;
+
   function renderCategoryList(cats: Overview["category_breakdown"], totalSum: number, isLivingGroup = false) {
-    if (cats.length === 0) return <p className="empty" style={{ fontSize: "0.85rem", padding: "8px 0" }}>None recorded</p>;
+    if (cats.length === 0) {
+      return <p className="empty" style={{ fontSize: "0.85rem", padding: "12px 0" }}>None recorded</p>;
+    }
     const maxCat = Math.max(1, ...cats.map((c) => c.total));
     const displayCats = isLivingGroup && !showAllLiving ? cats.slice(0, 5) : cats;
 
     return (
-      <div className="category-list">
+      <div className="category-list" style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         {displayCats.map((c) => {
           const groupPct = totalSum > 0 ? (c.total / totalSum) * 100 : 0;
           return (
             <div
               key={c.category_id}
-              className="category-row"
-              style={{ cursor: "pointer" }}
+              className="overview-category-row"
               title={`View ${c.category} deep dive analytics`}
               onClick={() => {
                 navigate(`/analytics/category/${encodeURIComponent(c.category_id)}?year=${date.year}&month=${date.month}&range=6m`);
               }}
             >
-              <div className="category-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div
+                className="category-name"
+                style={{
+                  fontWeight: 600,
+                  fontSize: "0.88rem",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  color: "var(--ink)",
+                }}
+              >
                 {c.category}
               </div>
-              <div className="bar-track">
-                <div className="bar-fill" style={{ width: `${Math.min(100, (c.total / maxCat) * 100)}%` }} />
+              <div
+                className="bar-track"
+                style={{
+                  height: "8px",
+                  backgroundColor: "var(--surface-subtle)",
+                  borderRadius: "var(--radius-pill)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  className="bar-fill"
+                  style={{
+                    width: `${Math.min(100, (c.total / maxCat) * 100)}%`,
+                    height: "100%",
+                    borderRadius: "var(--radius-pill)",
+                    backgroundColor: isLivingGroup ? "var(--accent-teal)" : "var(--accent-orange)",
+                    transition: "width 0.3s ease",
+                  }}
+                />
               </div>
-              <div className="category-total" style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
-                <span style={{ color: "var(--ink-muted)", fontSize: "0.8rem", fontWeight: 500 }}>
+              <div
+                className="category-total"
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  alignItems: "baseline",
+                  justifyContent: "flex-end",
+                  fontVariantNumeric: "tabular-nums",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span style={{ color: "var(--ink-muted)", fontSize: "0.78rem", fontWeight: 500 }}>
                   {groupPct.toFixed(1)}%
                 </span>
-                <span>{formatMoney(c.total, overview!.currency)}</span>
+                <span style={{ fontWeight: 650, fontSize: "0.9rem", color: "var(--ink)" }}>
+                  {formatMoney(c.total, overview!.currency)}
+                </span>
               </div>
             </div>
           );
@@ -264,50 +307,39 @@ export default function OverviewPage() {
   const monthParamTo = `${date.year}-${String(date.month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
   return (
-    <div className="overview-page" style={{ animation: "rise 0.4s ease both", maxWidth: 1060, margin: "0 auto" }}>
+    <div className="overview-page" style={{ animation: "rise 0.4s ease both" }}>
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* ZONE 1: MONTH SUMMARY & FLOW                                  */}
+      {/* ZONE 1: CONTEXT, MONTH CAROUSEL & ATTENTION                   */}
       {/* ───────────────────────────────────────────────────────────── */}
 
-      {/* Month Strip Controls */}
-      <header
-        className="overview-header"
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          marginBottom: "16px",
-        }}
-      >
-        <MonthStrip
-          year={date.year}
-          month={date.month}
-          onChange={(y, m) => setDate({ year: y, month: m })}
-          disabled={loading}
-        />
-      </header>
+      <div className="overview-top-row">
+        <div className="overview-title-area">
+          <h1 className="overview-page-title">Overview</h1>
+          <div
+            style={{
+              fontSize: "0.86rem",
+              color: "var(--ink-secondary)",
+              lineHeight: 1.45,
+              marginTop: "4px",
+            }}
+          >
+            {getHumanSummary(overview, date)}
+          </div>
+        </div>
 
-      {/* Human Deterministic Summary Sentence */}
-      <div
-        style={{
-          fontSize: "0.93rem",
-          color: "var(--ink-muted)",
-          lineHeight: 1.5,
-          marginBottom: "18px",
-          padding: "10px 14px",
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius)",
-        }}
-      >
-        <span style={{ color: "var(--ink)", fontWeight: 500 }}>
-          {getHumanSummary(overview, date)}
-        </span>
+        <div className="overview-month-strip-wrap">
+          <MonthStrip
+            year={date.year}
+            month={date.month}
+            onChange={(y, m) => setDate({ year: y, month: m })}
+            disabled={loading}
+          />
+        </div>
       </div>
 
-      {/* Needs Review / Data Quality Banner (if any) */}
+      {/* Needs Review Attention Banner (if any) */}
       {overview.review.needs_review_count > 0 && (
-        <div className="attention-banner" role="alert" style={{ marginBottom: "16px" }}>
+        <div className="attention-banner" role="alert" style={{ marginBottom: "20px" }}>
           <div className="attention-banner-content">
             <span className="attention-banner-icon" aria-hidden="true">⚠</span>
             <span>
@@ -321,125 +353,118 @@ export default function OverviewPage() {
         </div>
       )}
 
-      {/* Ledger Intelligence & Anomaly Signals Panel */}
-      <LedgerIntelligencePanel
-        onTransactionClick={(txId) => {
-          navigate(`/transactions?search=${encodeURIComponent(txId)}`);
-        }}
-      />
-
-      {/* Primary Financial Flow KPI Strip (Clean, Clickable for 6M trend, No TREND ↗ label) */}
-      <section className="metrics" aria-label="Monthly financial flow" style={{ marginBottom: "12px" }}>
-        <button
-          type="button"
-          className="metric-button"
-          onClick={() => openTrend("income")}
-          title="Click to view 6-month income trend"
-          aria-label="Income, click to view 6-month trend"
-        >
-          <div className="metric-label">Income</div>
-          <div className="metric-value" style={{ color: "var(--credit)" }}>
-            {formatMoney(overview.summary.income, overview.currency)}
-          </div>
-          <div className="metric-hint">
-            {overview.month_comparison.income_change_pct != null ? (
-              <span className={overview.month_comparison.income_change_pct >= 0 ? "metric-delta up" : "metric-delta down"}>
-                {overview.month_comparison.income_change_pct >= 0 ? "↑" : "↓"}{" "}
-                {Math.abs(overview.month_comparison.income_change_pct).toFixed(1)}% vs last month
-              </span>
-            ) : (
-              "vs last month —"
-            )}
-          </div>
-        </button>
-
-        <button
-          type="button"
-          className="metric-button"
-          onClick={() => openTrend("cash_flow")}
-          title="Click to view 6-month net cash flow trend"
-          aria-label="Net Cash Flow, click to view 6-month trend"
-        >
-          <div className="metric-label">Net Cash Flow</div>
-          <div
-            className="metric-value"
-            style={{
-              color: overview.summary.net_cash_flow >= 0 ? "var(--credit)" : "var(--debit)",
-            }}
-          >
-            {overview.summary.net_cash_flow >= 0 ? "+" : ""}
-            {formatMoney(overview.summary.net_cash_flow, overview.currency)}
-          </div>
-          <div className="metric-hint">Income − spending</div>
-        </button>
-
-        <button
-          type="button"
-          className="metric-button"
-          onClick={() => openTrend("spent")}
-          title="Click to view 6-month spending trend"
-          aria-label="Total Spent, click to view 6-month trend"
-        >
-          <div className="metric-label">Total Spent</div>
-          <div className="metric-value">{formatMoney(overview.summary.spent, overview.currency)}</div>
-          <div className="metric-hint">
-            {overview.month_comparison.spent_change_pct != null ? (
-              <span className={overview.month_comparison.spent_change_pct > 0 ? "metric-delta down" : "metric-delta up"}>
-                {overview.month_comparison.spent_change_pct > 0 ? "↑" : "↓"}{" "}
-                {Math.abs(overview.month_comparison.spent_change_pct).toFixed(1)}% vs last month
-              </span>
-            ) : (
-              "vs last month —"
-            )}
-          </div>
-        </button>
-      </section>
-
-      {/* Inline Reconciled Transactions Volume Sub-line */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "8px",
-          fontSize: "0.84rem",
-          color: "var(--ink-muted)",
-          padding: "8px 12px",
-          background: "var(--surface-muted, rgba(0,0,0,0.02))",
-          borderRadius: "var(--radius-sm)",
-          marginBottom: "28px",
-          border: "1px solid var(--line)",
-        }}
-      >
-        <div>
-          <strong style={{ color: "var(--ink)" }}>{overview.summary.transaction_count} expenses recorded</strong>
-          {" · "}
-          <span>{formatMoney(overview.summary.spent, overview.currency)} out</span>
-          {overview.summary.excluded_count ? (
-            <span style={{ opacity: 0.85 }}>
-              {" · "}
-              {overview.summary.excluded_count} transfers & alerts filtered
-            </span>
-          ) : null}
-        </div>
-        <Link
-          to={`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}`}
-          style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600, fontSize: "0.82rem" }}
-        >
-          View all transactions →
-        </Link>
+      {/* Ledger Intelligence & Signals */}
+      <div style={{ marginBottom: "24px" }}>
+        <LedgerIntelligencePanel
+          onTransactionClick={(txId) => {
+            navigate(`/transactions?search=${encodeURIComponent(txId)}`);
+          }}
+        />
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* ZONE 2: SPENDING ANALYSIS (Breakdown & Daily Pattern)         */}
+      {/* ZONE 2: PRIMARY HERO GRID (Spending Card + Flow Stack)        */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="grid-2" style={{ marginBottom: "28px", alignItems: "start" }}>
-        {/* Left: Spending Breakdown (Living Expenses vs Financial Commitments) */}
-        <section className="section" style={{ height: "100%" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
-            <h2 style={{ margin: 0 }}>Spending Breakdown</h2>
-            <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)" }}>
+
+      <div className="overview-hero-grid">
+        {/* Left: Prominent Spending Composition Card */}
+        <SpendingCompositionCard
+          totalSpent={overview.summary.spent}
+          currency={overview.currency}
+          consumerSpent={resolvedConsumerSpent}
+          commitmentsSpent={resolvedCommitmentsSpent}
+          spentChangePct={overview.month_comparison.spent_change_pct}
+          prevMonthName={prevMonthName}
+          onViewTrend={() => openTrend("spent")}
+        />
+
+        {/* Right: Financial Flow KPI Stack */}
+        <div className="overview-flow-stack">
+          {/* Income Metric Card */}
+          <button
+            type="button"
+            className="flow-metric-card"
+            onClick={() => openTrend("income")}
+            title="Click to view 6-month income trend"
+            aria-label="Income, click to view 6-month trend"
+          >
+            <div className="flow-metric-header">
+              <span className="flow-metric-label">Monthly Income</span>
+              <svg className="flow-metric-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+            </div>
+            <div className="flow-metric-amount" style={{ color: "var(--credit)" }}>
+              {formatMoney(overview.summary.income, overview.currency)}
+            </div>
+            <div className="flow-metric-hint">
+              {overview.month_comparison.income_change_pct != null ? (
+                <span className={overview.month_comparison.income_change_pct >= 0 ? "metric-delta up" : "metric-delta down"}>
+                  {overview.month_comparison.income_change_pct >= 0 ? "↑" : "↓"}{" "}
+                  {Math.abs(overview.month_comparison.income_change_pct).toFixed(1)}% vs last month
+                </span>
+              ) : (
+                "vs last month —"
+              )}
+            </div>
+          </button>
+
+          {/* Net Cash Flow Metric Card */}
+          <button
+            type="button"
+            className="flow-metric-card"
+            onClick={() => openTrend("cash_flow")}
+            title="Click to view 6-month net cash flow trend"
+            aria-label="Net Cash Flow, click to view 6-month trend"
+          >
+            <div className="flow-metric-header">
+              <span className="flow-metric-label">Net Cash Flow</span>
+              <svg className="flow-metric-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+            </div>
+            <div
+              className="flow-metric-amount"
+              style={{
+                color: overview.summary.net_cash_flow >= 0 ? "var(--credit)" : "var(--debit)",
+              }}
+            >
+              {overview.summary.net_cash_flow >= 0 ? "+" : ""}
+              {formatMoney(overview.summary.net_cash_flow, overview.currency)}
+            </div>
+            <div className="flow-metric-hint">Income minus total spending</div>
+          </button>
+
+          {/* Activity Subline Card */}
+          <SurfaceCard variant="subtle" padding="sm" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.84rem" }}>
+              <span style={{ fontWeight: 600, color: "var(--ink)" }}>
+                {overview.summary.transaction_count} expenses recorded
+              </span>
+              <Link
+                to={`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}`}
+                style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600, fontSize: "0.82rem" }}
+              >
+                View all →
+              </Link>
+            </div>
+            <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)" }}>
+              {overview.summary.excluded_count ? (
+                <span>{overview.summary.excluded_count} transfers &amp; alerts filtered from ledger</span>
+              ) : (
+                <span>Reconciled durable local ledger</span>
+              )}
+            </div>
+          </SurfaceCard>
+        </div>
+      </div>
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ZONE 3: ANALYTICAL REGION (Breakdown & Daily Pattern)         */}
+      {/* ───────────────────────────────────────────────────────────── */}
+
+      <div className="overview-analytical-grid">
+        {/* Left: Category Spending Breakdown */}
+        <SurfaceCard variant="standard" padding="md" style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>Spending Breakdown</h2>
+            <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontVariantNumeric: "tabular-nums" }}>
               {formatMoney(overview.summary.spent, overview.currency)} total
             </span>
           </div>
@@ -447,9 +472,9 @@ export default function OverviewPage() {
           {overview.category_breakdown.length === 0 ? (
             <p className="empty">No spending recorded for this month.</p>
           ) : (
-            <div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               {/* Group 1: Living / Consumer Expenses */}
-              <div style={{ marginBottom: "20px" }}>
+              <div>
                 <div
                   style={{
                     display: "flex",
@@ -460,21 +485,21 @@ export default function OverviewPage() {
                     textTransform: "uppercase",
                     color: "var(--ink-muted)",
                     marginBottom: "10px",
-                    paddingBottom: "4px",
-                    borderBottom: "1px solid var(--line)",
+                    paddingBottom: "6px",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
-                  <span>Consumer & Living Spending</span>
-                  <span>{formatMoney(livingTotal, overview.currency)}</span>
+                  <span>Consumer &amp; Living Spending</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatMoney(livingTotal, overview.currency)}</span>
                 </div>
                 {renderCategoryList(livingCategories, livingTotal, true)}
                 {livingCategories.length > 5 && (
-                  <div style={{ marginTop: "8px" }}>
+                  <div style={{ marginTop: "10px" }}>
                     <button
                       type="button"
                       className="btn quiet"
                       onClick={() => setShowAllLiving((prev) => !prev)}
-                      style={{ fontSize: "0.8rem", padding: "2px 6px" }}
+                      style={{ fontSize: "0.8rem", padding: "4px 8px" }}
                     >
                       {showAllLiving ? "Show top living categories ↑" : `View all ${livingCategories.length} categories →`}
                     </button>
@@ -482,7 +507,7 @@ export default function OverviewPage() {
                 )}
               </div>
 
-              {/* Group 2: Financial Commitments & Loan Obligations */}
+              {/* Group 2: Commitments & Loan Obligations */}
               {commitmentCategories.length > 0 && (
                 <div>
                   <div
@@ -495,45 +520,46 @@ export default function OverviewPage() {
                       textTransform: "uppercase",
                       color: "var(--ink-muted)",
                       marginBottom: "10px",
-                      paddingBottom: "4px",
-                      borderBottom: "1px solid var(--line)",
+                      paddingBottom: "6px",
+                      borderBottom: "1px solid var(--border)",
                     }}
                   >
-                    <span>Financial Commitments & Loans</span>
-                    <span>{formatMoney(commitmentTotal, overview.currency)}</span>
+                    <span>Financial Commitments &amp; Loans</span>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatMoney(commitmentTotal, overview.currency)}</span>
                   </div>
                   {renderCategoryList(commitmentCategories, commitmentTotal, false)}
                 </div>
               )}
             </div>
           )}
-        </section>
+        </SurfaceCard>
 
-        {/* Right: Daily Spending Chart with Interactive Tooltip & Click-through */}
-        <section className="section" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
-            <h2 style={{ margin: 0 }}>Daily Spending</h2>
-            <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", textAlign: "right" }}>
+        {/* Right: Daily Spending Timeline Chart */}
+        <SurfaceCard variant="standard" padding="md" style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
+            <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 700, color: "var(--ink)" }}>Daily Spending</h2>
+            <div style={{ fontSize: "0.82rem", color: "var(--ink-muted)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
               Avg {formatCompactMoney(avgDaily, overview.currency)} / day · Peak {formatCompactMoney(maxDaily, overview.currency)}
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "8px", height: "200px", marginTop: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", height: "220px", marginTop: "8px" }}>
             {/* Y-Axis Scale Column */}
             <div
               style={{
-                width: "44px",
+                width: "48px",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
                 alignItems: "flex-end",
-                paddingRight: "6px",
+                paddingRight: "8px",
                 fontSize: "0.72rem",
                 color: "var(--ink-muted)",
                 userSelect: "none",
+                fontVariantNumeric: "tabular-nums",
                 paddingTop: "2px",
                 paddingBottom: "2px",
-                borderRight: "1px solid var(--line)",
+                borderRight: "1px solid var(--border)",
               }}
             >
               <span>{formatCompactMoney(maxDaily, overview.currency)}</span>
@@ -543,12 +569,12 @@ export default function OverviewPage() {
 
             {/* Bars Canvas Container */}
             <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "flex-end", gap: "2px", paddingTop: "8px", paddingBottom: "2px" }}>
-              {/* Horizontal Reference Lines */}
-              <div style={{ position: "absolute", left: 0, right: 0, top: "2px", borderTop: "1px dashed var(--line)", opacity: 0.6, pointerEvents: "none" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: "1px dashed var(--line)", opacity: 0.6, pointerEvents: "none" }} />
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: "2px", borderTop: "1px solid var(--line)", pointerEvents: "none" }} />
+              {/* Reference Lines */}
+              <div style={{ position: "absolute", left: 0, right: 0, top: "2px", borderTop: "1px dashed var(--border)", opacity: 0.6, pointerEvents: "none" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, top: "50%", borderTop: "1px dashed var(--border)", opacity: 0.6, pointerEvents: "none" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: "2px", borderTop: "1px solid var(--border)", pointerEvents: "none" }} />
 
-              {/* Subtle Average Reference Line */}
+              {/* Daily Average Line */}
               {avgDaily > 0 && maxDaily > 0 && (
                 <div
                   style={{
@@ -556,10 +582,10 @@ export default function OverviewPage() {
                     left: 0,
                     right: 0,
                     bottom: `${Math.min(100, (avgDaily / maxDaily) * 100)}%`,
-                    borderTop: "1px dashed var(--accent)",
-                    opacity: 0.65,
+                    borderTop: "1px dashed var(--accent-teal)",
+                    opacity: 0.7,
                     pointerEvents: "none",
-                    zIndex: 0,
+                    zIndex: 2,
                   }}
                   title={`Daily average: ${formatMoney(avgDaily, overview.currency)}`}
                 />
@@ -592,30 +618,28 @@ export default function OverviewPage() {
                       cursor: hasSpend ? "pointer" : "default",
                     }}
                   >
-                    {/* Rich Hover Tooltip (Date, Amount, Count) */}
+                    {/* Rich Hover Tooltip */}
                     {isHovered && hasSpend && (
                       <div
                         style={{
                           position: "absolute",
                           bottom: `calc(${Math.max(6, heightPct)}% + 8px)`,
                           background: "var(--surface)",
-                          backgroundColor: "var(--surface)",
                           color: "var(--ink)",
-                          border: "1px solid var(--line)",
-                          padding: "6px 12px",
+                          border: "1px solid var(--border-strong)",
+                          padding: "8px 12px",
                           borderRadius: "var(--radius-md)",
-                          fontSize: "0.74rem",
+                          fontSize: "0.75rem",
                           fontVariantNumeric: "tabular-nums",
                           whiteSpace: "nowrap",
                           pointerEvents: "none",
                           zIndex: 50,
-                          opacity: 1,
-                          boxShadow: "0 8px 24px rgba(0, 0, 0, 0.28)",
+                          boxShadow: "var(--shadow-overlay)",
                           textAlign: "center",
                         }}
                       >
-                        <div style={{ fontWeight: 600, color: "var(--ink)" }}>{formatDate(d.dateStr)}</div>
-                        <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "var(--accent)", marginTop: 2 }}>
+                        <div style={{ fontWeight: 650, color: "var(--ink)" }}>{formatDate(d.dateStr)}</div>
+                        <div style={{ fontSize: "0.92rem", fontWeight: 750, color: "var(--accent-teal)", marginTop: 2 }}>
                           {formatMoney(d.spent, overview.currency)}
                         </div>
                         {d.count > 0 && (
@@ -630,10 +654,10 @@ export default function OverviewPage() {
                       style={{
                         width: "100%",
                         height: hasSpend ? `${Math.max(4, heightPct)}%` : "0%",
-                        background: isHovered ? "var(--ink)" : "var(--accent)",
+                        backgroundColor: isHovered ? "var(--ink)" : "var(--accent-teal)",
                         borderRadius: "2px 2px 0 0",
-                        opacity: hasSpend ? (isHovered ? 1 : 0.8) : 0.15,
-                        transition: "height 0.2s ease, opacity 0.15s ease, background 0.15s ease",
+                        opacity: hasSpend ? (isHovered ? 1 : 0.85) : 0.15,
+                        transition: "height 0.2s ease, opacity 0.15s ease, background-color 0.15s ease",
                       }}
                     />
                   </div>
@@ -643,7 +667,17 @@ export default function OverviewPage() {
           </div>
 
           {/* X Axis Timeline Labels */}
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem", color: "var(--ink-muted)", paddingTop: "6px", marginLeft: "52px" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: "0.72rem",
+              color: "var(--ink-muted)",
+              paddingTop: "8px",
+              marginLeft: "56px",
+              userSelect: "none",
+            }}
+          >
             <span>Day 1</span>
             <span>Day 7</span>
             <span>Day 14</span>
@@ -651,45 +685,50 @@ export default function OverviewPage() {
             <span>Day 28</span>
             <span>Day {daysInMonth}</span>
           </div>
-        </section>
+        </SurfaceCard>
       </div>
 
-      {/* Month-over-Month Comparison Strip ("VS LAST MONTH") with Deep Context */}
-      <section className="section" style={{ marginBottom: "28px" }}>
-        <h2 style={{ marginBottom: "14px" }}>VS LAST MONTH</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "16px" }}>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ZONE 4: MONTH-OVER-MONTH COMPARISON STRIP                     */}
+      {/* ───────────────────────────────────────────────────────────── */}
+
+      <SurfaceCard variant="standard" padding="md" style={{ marginBottom: "24px" }}>
+        <h2 style={{ margin: "0 0 16px 0", fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>
+          Month-Over-Month Comparison
+        </h2>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "20px" }}>
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 650, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>
               Spending Change
             </div>
-            <div style={{ fontSize: "1.08rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "1.1rem", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
               <span className={spendingDiff > 0 ? "metric-delta down" : "metric-delta up"}>
                 {spendingDiff > 0 ? "+" : ""}
                 {formatMoney(spendingDiff, overview.currency)}
               </span>{" "}
-              <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 400 }}>
+              <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 500 }}>
                 ({overview.month_comparison.spent_change_pct != null ? `${overview.month_comparison.spent_change_pct > 0 ? "↑" : "↓"} ${Math.abs(overview.month_comparison.spent_change_pct).toFixed(1)}%` : "—"})
               </span>
             </div>
           </div>
 
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 650, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>
               Income Change
             </div>
-            <div style={{ fontSize: "1.08rem", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ fontSize: "1.1rem", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
               <span className={incomeDiff >= 0 ? "metric-delta up" : "metric-delta down"}>
                 {incomeDiff > 0 ? "+" : ""}
                 {formatMoney(incomeDiff, overview.currency)}
               </span>{" "}
-              <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 400 }}>
+              <span style={{ fontSize: "0.82rem", color: "var(--ink-muted)", fontWeight: 500 }}>
                 ({overview.month_comparison.income_change_pct != null ? `${overview.month_comparison.income_change_pct >= 0 ? "↑" : "↓"} ${Math.abs(overview.month_comparison.income_change_pct).toFixed(1)}%` : "—"})
               </span>
             </div>
           </div>
 
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 650, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>
               Largest Increase
             </div>
             <div style={{ fontSize: "0.92rem" }}>
@@ -699,7 +738,7 @@ export default function OverviewPage() {
                   <span className="metric-delta down" style={{ fontVariantNumeric: "tabular-nums" }}>
                     +{formatMoney(maxInc, overview.currency)}
                   </span>
-                  <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 2 }}>{incContext}</div>
+                  <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2 }}>{incContext}</div>
                 </div>
               ) : (
                 <span style={{ color: "var(--ink-muted)" }}>None</span>
@@ -708,7 +747,7 @@ export default function OverviewPage() {
           </div>
 
           <div>
-            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>
+            <div style={{ color: "var(--ink-muted)", fontSize: "0.76rem", fontWeight: 650, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>
               Largest Decrease
             </div>
             <div style={{ fontSize: "0.92rem" }}>
@@ -718,7 +757,7 @@ export default function OverviewPage() {
                   <span className="metric-delta up" style={{ fontVariantNumeric: "tabular-nums" }}>
                     {formatMoney(maxDec, overview.currency)}
                   </span>
-                  <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 2 }}>{decContext}</div>
+                  <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2 }}>{decContext}</div>
                 </div>
               ) : (
                 <span style={{ color: "var(--ink-muted)" }}>None</span>
@@ -726,16 +765,17 @@ export default function OverviewPage() {
             </div>
           </div>
         </div>
-      </section>
+      </SurfaceCard>
 
       {/* ───────────────────────────────────────────────────────────── */}
-      {/* ZONE 3: OUTFLOW DETAILS (Merchants, Accounts, Largest TXs)     */}
+      {/* ZONE 5: OUTFLOW DETAILS (Top Merchants & Payment Methods)     */}
       {/* ───────────────────────────────────────────────────────────── */}
-      <div className="grid-2" style={{ marginBottom: "28px" }}>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "24px", marginBottom: "24px" }}>
         {/* Top Outflows / Payees */}
-        <section className="section">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
-            <h2 style={{ margin: 0 }}>Top Outflows</h2>
+        <SurfaceCard variant="standard" padding="md">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "14px" }}>
+            <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>Top Outflows</h2>
             <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>Top payees by volume</span>
           </div>
           {overview.top_merchants.length === 0 ? (
@@ -750,8 +790,8 @@ export default function OverviewPage() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    padding: "9px 6px",
-                    borderBottom: "1px solid var(--line)",
+                    padding: "10px 8px",
+                    borderBottom: "1px solid var(--border)",
                     cursor: "pointer",
                     borderRadius: "var(--radius-sm)",
                   }}
@@ -761,26 +801,26 @@ export default function OverviewPage() {
                   }}
                 >
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", paddingRight: "16px" }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.92rem" }}>
+                    <div style={{ fontWeight: 650, fontSize: "0.92rem", color: "var(--ink)" }}>
                       {m.merchant || "Unidentified payee"}
                     </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 1 }}>
+                    <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2 }}>
                       {m.count} {m.count === 1 ? "transaction" : "transactions"}
                     </div>
                   </div>
-                  <div style={{ fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                  <div style={{ fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--ink)" }}>
                     {formatMoney(m.total, overview.currency)}
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </section>
+        </SurfaceCard>
 
-        {/* Payment Methods (Quiet Percentages & Clickable Accounts) */}
-        <section className="section">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
-            <h2 style={{ margin: 0 }}>Payment Methods</h2>
+        {/* Payment Methods */}
+        <SurfaceCard variant="standard" padding="md">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "14px" }}>
+            <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>Payment Methods</h2>
             <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>Distribution of spend</span>
           </div>
           {overview.account_breakdown.length === 0 ? (
@@ -797,8 +837,8 @@ export default function OverviewPage() {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
-                      padding: "9px 6px",
-                      borderBottom: "1px solid var(--line)",
+                      padding: "10px 8px",
+                      borderBottom: "1px solid var(--border)",
                       cursor: "pointer",
                       borderRadius: "var(--radius-sm)",
                     }}
@@ -808,20 +848,20 @@ export default function OverviewPage() {
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ fontWeight: 650, fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "6px" }}>
                         {isUnknown ? (
-                          <span style={{ color: "var(--warn)", fontSize: "0.82rem", fontWeight: 600 }}>
+                          <span style={{ color: "var(--warn)", fontSize: "0.82rem", fontWeight: 650 }}>
                             ⚠ Unknown / Unlinked
                           </span>
                         ) : (
                           <AccountBadge accountName={a.account} logoSize={20} />
                         )}
                       </div>
-                      <div style={{ fontSize: "0.78rem", color: "var(--ink-muted)", marginTop: 1 }}>
+                      <div style={{ fontSize: "0.76rem", color: "var(--ink-muted)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
                         {a.percentage.toFixed(1)}% of spending
                       </div>
                     </div>
-                    <div style={{ fontWeight: 600, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                    <div style={{ fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color: "var(--ink)" }}>
                       {formatMoney(a.total, overview.currency)}
                     </div>
                   </div>
@@ -829,13 +869,16 @@ export default function OverviewPage() {
               })}
             </div>
           )}
-        </section>
+        </SurfaceCard>
       </div>
 
-      {/* Largest Transactions (5 Table Rows + Link to Full List) */}
-      <section className="section" style={{ marginBottom: "28px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
-          <h2 style={{ margin: 0 }}>Largest Transactions</h2>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* ZONE 6: LARGEST TRANSACTIONS                                  */}
+      {/* ───────────────────────────────────────────────────────────── */}
+
+      <SurfaceCard variant="standard" padding="md" style={{ marginBottom: "28px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
+          <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 700, color: "var(--ink)" }}>Largest Transactions</h2>
           <span style={{ fontSize: "0.8rem", color: "var(--ink-muted)" }}>Top individual outflows</span>
         </div>
         {overview.largest_transactions.length > 0 ? (
@@ -862,12 +905,12 @@ export default function OverviewPage() {
                       }}
                     >
                       <td className="tx-date">{formatDate(t.date)}</td>
-                      <td style={{ fontWeight: 600 }}>{t.merchant || "Unidentified merchant"}</td>
+                      <td style={{ fontWeight: 650 }}>{t.merchant || "Unidentified merchant"}</td>
                       <td>
                         <span className="badge">{t.category || "Uncategorized"}</span>
                       </td>
                       <td style={{ color: "var(--ink-muted)" }}>{t.account || "—"}</td>
-                      <td className="tx-amount num debit">
+                      <td className="tx-amount num debit" style={{ fontWeight: 700 }}>
                         −{formatMoney(t.amount, overview.currency)}
                       </td>
                     </tr>
@@ -894,7 +937,7 @@ export default function OverviewPage() {
                     </div>
                     <div className="tx-card-amount debit">−{formatMoney(t.amount, overview.currency)}</div>
                   </div>
-                  <div className="tx-card-footer" style={{ borderTop: "1px solid var(--line)", paddingTop: 8 }}>
+                  <div className="tx-card-footer" style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <span className="badge">{t.category || "Uncategorized"}</span>
                       {t.account && <span className="tx-card-tag">{t.account}</span>}
@@ -906,10 +949,10 @@ export default function OverviewPage() {
             </div>
 
             {/* Bottom View All Link */}
-            <div style={{ marginTop: "14px", textAlign: "right" }}>
+            <div style={{ marginTop: "16px", textAlign: "right" }}>
               <Link
                 to={`/transactions?date_from=${monthParamFrom}&date_to=${monthParamTo}`}
-                style={{ color: "var(--accent)", textDecoration: "none", fontSize: "0.85rem", fontWeight: 600 }}
+                style={{ color: "var(--accent)", textDecoration: "none", fontSize: "0.86rem", fontWeight: 650 }}
               >
                 View all {overview.summary.transaction_count} transactions →
               </Link>
@@ -918,9 +961,9 @@ export default function OverviewPage() {
         ) : (
           <p className="empty">No transactions recorded for this month.</p>
         )}
-      </section>
+      </SurfaceCard>
 
-      {/* Financial Trend Modal (Spent, Income, Net Cash Flow) */}
+      {/* Financial Trend Modal */}
       <FinancialTrendModal
         open={trendModalOpen}
         loading={trendsLoading}
