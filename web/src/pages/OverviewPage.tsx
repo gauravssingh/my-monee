@@ -23,7 +23,7 @@ function getHumanSummary(overview: Overview, date: { year: number; month: number
   }
 
   const consumerSpent = overview.summary.consumer_spent != null ? overview.summary.consumer_spent : overview.summary.spent;
-  const commitmentsSpent = overview.summary.commitments_spent || 0;
+  const commitmentsSpent = overview.summary.commitments_spent ?? 0;
 
   let compositionText = "";
   if (commitmentsSpent > 0 && consumerSpent > 0) {
