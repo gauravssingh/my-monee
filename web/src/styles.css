@@ -5440,3 +5440,342 @@ textarea.input {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+
+/* --------------------------------------------------------------------------
+   MyMonee product-wide visual system — legacy page component alignment
+   Keeps existing page behavior and markup while bringing every workspace
+   surface into the warm, full-width design language.
+   -------------------------------------------------------------------------- */
+
+.app-main,
+.app-content,
+.main-content {
+  min-width: 0;
+}
+
+.app-main > main,
+.app-content > main {
+  width: 100%;
+  min-width: 0;
+}
+
+.page-header,
+.category-analytics-header,
+.settings-page-header {
+  margin-bottom: 28px;
+}
+
+.page-title,
+.page-header h1,
+.category-analytics-header h1,
+.settings-page-wrapper h1 {
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 2vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+}
+
+.page-subtitle,
+.page-header p {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.panel,
+.section,
+.panel.section,
+.category-metric-card,
+.category-insight-card,
+.category-trend-panel,
+.category-subcats-panel,
+.category-merchants-panel {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.panel,
+.section,
+.panel.section {
+  padding: clamp(18px, 1.5vw, 26px);
+}
+
+.metrics,
+.category-metrics-grid {
+  gap: 14px;
+}
+
+.metric,
+.panel.metric,
+.category-metric-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: none;
+  padding: 20px;
+}
+
+.metric-label,
+.category-metric-label {
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.metric-value,
+.category-metric-value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+
+.metric-hint,
+.category-metric-hint {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+input,
+select,
+textarea,
+.input {
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.input:focus {
+  outline: 2px solid color-mix(in srgb, var(--focus-ring) 28%, transparent);
+  outline-offset: 1px;
+  border-color: var(--focus-ring);
+}
+
+.btn,
+button.btn {
+  border-radius: 10px;
+  font-weight: 600;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.btn.primary,
+button.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn.quiet,
+button.btn.quiet {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink-secondary);
+}
+
+.btn:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.table-wrap,
+.section.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.tx-table-desktop {
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 760px;
+  width: 100%;
+}
+
+.tx-table-desktop thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 12px 14px;
+  color: var(--ink-muted);
+  background: var(--surface-subtle);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.tx-table-desktop tbody td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-secondary);
+  vertical-align: middle;
+}
+
+.tx-table-desktop tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tx-table-desktop tbody tr:hover {
+  background: var(--surface-subtle);
+}
+
+.num,
+.tx-amount,
+.metric-value,
+.category-metric-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+
+.empty {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink-muted);
+  padding: 36px 24px;
+}
+
+.error {
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--danger-soft);
+  color: var(--danger);
+  padding: 14px 16px;
+}
+
+.modal-backdrop {
+  background: rgba(18, 18, 18, 0.42);
+  backdrop-filter: blur(5px);
+}
+
+.modal-panel {
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--border);
+}
+
+.sticky-filters {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.category-analytics-page {
+  width: 100%;
+  max-width: none;
+}
+
+.category-metrics-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.category-intelligence-section {
+  margin-top: 28px;
+}
+
+.category-section-title,
+.category-panel-title,
+.category-trend-title {
+  color: var(--ink);
+  letter-spacing: -0.025em;
+}
+
+.category-trend-panel,
+.category-subcats-panel,
+.category-merchants-panel {
+  padding: 22px;
+}
+
+.settings-page-wrapper {
+  width: 100%;
+  max-width: none;
+}
+
+.settings-content-area {
+  min-width: 0;
+  border-radius: var(--radius-card);
+}
+
+.tx-cards-mobile .tx-card,
+.tx-cards-mobile .tx-card-header {
+  border-color: var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+}
+
+@media (min-width: 1600px) {
+  .category-metrics-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .category-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .panel,
+  .section,
+  .panel.section,
+  .category-trend-panel,
+  .category-subcats-panel,
+  .category-merchants-panel {
+    padding: 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .category-metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .metric,
+  .panel.metric,
+  .category-metric-card {
+    padding: 14px;
+  }
+
+  .table-wrap,
+  .section.table-wrap {
+    border-radius: var(--radius-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  button.btn,
+  .category-view-toggle .btn {
+    transition: none;
+  }
+}
