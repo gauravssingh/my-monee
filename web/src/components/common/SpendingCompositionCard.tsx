@@ -20,6 +20,7 @@ export interface SpendingCompositionBreakdown {
   allocatedSum: number;
   effectiveTotal: number;
   unallocatedAmount: number;
+  overallocatedAmount: number;
   consumerPct: number;
   commitmentsPct: number;
   unallocatedPct: number;
@@ -43,6 +44,7 @@ export function computeSpendingComposition(
   const allocatedSum = safeConsumer + safeCommitments;
   const effectiveTotal = Math.max(safeTotal, allocatedSum);
   const unallocatedAmount = safeTotal > allocatedSum ? safeTotal - allocatedSum : 0;
+  const overallocatedAmount = allocatedSum > safeTotal ? allocatedSum - safeTotal : 0;
 
   // Proportions
   const consumerPct = effectiveTotal > 0 ? (safeConsumer / effectiveTotal) * 100 : 0;
@@ -55,7 +57,7 @@ export function computeSpendingComposition(
   const commitmentsBarWidth = Math.min(100, Math.max(0, commitmentsPct));
   const unallocatedBarWidth = Math.min(100, Math.max(0, unallocatedPct));
 
-  const accessibleCompositionLabel = `Spending composition: ${consumerPct.toFixed(1)}% consumer and living spending, ${commitmentsPct.toFixed(1)}% financial commitments and loans${unallocatedPct > 0.01 ? `, ${unallocatedPct.toFixed(1)}% other outflows` : ""}`;
+  const accessibleCompositionLabel = `Spending composition: ${consumerPct.toFixed(1)}% consumer and living spending, ${commitmentsPct.toFixed(1)}% financial commitments and loans${unallocatedPct > 0.01 ? `, ${unallocatedPct.toFixed(1)}% other outflows` : ""}${overallocatedAmount > 0.01 ? ". Breakdown exceeds reported total; figures need reconciliation" : ""}`;
 
   return {
     safeTotal,
@@ -64,6 +66,7 @@ export function computeSpendingComposition(
     allocatedSum,
     effectiveTotal,
     unallocatedAmount,
+    overallocatedAmount,
     consumerPct,
     commitmentsPct,
     unallocatedPct,
@@ -91,6 +94,7 @@ export default function SpendingCompositionCard({
     safeCommitments,
     effectiveTotal,
     unallocatedAmount,
+    overallocatedAmount,
     consumerPct,
     commitmentsPct,
     unallocatedPct,
@@ -207,6 +211,13 @@ export default function SpendingCompositionCard({
             />
           )}
         </div>
+      )}
+
+      {overallocatedAmount > 0.01 && (
+        <p className="spending-composition-warning" role="alert">
+          Breakdown exceeds reported outflows by {formatMoney(overallocatedAmount, currency)}.
+          The category figures do not reconcile to the total.
+        </p>
       )}
 
       {/* Breakdown Detail Rows */}
