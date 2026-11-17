@@ -214,8 +214,8 @@ export default function OverviewPage() {
   const livingTotal = livingCategories.reduce((acc, c) => acc + c.total, 0);
   const commitmentTotal = commitmentCategories.reduce((acc, c) => acc + c.total, 0);
 
-  const resolvedConsumerSpent = overview.summary.consumer_spent != null ? overview.summary.consumer_spent : livingTotal;
-  const resolvedCommitmentsSpent = overview.summary.commitments_spent || commitmentTotal;
+  const resolvedConsumerSpent = overview.summary.consumer_spent ?? livingTotal;
+  const resolvedCommitmentsSpent = overview.summary.commitments_spent ?? commitmentTotal;
 
   function renderCategoryList(cats: Overview["category_breakdown"], totalSum: number, isLivingGroup = false) {
     if (cats.length === 0) {
@@ -353,15 +353,6 @@ export default function OverviewPage() {
         </div>
       )}
 
-      {/* Ledger Intelligence & Signals */}
-      <div style={{ marginBottom: "24px" }}>
-        <LedgerIntelligencePanel
-          onTransactionClick={(txId) => {
-            navigate(`/transactions?search=${encodeURIComponent(txId)}`);
-          }}
-        />
-      </div>
-
       {/* ───────────────────────────────────────────────────────────── */}
       {/* ZONE 2: PRIMARY HERO GRID (Spending Card + Flow Stack)        */}
       {/* ───────────────────────────────────────────────────────────── */}
@@ -453,6 +444,15 @@ export default function OverviewPage() {
             </div>
           </SurfaceCard>
         </div>
+      </div>
+
+      {/* Ledger Intelligence & Signals */}
+      <div style={{ marginBottom: "24px" }}>
+        <LedgerIntelligencePanel
+          onTransactionClick={(txId) => {
+            navigate(`/transactions?search=${encodeURIComponent(txId)}`);
+          }}
+        />
       </div>
 
       {/* ───────────────────────────────────────────────────────────── */}

@@ -276,6 +276,8 @@ textarea {
   background-color: var(--canvas);
   color: var(--ink);
   width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* Desktop Persistent Navigation Rail */
@@ -584,6 +586,9 @@ textarea {
 }
 
 .spending-card-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--ink-muted);
@@ -609,15 +614,18 @@ textarea {
 .spending-card-trend-btn {
   background: var(--surface-subtle);
   border: 1px solid var(--border);
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
+  border-radius: var(--radius-pill);
+  padding: 3px 9px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
   color: var(--ink-muted);
   cursor: pointer;
   transition: all 0.15s ease;
+  width: auto;
+  height: auto;
 }
 
 .spending-card-trend-btn:hover {
@@ -688,6 +696,10 @@ textarea {
   background-color: var(--accent-orange);
 }
 
+.spending-track-segment.neutral {
+  background-color: var(--border-strong);
+}
+
 /* Breakdown Rows */
 .spending-breakdown-rows {
   display: flex;
@@ -736,6 +748,10 @@ textarea {
   background-color: var(--accent-orange);
 }
 
+.spending-row-dot.neutral {
+  background-color: var(--ink-muted);
+}
+
 .spending-row-text {
   display: flex;
   flex-direction: column;
@@ -781,6 +797,19 @@ textarea {
   background-color: var(--accent-orange);
 }
 
+.spending-row-bar-fill.neutral {
+  background-color: var(--border-strong);
+}
+
+:root[data-theme="dark"] .spending-track-segment.neutral,
+:root[data-theme="dark"] .spending-row-bar-fill.neutral {
+  background-color: #555E6C;
+}
+
+:root[data-theme="dark"] .spending-row-dot.neutral {
+  background-color: #94A3B8;
+}
+
 .spending-row-value-group {
   display: flex;
   align-items: baseline;
@@ -811,6 +840,13 @@ textarea {
 
 .overview-page {
   width: 100%;
+  container-type: inline-size;
+  container-name: overview;
+}
+
+.spending-composition-card {
+  container-type: inline-size;
+  container-name: spending-card;
 }
 
 .overview-top-row {
@@ -820,6 +856,29 @@ textarea {
   gap: 20px;
   margin-bottom: 20px;
   flex-wrap: wrap;
+}
+
+.overview-month-strip-wrap {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .overview-top-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .overview-month-strip-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .overview-month-strip-wrap .month-strip-container,
+  .overview-month-strip-wrap .month-strip-main {
+    width: 100%;
+    max-width: 100%;
+  }
 }
 
 .overview-title-area {
@@ -958,6 +1017,52 @@ textarea {
   }
   .overview-analytical-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@container overview (max-width: 980px) {
+  .overview-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .overview-analytical-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}
+
+@container overview (min-width: 580px) and (max-width: 980px) {
+  .overview-flow-stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .overview-flow-stack > .surface-card-subtle {
+    grid-column: 1 / -1;
+  }
+}
+
+@container spending-card (max-width: 580px) {
+  .spending-breakdown-row {
+    grid-template-columns: 1fr auto;
+    row-gap: 8px;
+  }
+  .spending-row-bar-wrap {
+    grid-column: 1 / -1;
+    order: 3;
+    width: 100%;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1280px) {
+  .app-sidebar {
+    width: 220px;
+  }
+  .app-main-viewport {
+    width: calc(100% - 220px);
+  }
+  .app-main-content {
+    padding: 24px 28px 48px;
   }
 }
 
@@ -3695,20 +3800,35 @@ textarea.input {
     animation: rise 0.15s ease both;
   }
 
+  @keyframes drawerSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
   .mobile-drawer {
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
     width: min(300px, 85vw);
     background: var(--surface);
-    border-left: 1px solid var(--line);
+    border-left: 1px solid var(--border);
     z-index: 1001;
     display: flex;
     flex-direction: column;
-    padding: calc(20px + var(--sat)) 20px calc(24px + var(--sab));
+    padding: calc(16px + var(--sat)) 16px calc(20px + var(--sab));
     box-shadow: -8px 0 32px rgba(0, 0, 0, 0.16);
-    animation: rise 0.2s ease both;
+    box-sizing: border-box;
+    animation: drawerSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .mobile-drawer-header {
@@ -3769,6 +3889,34 @@ textarea.input {
   .mobile-drawer-sublink.active {
     color: var(--accent) !important;
     font-weight: 600 !important;
+  }
+
+  .mobile-drawer-footer {
+    padding-top: 14px;
+    margin-top: 8px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .mobile-drawer-lock-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 14px;
+    background: transparent;
+    border: 1px solid var(--danger-border, rgba(239, 68, 68, 0.25));
+    border-radius: var(--radius-sm);
+    color: var(--danger);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .mobile-drawer-lock-btn:hover {
+    background: var(--danger-soft, rgba(239, 68, 68, 0.08));
+    border-color: var(--danger);
   }
 
   .mobile-recurring-tabs {
