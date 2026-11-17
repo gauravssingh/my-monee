@@ -5779,3 +5779,14 @@ a:focus-visible {
     transition: none;
   }
 }
+
+.spending-composition-warning {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 34%, var(--border));
+  border-radius: 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
